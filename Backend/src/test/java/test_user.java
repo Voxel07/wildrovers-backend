@@ -39,16 +39,17 @@ public class test_user {
     }
 
     public User GetUser(Long id, String username) {
+        System.out.println("ID:" + id + " Username: " + username);
         if (id != 0 && username == "") {
             Response resp = given().queryParam("userId", id).contentType(MediaType.APPLICATION_JSON).when()
                     .get("/user");
             resp.then().statusCode(200);
-            return resp.body().as(User.class);
+            return Arrays.asList(resp.getBody().as(User[].class)).get(0);
         } else {
             Response resp = given().queryParam("username", username).contentType(MediaType.APPLICATION_JSON).when()
                     .get("/user");
             resp.then().statusCode(200);
-            return resp.body().as(User.class);
+            return Arrays.asList(resp.getBody().as(User[].class)).get(0);
         }
 
     }
@@ -61,6 +62,7 @@ public class test_user {
         Assertions.assertEquals(javaObj.getActive(), ausDB.getActive());
         Assertions.assertEquals(javaObj.getRole(), ausDB.getRole());
         Assertions.assertEquals(javaObj.getPassword(), ausDB.getPassword());
+        System.out.println("Setting ID:" + ausDB.getId() + " toUsername: " + javaObj.getUserName());
         javaObj.setId(ausDB.getId());
     }
 
@@ -101,8 +103,8 @@ public class test_user {
     void TestGetUsers() {
         List<User> aktUserInDB = GetUsers();
         Assertions.assertEquals(2, aktUserInDB.size());
-        CheckUserValues(aktUserInDB.get(0), userA);
-        CheckUserValues(aktUserInDB.get(1), userB);
+        CheckUserValues(userA, aktUserInDB.get(0));
+        CheckUserValues(userB, aktUserInDB.get(1));
     }
 
     @Test
