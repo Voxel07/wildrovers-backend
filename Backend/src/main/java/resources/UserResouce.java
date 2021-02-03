@@ -46,15 +46,14 @@ public class UserResouce {
         }
     }
 
-    // @PUT
-    // @Path("{companyId}")
-    // @Produces(MediaType.APPLICATION_JSON)
-    // @Consumes(MediaType.APPLICATION_JSON)
-    // public String updateUser(User usr,@PathParam("companyId") Long companyId) 
-    // { 	
-    // 	System.out.println("UserResource/updateUser");
-    //     return userOrm.updateUser(usr,companyId);
-    // }
+    @PUT
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public String updateUser(User user) 
+    { 	
+    	System.out.println("UserResource/updateUser");
+        return userOrm.updateUser(user);
+    }
 
     @POST
     @Produces(MediaType.APPLICATION_JSON)

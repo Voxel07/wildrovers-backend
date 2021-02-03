@@ -62,8 +62,10 @@ public class test_user {
         Assertions.assertEquals(javaObj.getActive(), ausDB.getActive());
         Assertions.assertEquals(javaObj.getRole(), ausDB.getRole());
         Assertions.assertEquals(javaObj.getPassword(), ausDB.getPassword());
-        System.out.println("Setting ID:" + ausDB.getId() + " toUsername: " + javaObj.getUserName());
-        javaObj.setId(ausDB.getId());
+        if (javaObj.getId() == null) {
+            System.out.println("Setting ID:" + ausDB.getId() + " toUsername: " + javaObj.getUserName());
+            javaObj.setId(ausDB.getId());
+        }
     }
 
     public void CheckUserAddress(User u, Address a) {
@@ -113,5 +115,78 @@ public class test_user {
         CheckUserValues(userA, GetUser(userA.getId(), ""));
         CheckUserValues(userA, GetUser(0L, userA.getUserName()));
     }
+
+    @Test
+    @Order(6)
+    void TestUpdateUser() {
+        userA.setFirstName("newFirstName");
+        given().contentType(MediaType.APPLICATION_JSON).body(userA).when().put("/user").then().statusCode(200)
+                .body(is("User erfolgreich aktualisiert"));
+        userA.setUserName("newUserName");
+        given().contentType(MediaType.APPLICATION_JSON).body(userA).when().put("/user").then().statusCode(200)
+                .body(is("User erfolgreich aktualisiert"));
+        userA.setEmail("newEmail");
+        given().contentType(MediaType.APPLICATION_JSON).body(userA).when().put("/user").then().statusCode(200)
+                .body(is("User erfolgreich aktualisiert"));
+
+    }
+
+    @Test
+    @Order(7)
+    void TestUpdateUser2() {
+        userA.setUserName("newUserName2");
+        userA.setEmail("newEmail2");
+        given().contentType(MediaType.APPLICATION_JSON).body(userA).when().put("/user").then().statusCode(200)
+                .body(is("User erfolgreich aktualisiert"));
+    }
+
+    @Test
+    @Order(8)
+    void TestinvalideUpdate1() {
+        userB.setUserName("newUserName2");
+        userB.setEmail("newEmail2");
+        given().contentType(MediaType.APPLICATION_JSON).body(userB).when().put("/user").then().statusCode(200)
+                .body(is("Email und UserName bereits vergeben"));
+    }
+    @Test
+    @Order(9)   
+    void TestinvalideUpdate2() {
+        userB.setUserName("newUserName2");
+        userB.setEmail("newEmail345");
+        given().contentType(MediaType.APPLICATION_JSON).body(userB).when().put("/user").then().statusCode(200)
+                .body(is("Username bereits vergeben"));
+    }
+
+    @Test
+    @Order(10)   
+    void TestinvalideUpdate3() {
+        userB.setUserName("newUserName2456456");
+        userB.setEmail("newEmail2");
+        given().contentType(MediaType.APPLICATION_JSON).body(userB).when().put("/user").then().statusCode(200)
+                .body(is("Email bereits vergeben"));
+
+    }
+
+    // @Test
+    // @Order(8)
+    // void TestAddAddress() {
+
+    // }
+
+    // @Test
+    // @Order(9)
+    // void TestUpdateAddress() {
+
+    // }
+
+    // @Test
+    // @Order(10)
+    // void TestAddPhone() {
+    // }
+
+    // @Test
+    // @Order(11)
+    // void TestUpdatePhone() {
+    // }
 
 }
