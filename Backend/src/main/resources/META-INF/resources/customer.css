@@ -1,0 +1,66 @@
+.grid-container {
+    display: grid;
+    grid-template-columns: 0.4fr 2.7fr;
+    grid-template-rows: 0.2fr 1.8fr;
+    gap: 0px 0px;
+    grid-template-areas:
+      ". ."
+      "Menue Page-Content-Customer";
+  }
+  
+  .Menue {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr 1fr 1fr 1fr 1fr;
+    gap: 0px 0px;
+    grid-template-areas:
+      "."
+      "Btn-Customer"
+      "Btn-Contract"
+      "Btn-User"
+      "."
+      ".";
+    grid-area: Menue;
+  }
+  
+  .Btn-Customer { grid-area: Btn-Customer; }
+  
+  .Btn-Contract { grid-area: Btn-Contract; }
+  
+  .Btn-User { grid-area: Btn-User; }
+  
+  .Page-Content-Customer {
+    display: grid;
+    grid-template-columns: 1.5fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 0px 0px;
+    grid-template-areas:
+      "Customer-Details"
+      ".";
+    grid-area: Page-Content-Customer;
+  }
+  
+  .Customer-Details {
+    display: grid;
+    grid-template-columns: 1.5fr 1.5fr 1.5fr 0.5fr 0.5fr 0.7fr 0.7fr;
+    grid-template-rows: 1fr;
+    gap: 0px 0px;
+    grid-template-areas:
+      "Customer-Name Customer-Address-A Customer-Address-B Customer-Eddit Customer-Delete Customer-Contracts Customer-Users";
+    grid-area: Customer-Details;
+  }
+  
+  .Customer-Name { grid-area: Customer-Name; }
+  
+  .Customer-Address-A { grid-area: Customer-Address-A; }
+  
+  .Customer-Address-B { grid-area: Customer-Address-B; }
+  
+  .Customer-Eddit { grid-area: Customer-Eddit; }
+  
+  .Customer-Delete { grid-area: Customer-Delete; }
+  
+  .Customer-Contracts { grid-area: Customer-Contracts; }
+  
+  .Customer-Users { grid-area: Customer-Users; }
+  

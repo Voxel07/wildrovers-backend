@@ -1,0 +1,66 @@
+body {
+    background-color: #0D1117;
+    display: flex;
+    justify-content: center;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    /* background-image:url("../../images/Logo.png"); */
+}
+
+.Form-Container {
+     background-color: whitesmoke;
+    margin-top: 25px;
+    border: solid 3px #ee942e;
+    border-radius: 15px;
+}
+
+.Form {
+   
+    border-radius: 10px;
+    box-shadow: rgba(#558cdf, 50) 10px 10px;
+    display: flex;
+    flex-flow: column;
+    align-items: center;
+}
+
+.Form-Field-TextField{
+    margin-top: 10px;
+    color: whitesmoke;
+}
+
+.Form-Header{
+    color: white;
+    display: flex;
+    flex-flow: column;
+    width: 350px;
+}
+
+.Form-Header-Titel{
+    margin-top: 25px;
+    /* background-color: wheat; */
+    display: flex;
+    flex-grow: 1;
+}
+
+.Form-Header-Titel-Emblem{
+    /* background-image: url("../../images/Logo_hell.png"); */
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+    width: 100px;
+    height: 75px;
+}
+.Form-Header-Titel-Text{
+    /* background-image: url("../../images/Schrift.png"); */
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+    width: 350px;
+}
+.Form-Header-SubTitle{
+    /* background-color: red; */
+    margin-top: 50px;
+    margin-bottom: 50px;
+    text-align: center;
+}
