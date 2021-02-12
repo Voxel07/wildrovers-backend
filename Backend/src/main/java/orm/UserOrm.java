@@ -7,7 +7,7 @@ import javax.persistence.EntityManager;
 import javax.persistence.TypedQuery;
 import javax.transaction.Transactional;
 
-import model.*;
+import model.User;
 
 @ApplicationScoped
 public class UserOrm {
@@ -102,4 +102,6 @@ public class UserOrm {
         }
         return errorMSG;
     }
+
+
 }

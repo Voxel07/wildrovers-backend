@@ -1,8 +1,15 @@
 package resources;
-import java.util.List;
 
+//Datentypen
+import java.util.List;
+//Quarkus zeug
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
+import javax.swing.text.AttributeSet.ColorAttribute;
+
+//Logging zeug
+import org.jboss.logging.Logger;
+//HTTP Requests
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
@@ -13,54 +20,60 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
-import model.*;
-import orm.*;
+//Eigene Imports
+import model.User;
+import orm.UserOrm;
 import javax.ws.rs.QueryParam;
 
 @Path("/user")
 public class UserResouce {
+    private static final Logger LOG = Logger.getLogger(UserResouce.class);
     @ApplicationScoped
     @Inject
     UserOrm userOrm;
 
-
-@GET
+    @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public List<User> getUser(	@QueryParam("userId") Long userId,			
-                                @QueryParam("username") String userName)
+    public List<User> getUser(@QueryParam("userId") Long userId, @QueryParam("username") String userName)
 
-    {   
-    	System.out.println("UserResource/getUser");
-        if(userId != null){
-        	System.out.println("getUserById");
-          return userOrm.getUserById(userId);
-        } 
-        else if(userName!=null){
-        	System.out.println("getUserByUsername");
+    {
+        LOG.info("UserResource/getUser");
+        if (userId != null) {
+            LOG.info("getUserById");
+            return userOrm.getUserById(userId);
+        } else if (userName != null) {
+            LOG.info("getUserByUsername");
             return userOrm.getUserByUsername(userName);
-        }
-        else{  
-        	System.out.println("getUsers");
-            return  userOrm.getUsers();
+        } else {
+            LOG.info("getUsers");
+            return userOrm.getUsers();
         }
     }
 
     @PUT
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String updateUser(User user) 
-    { 	
-    	System.out.println("UserResource/updateUser");
+    public String updateUser(User user) {
+        LOG.info("UserResource/updateUser");
         return userOrm.updateUser(user);
     }
 
     @POST
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String addUser(User usr) 
-    {
-    	System.out.println("UserResource/addUser");
+    public String addUser(User usr) {
+        LOG.info("UserResource/addUser");
         return userOrm.addUser(usr);
     }
+
+    @DELETE
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public String deleteUser(User usr) {
+        LOG.info("UserResource/deleteUser");
+        // return userOrm.addUser(usr);
+        return "testingdelete";
+    }
+
 }

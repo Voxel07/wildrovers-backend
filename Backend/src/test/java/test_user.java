@@ -10,7 +10,9 @@ import static org.hamcrest.CoreMatchers.is;
 
 import javax.inject.Inject;
 import javax.ws.rs.core.MediaType;
-import model.*;
+import model.User;
+import model.Address;
+import model.Phone;
 
 import java.util.Arrays;
 import java.util.List;
@@ -22,6 +24,7 @@ public class test_user {
     private static User userA = new User("voxel@web.de", "Camo", "123", "Matthias", "Schnedier", "Vorstand", true);
     private static User userB = new User("matze.schneider95@web.de", "Voxel", "123", "Ralf", "Müller", "Mitglied",
             false);
+    private static Address addA = new Address("Limburgweg","Nottingen",73274L,25L,"");
 
     public void AddUser(User u, String answer) {
         given().contentType(MediaType.APPLICATION_JSON).body(u).when().post("/user").then().statusCode(200)
@@ -167,17 +170,21 @@ public class test_user {
 
     }
 
-    // @Test
-    // @Order(8)
-    // void TestAddAddress() {
+    @Test
+    @Order(11)
+    void TestAddAddress() {
+        userA.setAddress(addA);
+        CheckUserAddress(GetUser(0L, userA.getUserName()),addA);
+    }
 
-    // }
-
-    // @Test
-    // @Order(9)
-    // void TestUpdateAddress() {
-
-    // }
+    @Test
+    @Order(12)
+    void TestUpdateAddress() {
+        addA.setPostalcode(12345L);
+        addA.setStreet("TestingRoad");
+        userA.setAddress(addA);
+        CheckUserAddress(GetUser(0L, userA.getUserName()),addA);
+    }
 
     // @Test
     // @Order(10)

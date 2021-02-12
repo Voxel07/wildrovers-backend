@@ -68,8 +68,7 @@ public class Phone{
         this.type = name;
     }
     
-   //Ab hier zusammenhang mit der Phone Klasse
-   @JsonbTransient
+    @JsonbTransient
     public User getUsr() {
 		return usr;
 	}

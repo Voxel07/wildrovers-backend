@@ -17,9 +17,6 @@ public class Address {
 
     @Column(name = "id", unique = true)
     private Long id;
-
-    @OneToOne(mappedBy = "address")
-    private User user;
     
     @Column(name = "Street")
     private String street;
@@ -35,6 +32,9 @@ public class Address {
 
     @Column(name = "AddressSupplements")
     private String addressSupplements;
+
+    @OneToOne(mappedBy = "address")
+    private User user;
 
     public Long getId() {
         return id;
@@ -95,9 +95,8 @@ public class Address {
 
     }
 
-    public Address(User user, String street, String state, Long postalcode, Long streetNumber,
+    public Address(String street, String state, Long postalcode, Long streetNumber,
             String addressSupplements) {
-        this.user = user;
         this.street = street;
         this.state = state;
         this.postalcode = postalcode;
