@@ -2,7 +2,7 @@ package model;
 
 import java.util.ArrayList;
 import java.util.List;
-
+import java.time.LocalDate;
 import javax.json.bind.annotation.JsonbTransient;
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
@@ -48,6 +48,12 @@ public class User {
 
     @Column(name = "isActive")
     private boolean isActive;
+
+    @Column(name = "lastLogin")
+    private LocalDate lastLogin;
+
+    @Column(name = "regestrationDate")
+    private LocalDate regDate;
 
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "address_id", referencedColumnName = "id")
@@ -164,6 +170,22 @@ public class User {
 
     public void setActive(boolean isActive) {
         this.isActive = isActive;
+    }
+
+    public LocalDate getLastLogin() {
+        return lastLogin;
+    }
+
+    public void setLastLogin(LocalDate lastLogin) {
+        this.lastLogin = lastLogin;
+    }
+
+    public LocalDate getRegDate() {
+        return regDate;
+    }
+
+    public void setRegDate(LocalDate regDate) {
+        this.regDate = regDate;
     }
 
   

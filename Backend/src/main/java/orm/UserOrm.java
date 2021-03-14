@@ -9,6 +9,7 @@ import javax.transaction.Transactional;
 
 import model.User;
 
+import java.time.LocalDate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -49,6 +50,8 @@ public class UserOrm {
         if (!query.getResultList().isEmpty()) {
             return "Nutzer bereits bekannt";
         }
+
+        usr.setRegDate(LocalDate.now());
 
         // Nutzer einfügen
         try {
@@ -117,6 +120,23 @@ public class UserOrm {
             }
         }
         return errorMSG;
+    }
+
+    @Transactional
+    public String loginUser(User usr) {
+
+        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.username = :val", User.class);
+        query.setParameter("val", usr.getUserName());
+        // Falls kein User mit dem namen gefunden wurde
+        if (query.getResultList().isEmpty()) {
+            return "Kein nutzer mit diesen Namen gefunden";
+        }
+        if (query.getSingleResult().getPassword().equals(usr.getPassword())) {
+            return "true";
+        } else {
+            return "Passwort passt nicht";
+        }
+
     }
 
 }
