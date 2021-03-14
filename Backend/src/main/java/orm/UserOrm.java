@@ -9,6 +9,9 @@ import javax.transaction.Transactional;
 
 import model.User;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 @ApplicationScoped
 public class UserOrm {
     @Inject
@@ -36,6 +39,9 @@ public class UserOrm {
     @Transactional
     public String addUser(User usr) {
         // Prüfen dass Username und Email einzigartig sind
+        // if (testInputs(usr) == "default") {
+        //     return "da passt was nicht";
+        // } else {
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.username =: val1 OR u.email =: val2",
                 User.class);
         query.setParameter("val1", usr.getUserName());
@@ -48,12 +54,27 @@ public class UserOrm {
         try {
             em.persist(usr);
         } catch (Exception e) {
-            return "" + e;
+            return "Fehler beim Nutzer einfügen" + e;
         }
 
         // Id zurückgeben
         return "" + getUserByUsername(usr.getUserName()).get(0).getId();
     }
+
+    // }
+
+    // public String testInputs(User usr) {
+    //     if (!validateEmail(usr.getEmail())) {
+    //         return "invalid Email";
+    //     }
+    //     return "default";
+    // }
+
+    // public Boolean validateEmail(String email){
+    //     Pattern p = Pattern.compile("/\A[^@]+@([^@\.]+\.)+[^@\.]+\z/");
+    //     Matcher m = p.matcher(email);
+    //     return m.matches();
+    // }
 
     @Transactional
     public String updateUser(User u) {
@@ -65,34 +86,29 @@ public class UserOrm {
         query.setParameter("val2", u.getEmail());
 
         List<User> userAusDB = query.getResultList();
-        //Wenn user zurückgekomen sind
+        // Wenn user zurückgekomen sind
         if (!userAusDB.isEmpty()) {
-            //Alle user durchlaufen 
+            // Alle user durchlaufen
             for (User aktUser : userAusDB) {
-                //Ürüfen ob die ID die gleiche ist. 
-                if (!aktUser.getId().equals(u.getId()) && !error) 
-                {
-                    //Wenn nicht prüfen ob der Name doppelt ist
-                    if(aktUser.getEmail().equals(u.getEmail()) && aktUser.getUserName().equals(u.getUserName())){
+                // Ürüfen ob die ID die gleiche ist.
+                if (!aktUser.getId().equals(u.getId()) && !error) {
+                    // Wenn nicht prüfen ob der Name doppelt ist
+                    if (aktUser.getEmail().equals(u.getEmail()) && aktUser.getUserName().equals(u.getUserName())) {
                         error = true;
                         errorMSG = "Email und UserName bereits vergeben";
-                    }
-                    else if (aktUser.getUserName().equals(u.getUserName())) 
-                    {
+                    } else if (aktUser.getUserName().equals(u.getUserName())) {
                         error = true;
                         errorMSG = "Username bereits vergeben";
-                    } 
-                    //Oder die Email
-                    else if (aktUser.getEmail().equals(u.getEmail())) 
-                    {
+                    }
+                    // Oder die Email
+                    else if (aktUser.getEmail().equals(u.getEmail())) {
                         error = true;
                         errorMSG = "Email bereits vergeben";
                     }
                 }
             }
-        } 
-        if (!error) 
-        {
+        }
+        if (!error) {
             try {
                 em.merge(u);
                 errorMSG = "User erfolgreich aktualisiert";
@@ -102,6 +118,5 @@ public class UserOrm {
         }
         return errorMSG;
     }
-
 
 }
