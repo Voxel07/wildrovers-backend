@@ -32,7 +32,7 @@ public class UserOrm {
     }
 
     public List<User> getUserByUsername(String userName) {
-        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE username =: val", User.class);
+        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE userName =: val", User.class);
         query.setParameter("val", userName);
         return query.getResultList();
     }
@@ -43,7 +43,7 @@ public class UserOrm {
         // if (testInputs(usr) == "default") {
         //     return "da passt was nicht";
         // } else {
-        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.username =: val1 OR u.email =: val2",
+        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val2",
                 User.class);
         query.setParameter("val1", usr.getUserName());
         query.setParameter("val2", usr.getEmail());
@@ -51,7 +51,7 @@ public class UserOrm {
             return "Nutzer bereits bekannt";
         }
 
-        usr.setRegDate(LocalDate.now());
+       // usr.setRegDate(LocalDate.now());
 
         // Nutzer einfügen
         try {
@@ -83,7 +83,7 @@ public class UserOrm {
     public String updateUser(User u) {
         boolean error = false;
         String errorMSG = "";
-        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.username =: val1 OR u.email =: val2",
+        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val2",
                 User.class);
         query.setParameter("val1", u.getUserName());
         query.setParameter("val2", u.getEmail());
@@ -125,8 +125,9 @@ public class UserOrm {
     @Transactional
     public String loginUser(User usr) {
 
-        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.username = :val", User.class);
+        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName = :val OR email = :val2" , User.class);
         query.setParameter("val", usr.getUserName());
+        query.setParameter("val2", usr.getEmail());
         // Falls kein User mit dem namen gefunden wurde
         if (query.getResultList().isEmpty()) {
             return "Kein nutzer mit diesen Namen gefunden";

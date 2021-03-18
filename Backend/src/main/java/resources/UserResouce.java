@@ -12,6 +12,7 @@ import org.jboss.logging.Logger;
 //HTTP Requests
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
+import javax.ws.rs.PATCH;
 import javax.ws.rs.PUT;
 import javax.ws.rs.POST;
 import javax.ws.rs.DELETE;
@@ -57,6 +58,13 @@ public class UserResouce {
     public String updateUser(User user) {
         LOG.info("UserResource/updateUser");
         return userOrm.updateUser(user);
+    }
+    @POST
+    @Path("/login")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public String login(User user){
+        return userOrm.loginUser(user);
     }
 
     @POST

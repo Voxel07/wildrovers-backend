@@ -1,4 +1,4 @@
-package model;
+package model.Forum;
 
 public class ForumAnswers {
     

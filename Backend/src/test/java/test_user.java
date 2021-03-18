@@ -21,7 +21,7 @@ import java.util.List;
 @TestMethodOrder(OrderAnnotation.class)
 public class test_user {
 
-    private static User userA = new User("voxel@web.de", "Camo", "123", "Matthias", "Schnedier", "Vorstand", true);
+    private static User userA = new User("voxel@web.de", "Camo", "123", "Matthias", "Schneider", "Vorstand", true);
     private static User userB = new User("matze.schneider95@web.de", "Voxel", "123", "Ralf", "Müller", "Mitglied",
             false);
     private static Address addA = new Address("Limburgweg","Nottingen",73274L,25L,"");
@@ -49,7 +49,7 @@ public class test_user {
             resp.then().statusCode(200);
             return Arrays.asList(resp.getBody().as(User[].class)).get(0);
         } else {
-            Response resp = given().queryParam("username", username).contentType(MediaType.APPLICATION_JSON).when()
+            Response resp = given().queryParam("userName", username).contentType(MediaType.APPLICATION_JSON).when()
                     .get("/user");
             resp.then().statusCode(200);
             return Arrays.asList(resp.getBody().as(User[].class)).get(0);
@@ -66,7 +66,7 @@ public class test_user {
         Assertions.assertEquals(javaObj.getRole(), ausDB.getRole());
         Assertions.assertEquals(javaObj.getPassword(), ausDB.getPassword());
         if (javaObj.getId() == null) {
-            System.out.println("Setting ID:" + ausDB.getId() + " toUsername: " + javaObj.getUserName());
+            System.out.println("Setting ID:" + ausDB.getId() + " to userName: " + javaObj.getUserName());
             javaObj.setId(ausDB.getId());
         }
     }

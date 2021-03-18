@@ -32,7 +32,7 @@ public class User {
     private String email;
 
     @Column(name = "userName", unique = true)
-    private String username;
+    private String userName;
     
     @Column(name = "password")
     private String password;
@@ -77,9 +77,9 @@ public class User {
 
     }
     
-    public User(String email, String username, String password, String firstName, String lastName, String role, Boolean isActive) {
+    public User(String email, String userName, String password, String firstName, String lastName, String role, Boolean isActive) {
         this.email = email;
-        this.username = username;
+        this.userName = userName;
         this.password = password;
         this.firstName = firstName;
         this.lastName = lastName;
@@ -104,11 +104,11 @@ public class User {
     }
 
     public String getUserName() {
-        return username;
+        return userName;
     }
 
     public void setUserName(String username) {
-        this.username = username;
+        this.userName = username;
     }
 
     public String getPassword() {
