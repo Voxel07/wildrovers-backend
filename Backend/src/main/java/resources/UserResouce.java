@@ -2,6 +2,9 @@ package resources;
 
 //Datentypen
 import java.util.List;
+
+import javax.annotation.security.PermitAll;
+import javax.annotation.security.RolesAllowed;
 //Quarkus zeug
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
@@ -29,6 +32,7 @@ import javax.ws.rs.QueryParam;
 @Path("/user")
 public class UserResouce {
     private static final Logger LOG = Logger.getLogger(UserResouce.class);
+
     @ApplicationScoped
     @Inject
     UserOrm userOrm;
@@ -36,9 +40,7 @@ public class UserResouce {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public List<User> getUser(@QueryParam("userId") Long userId, @QueryParam("username") String userName)
-
-    {
+    public List<User> getUser(@QueryParam("userId") Long userId, @QueryParam("username") String userName){
         LOG.info("UserResource/getUser");
         if (userId != null) {
             LOG.info("getUserById");
@@ -53,14 +55,17 @@ public class UserResouce {
     }
 
     @PUT
+    @RolesAllowed("admin")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public String updateUser(User user) {
         LOG.info("UserResource/updateUser");
         return userOrm.updateUser(user);
     }
+
     @POST
     @Path("/login")
+    @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public String login(User user){
@@ -68,6 +73,7 @@ public class UserResouce {
     }
 
     @POST
+    @RolesAllowed("user")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public String addUser(User usr) {

@@ -26,12 +26,16 @@ public class UserOrm {
     }
 
     public List<User> getUserById(Long userId) {
+        System.out.println("UserOrm/getUserById");
+
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE id =: val", User.class);
         query.setParameter("val", userId);
         return query.getResultList();
     }
 
     public List<User> getUserByUsername(String userName) {
+        System.out.println("UserOrm/getUserByUsername");
+
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE userName =: val", User.class);
         query.setParameter("val", userName);
         return query.getResultList();
@@ -39,6 +43,8 @@ public class UserOrm {
 
     @Transactional
     public String addUser(User usr) {
+        System.out.println("UserOrm/addUser");
+
         // Prüfen dass Username und Email einzigartig sind
         // if (testInputs(usr) == "default") {
         //     return "da passt was nicht";
@@ -81,6 +87,8 @@ public class UserOrm {
 
     @Transactional
     public String updateUser(User u) {
+        System.out.println("UserOrm/updateUser");
+
         boolean error = false;
         String errorMSG = "";
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val2",
@@ -124,6 +132,7 @@ public class UserOrm {
 
     @Transactional
     public String loginUser(User usr) {
+        System.out.println("UserOrm/loginUser");
 
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName = :val OR email = :val2" , User.class);
         query.setParameter("val", usr.getUserName());

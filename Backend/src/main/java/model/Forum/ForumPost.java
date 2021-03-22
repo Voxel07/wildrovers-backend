@@ -5,10 +5,15 @@ import model.Forum.ForumAnswers;
 import model.Forum.ForumCategory;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.ArrayList;
+
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
+import javax.persistence.JoinColumn;
 import javax.persistence.OneToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.ManyToOne;
@@ -18,7 +23,7 @@ import javax.persistence.CascadeType;
 
 
 @Entity
-@Table(name = "ForumPost")
+@Table(name = "FORUM_POSTS")
 public class ForumPost {
     @Id
     @SequenceGenerator(name = "forumPostSeq", sequenceName = "ZSEQ_FORUNPOST_ID", allocationSize = 1, initialValue = 1)
@@ -40,19 +45,18 @@ public class ForumPost {
     private LocalDate editDate;
 
     @OneToOne(cascade = CascadeType.ALL)
-    @Column(name = "creator")
+    @JoinColumn(name = "creator",referencedColumnName = "id")
     private User creator;
 
     @OneToOne(cascade = CascadeType.ALL)
-    @Column(name = "editedBy")
+    @JoinColumn(name = "editedBy",referencedColumnName = "id")
     private User editor;
 
-    @OneToMany()
-    @Column(name = "answers")
-    private ForumAnswers answers;
+    @OneToMany(mappedBy="post",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
+    private List<ForumAnswers> answers = new ArrayList<>();
 
-    @ManyToOne
-    @Column(name="category")
+    @ManyToOne(fetch=FetchType.LAZY)
+    @JoinColumn(name="category", referencedColumnName="id")
     private ForumCategory category;
 
     //User
