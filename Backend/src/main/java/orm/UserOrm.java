@@ -13,10 +13,14 @@ import java.time.LocalDate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+
 @ApplicationScoped
 public class UserOrm {
+
     @Inject
     EntityManager em;
+
+
 
     public List<User> getUsers() {
         System.out.println("UserOrm/getUsers");
@@ -148,5 +152,7 @@ public class UserOrm {
         }
 
     }
+
+    
 
 }

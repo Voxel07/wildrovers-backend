@@ -7,6 +7,7 @@ import javax.annotation.security.PermitAll;
 import javax.annotation.security.RolesAllowed;
 //Quarkus zeug
 import javax.enterprise.context.ApplicationScoped;
+import javax.enterprise.context.RequestScoped;
 import javax.inject.Inject;
 import javax.swing.text.AttributeSet.ColorAttribute;
 
@@ -29,15 +30,28 @@ import model.User;
 import orm.UserOrm;
 import javax.ws.rs.QueryParam;
 
+//Emailzeug
+import io.quarkus.mailer.Mailer;
+import io.quarkus.mailer.reactive.ReactiveMailer;
+
+
 @Path("/user")
+@RequestScoped
 public class UserResouce {
     private static final Logger LOG = Logger.getLogger(UserResouce.class);
 
-    @ApplicationScoped
+   
     @Inject
     UserOrm userOrm;
 
+    // @Inject
+    // @SecurityIdentity test;
+
+    // @Inject
+    // @JSONWebToken jwt;
+
     @GET
+    @RolesAllowed("user")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public List<User> getUser(@QueryParam("userId") Long userId, @QueryParam("username") String userName){
@@ -55,7 +69,7 @@ public class UserResouce {
     }
 
     @PUT
-    @RolesAllowed("admin")
+    @RolesAllowed("admin,user")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public String updateUser(User user) {
@@ -73,7 +87,7 @@ public class UserResouce {
     }
 
     @POST
-    @RolesAllowed("user")
+    @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public String addUser(User usr) {
@@ -89,5 +103,18 @@ public class UserResouce {
         // return userOrm.addUser(usr);
         return "testingdelete";
     }
+
+    //Blocking sync
+    // @Inject
+    // Mailer mailer;
+
+    //Async
+    // @Inject
+    // ReactiveMailer reactiveMailer;
+
+    
+    // mailer.send(Mail.withText("to@acme.org", "A simple email from quarkus", "This is my body."));
+
+    // Uni<Void> stage = reactiveMailer.send(Mail.withText("to@acme.org", "A reactive email from quarkus", "This is my body."));
 
 }

@@ -10,6 +10,7 @@ repositories {
 }
 
 dependencies {
+    implementation 'io.quarkus:quarkus-oidc'
     implementation 'io.quarkus:quarkus-mailer'
     //F?r JSONObject
 	implementation 'org.json:json:20201115'
