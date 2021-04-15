@@ -10,7 +10,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.quarkus:quarkus-oidc'
+    implementation enforcedPlatform("io.quarkus:quarkus-universe-bom:1.12.2.Final")
     implementation 'io.quarkus:quarkus-mailer'
     //F?r JSONObject
 	implementation 'org.json:json:20201115'
@@ -26,8 +26,15 @@ dependencies {
     testImplementation 'io.quarkus:quarkus-junit5'  
     testImplementation 'io.rest-assured:rest-assured'
     
-    //Security
+//Security
     implementation 'io.quarkus:quarkus-security-jpa'
+    
+    //JWT
+    implementation 'io.quarkus:quarkus-smallrye-jwt'
+   
+    implementation 'io.quarkus:quarkus-smallrye-jwt-build' //Wird villeicht nicht gebraucht 
+    
+    // implementation 'io.quarkus:quarkus-oidc'
 }
 
 group 'jaxquarkus'

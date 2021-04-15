@@ -6,6 +6,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "type": "java",
+            "name": "Launch GenerateToken",
+            "request": "launch",
+            "mainClass": "resources.GenerateToken",
+            "projectName": "Homepage"
+        },
+        {
             "preLaunchTask": "quarkusDev (Backend)",
             "type": "java",
             "request": "attach",

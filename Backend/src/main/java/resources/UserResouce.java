@@ -3,14 +3,12 @@ package resources;
 //Datentypen
 import java.util.List;
 
-import javax.annotation.security.PermitAll;
-import javax.annotation.security.RolesAllowed;
 //Quarkus zeug
-import javax.enterprise.context.ApplicationScoped;
+// import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.context.RequestScoped;
 import javax.inject.Inject;
 import javax.swing.text.AttributeSet.ColorAttribute;
-
+import javax.ws.rs.InternalServerErrorException;
 //Logging zeug
 import org.jboss.logging.Logger;
 //HTTP Requests
@@ -34,6 +32,13 @@ import javax.ws.rs.QueryParam;
 import io.quarkus.mailer.Mailer;
 import io.quarkus.mailer.reactive.ReactiveMailer;
 
+//Sicherheits Zeug
+import javax.ws.rs.core.SecurityContext;
+
+import org.eclipse.microprofile.jwt.JsonWebToken;
+import java.security.Principal;
+import javax.annotation.security.PermitAll;
+import javax.annotation.security.RolesAllowed;
 
 @Path("/user")
 @RequestScoped
@@ -47,8 +52,8 @@ public class UserResouce {
     // @Inject
     // @SecurityIdentity test;
 
-    // @Inject
-    // @JSONWebToken jwt;
+    @Inject
+    JsonWebToken  jwt;
 
     @GET
     @RolesAllowed("user")
@@ -96,6 +101,7 @@ public class UserResouce {
     }
 
     @DELETE
+    @RolesAllowed("admin,user")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public String deleteUser(User usr) {

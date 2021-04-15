@@ -5,5 +5,10 @@
         "**/.project": true,
         "**/.settings": true,
         "**/.factorypath": true
-    }
+    },
+    "microprofile.tools.validation.unknown.excluded": [
+        "*/mp-rest/providers/*/priority",
+        "mp.openapi.schema.*",
+        "smallrye.jwt.sign.key-location"
+    ]
 }

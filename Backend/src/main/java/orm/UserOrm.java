@@ -8,6 +8,7 @@ import javax.persistence.TypedQuery;
 import javax.transaction.Transactional;
 
 import model.User;
+import resources.GenerateToken;
 
 import java.time.LocalDate;
 import java.util.regex.Matcher;
@@ -146,7 +147,8 @@ public class UserOrm {
             return "Kein nutzer mit diesen Namen gefunden";
         }
         if (query.getSingleResult().getPassword().equals(usr.getPassword())) {
-            return "true";
+           
+            return  GenerateToken.generator("user","camo");
         } else {
             return "Passwort passt nicht";
         }
