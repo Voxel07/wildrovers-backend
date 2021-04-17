@@ -38,4 +38,6 @@ application.properties
 settings.gradle
 
 #security stuff
-Backend/src/main/resources/META-INF/resources/
+src/main/resources/META-INF/resources/privateKey.pem
+src/main/resources/META-INF/resources/publicKey.pem
+src/main/resources/META-INF/resources/rsaPrivateKey.pem
