@@ -36,3 +36,6 @@ build/
 #src
 application.properties
 settings.gradle
+
+#security stuff
+Backend/src/main/resources/META-INF/resources/
