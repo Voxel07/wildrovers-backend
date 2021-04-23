@@ -96,34 +96,35 @@ public class UserOrm {
 
         boolean error = false;
         String errorMSG = "";
-        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val2",
+        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val2 OR u.id =: val3",
                 User.class);
         query.setParameter("val1", u.getUserName());
         query.setParameter("val2", u.getEmail());
+        query.setParameter("val3", u.getId());
 
         List<User> userAusDB = query.getResultList();
         // Wenn user zurückgekomen sind
-        if (!userAusDB.isEmpty()) {
+        if (userAusDB.isEmpty()) return "Keinen Nutzer mit diesen Daten gefunden";
             // Alle user durchlaufen
-            for (User aktUser : userAusDB) {
-                // Ürüfen ob die ID die gleiche ist.
-                if (!aktUser.getId().equals(u.getId()) && !error) {
-                    // Wenn nicht prüfen ob der Name doppelt ist
-                    if (aktUser.getEmail().equals(u.getEmail()) && aktUser.getUserName().equals(u.getUserName())) {
-                        error = true;
-                        errorMSG = "Email und UserName bereits vergeben";
-                    } else if (aktUser.getUserName().equals(u.getUserName())) {
-                        error = true;
-                        errorMSG = "Username bereits vergeben";
-                    }
-                    // Oder die Email
-                    else if (aktUser.getEmail().equals(u.getEmail())) {
-                        error = true;
-                        errorMSG = "Email bereits vergeben";
-                    }
+        for (User aktUser : userAusDB) {
+            // Überprüfen ob die ID die gleiche ist.
+            if (!aktUser.getId().equals(u.getId()) && !error) {
+                // Wenn nicht prüfen ob der Name doppelt ist
+                if (aktUser.getEmail().equals(u.getEmail()) && aktUser.getUserName().equals(u.getUserName())) {
+                    error = true;
+                    errorMSG = "Email und UserName bereits vergeben";
+                } else if (aktUser.getUserName().equals(u.getUserName())) {
+                    error = true;
+                    errorMSG = "Username bereits vergeben";
+                }
+                // Oder die Email
+                else if (aktUser.getEmail().equals(u.getEmail())) {
+                    error = true;
+                    errorMSG = "Email bereits vergeben";
                 }
             }
         }
+        
         if (!error) {
             try {
                 em.merge(u);

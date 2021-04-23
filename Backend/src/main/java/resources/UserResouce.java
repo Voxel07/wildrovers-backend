@@ -4,7 +4,7 @@ package resources;
 import java.util.List;
 
 //Quarkus zeug
-// import javax.enterprise.context.ApplicationScoped;
+import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.context.RequestScoped;
 import javax.inject.Inject;
 import javax.swing.text.AttributeSet.ColorAttribute;
@@ -41,7 +41,8 @@ import javax.annotation.security.PermitAll;
 import javax.annotation.security.RolesAllowed;
 
 @Path("/user")
-@RequestScoped
+// @RequestScoped
+@ApplicationScoped
 public class UserResouce {
     private static final Logger LOG = Logger.getLogger(UserResouce.class);
 
@@ -56,7 +57,7 @@ public class UserResouce {
     JsonWebToken  jwt;
 
     @GET
-    @RolesAllowed("user")
+    // @RolesAllowed("user")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public List<User> getUser(@QueryParam("userId") Long userId, @QueryParam("username") String userName){
@@ -74,7 +75,7 @@ public class UserResouce {
     }
 
     @PUT
-    @RolesAllowed("admin,user")
+    // @RolesAllowed("admin,user")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public String updateUser(User user) {
@@ -84,7 +85,7 @@ public class UserResouce {
 
     @POST
     @Path("/login")
-    @PermitAll
+    // @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public String login(User user){
@@ -92,7 +93,7 @@ public class UserResouce {
     }
 
     @POST
-    @PermitAll
+    // @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public String addUser(User usr) {
@@ -101,7 +102,7 @@ public class UserResouce {
     }
 
     @DELETE
-    @RolesAllowed("admin,user")
+    // @RolesAllowed("admin,user")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public String deleteUser(User usr) {

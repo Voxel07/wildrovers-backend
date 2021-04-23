@@ -123,12 +123,17 @@ public class test_user {
     @Order(6)
     void TestUpdateUser() {
         userA.setFirstName("newFirstName");
+        System.out.println("looking for user: "+ userA.getUserName() + "email:" +userA.getFirstName());
         given().contentType(MediaType.APPLICATION_JSON).body(userA).when().put("/user").then().statusCode(200)
                 .body(is("User erfolgreich aktualisiert"));
+
         userA.setUserName("newUserName");
+        System.out.println("looking for user: "+ userA.getFirstName() + "email:" +userA.getUserName());
         given().contentType(MediaType.APPLICATION_JSON).body(userA).when().put("/user").then().statusCode(200)
                 .body(is("User erfolgreich aktualisiert"));
+        
         userA.setEmail("newEmail");
+        System.out.println("looking for user: "+ userA.getUserName() + "email:" +userA.getEmail());
         given().contentType(MediaType.APPLICATION_JSON).body(userA).when().put("/user").then().statusCode(200)
                 .body(is("User erfolgreich aktualisiert"));
 
@@ -139,6 +144,7 @@ public class test_user {
     void TestUpdateUser2() {
         userA.setUserName("newUserName2");
         userA.setEmail("newEmail2");
+        System.out.println("looking for user: "+ userA.getUserName() + "email:" +userA.getEmail());
         given().contentType(MediaType.APPLICATION_JSON).body(userA).when().put("/user").then().statusCode(200)
                 .body(is("User erfolgreich aktualisiert"));
     }

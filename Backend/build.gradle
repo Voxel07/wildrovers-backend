@@ -10,7 +10,7 @@ repositories {
 }
 
 dependencies {
-    implementation enforcedPlatform("io.quarkus:quarkus-universe-bom:1.12.2.Final")
+    // implementation enforcedPlatform("io.quarkus:quarkus-universe-bom:1.12.2.Final")
     implementation 'io.quarkus:quarkus-mailer'
     //F?r JSONObject
 	implementation 'org.json:json:20201115'
@@ -32,12 +32,12 @@ dependencies {
     //JWT
     implementation 'io.quarkus:quarkus-smallrye-jwt'
    
-    implementation 'io.quarkus:quarkus-smallrye-jwt-build' //Wird villeicht nicht gebraucht 
+    // implementation 'io.quarkus:quarkus-smallrye-jwt-build' //Wird villeicht nicht gebraucht 
     
     // implementation 'io.quarkus:quarkus-oidc'
 }
 
-group 'jaxquarkus'
+group 'Backend'
 version '0.1.0'
 
 compileJava {
