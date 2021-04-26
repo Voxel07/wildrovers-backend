@@ -1,82 +1,60 @@
 package resources;
 
-import javax.annotation.security.DenyAll;
-import javax.annotation.security.PermitAll;
-import javax.annotation.security.RolesAllowed;
+//Datentypen
+import java.util.List;
+
+//Quarkus zeug
+import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.context.RequestScoped;
 import javax.inject.Inject;
-import javax.ws.rs.GET;
+import javax.swing.text.AttributeSet.ColorAttribute;
 import javax.ws.rs.InternalServerErrorException;
+//Logging zeug
+import org.jboss.logging.Logger;
+//HTTP Requests
+import javax.ws.rs.Consumes;
+import javax.ws.rs.GET;
+import javax.ws.rs.PATCH;
+import javax.ws.rs.PUT;
+import javax.ws.rs.POST;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+
+//Eigene Imports
+import model.User;
+import orm.ForumOrm;
+import orm.UserOrm;
+import javax.ws.rs.QueryParam;
+
+//Emailzeug
+import io.quarkus.mailer.Mailer;
+import io.quarkus.mailer.reactive.ReactiveMailer;
+
+//Sicherheits Zeug
 import javax.ws.rs.core.SecurityContext;
 
-import org.eclipse.microprofile.jwt.Claim;
-import org.eclipse.microprofile.jwt.Claims;
 import org.eclipse.microprofile.jwt.JsonWebToken;
+import java.security.Principal;
+import javax.annotation.security.PermitAll;
+import javax.annotation.security.RolesAllowed;
 
-@Path("/secured")
-@RequestScoped
+import model.Forum.ForumPost;
+
+@Path("/user")
+// @RequestScoped
+@ApplicationScoped
 public class ForumResource {
-
-    @Inject
-    JsonWebToken jwt;
-    @Inject
-    @Claim(standard = Claims.birthdate)
-    String birthdate;
     
+    @Inject
+    ForumOrm forumOrm;
 
     @GET
-    @Path("permit-all")
-    @PermitAll
-    @Produces(MediaType.TEXT_PLAIN)
-    public String hello(@Context SecurityContext ctx) {
-    	return getResponseString(ctx);
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public List<ForumPost> getKategorys(){
+        return forumOrm.getPosts();
     }
-
-    @GET
-    @Path("roles-allowed")
-    @RolesAllowed({ "user", "Admin" })
-    @Produces(MediaType.TEXT_PLAIN)
-    public String helloRolesAllowed(@Context SecurityContext ctx) {
-    	return getResponseString(ctx) + ", birthdate: " + jwt.getClaim("birthdate").toString();
-    }
-    
-    @GET
-    @Path("roles-allowed-admin")
-    @RolesAllowed("Admin")
-    @Produces(MediaType.TEXT_PLAIN)
-    public String helloRolesAllowedAdmin(@Context SecurityContext ctx) {
-    	return getResponseString(ctx) + ", birthdate: " + birthdate;
-    }
-
-    @GET
-    @Path("deny-all")
-    @DenyAll
-    @Produces(MediaType.TEXT_PLAIN)
-    public String helloShouldDeny(@Context SecurityContext ctx) {
-        throw new InternalServerErrorException("This method must not be invoked");
-    }
-
-    private String getResponseString(SecurityContext ctx) {
-    	String name;
-        if (ctx.getUserPrincipal() == null) {
-            name = "anonymous";
-        } else if (!ctx.getUserPrincipal().getName().equals(jwt.getName())) {
-            throw new InternalServerErrorException("Principal and JsonWebToken names do not match");
-        } else {
-            name = ctx.getUserPrincipal().getName();
-        }
-        return String.format("hello + %s,"
-        		+ " isHttps: %s,"
-        		+ " authScheme: %s,"
-        		+ " hasJWT: %s",
-        		name, ctx.isSecure(), ctx.getAuthenticationScheme(), hasJwt());
-    }
-
-	private boolean hasJwt() {
-		return jwt.getClaimNames() != null;
-	}
 }
