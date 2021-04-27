@@ -41,9 +41,10 @@ import java.security.Principal;
 import javax.annotation.security.PermitAll;
 import javax.annotation.security.RolesAllowed;
 
+import model.Forum.ForumCategory;
 import model.Forum.ForumPost;
 
-@Path("/user")
+@Path("/forum")
 // @RequestScoped
 @ApplicationScoped
 public class ForumResource {
@@ -52,9 +53,47 @@ public class ForumResource {
     ForumOrm forumOrm;
 
     @GET
+    @Path("category")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public List<ForumPost> getKategorys(){
-        return forumOrm.getPosts();
+    public List<ForumCategory> getCategorys(@QueryParam("categoryId") Long categoryId,@QueryParam("category") String category)
+    {
+        if(categoryId != null){
+            return forumOrm.getCategoriesById(categoryId);
+        }
+        else if(category != null){
+            return forumOrm.getCategoriesByName(category);
+        }
+        else{
+            return forumOrm.getAllCategories();
+        }
+    }
+
+    @PUT
+    @Path("category")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public String addCategory(ForumCategory fc){
+        //Check permissions
+        return forumOrm.addCategory(fc);
+    }
+
+    @POST
+    @Path("category")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public String updateCategory(ForumCategory fc){
+        //Check permissions
+        return forumOrm.updateCategory(fc);
+    }
+
+    @DELETE
+    @Path("category")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public String deleteCategory(ForumCategory fc){
+        //Check permissions
+        return forumOrm.removeCategory(fc);
+
     }
 }
