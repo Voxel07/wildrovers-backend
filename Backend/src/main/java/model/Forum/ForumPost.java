@@ -56,8 +56,8 @@ public class ForumPost {
     private List<ForumAnswers> answers = new ArrayList<>();
 
     @ManyToOne(fetch=FetchType.LAZY)
-    @JoinColumn(name="category", referencedColumnName="id")
-    private ForumCategory category;
+    @JoinColumn(name="topic_id", referencedColumnName="id")
+    private ForumCategory topic;
 
     //User
     //Antworten
