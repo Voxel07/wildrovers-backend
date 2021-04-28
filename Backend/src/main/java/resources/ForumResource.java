@@ -56,15 +56,19 @@ public class ForumResource {
     @Path("category")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public List<ForumCategory> getCategorys(@QueryParam("categoryId") Long categoryId,@QueryParam("category") String category)
+    public List<ForumCategory> getCategorys(@QueryParam("categoryId") Long categorId,@QueryParam("category") String category)
     {
-        if(categoryId != null){
-            return forumOrm.getCategoriesById(categoryId);
+        System.out.println("ForumResource/getCategorys");
+        if(categorId != null){
+            System.out.println("ForumResource/getCategorys/id");
+            return forumOrm.getCategoriesById(categorId);
         }
         else if(category != null){
+            System.out.println("ForumResource/getCategorys/name");
             return forumOrm.getCategoriesByName(category);
         }
         else{
+            System.out.println("ForumResource/getCategorys/all");
             return forumOrm.getAllCategories();
         }
     }
@@ -73,9 +77,10 @@ public class ForumResource {
     @Path("category")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String addCategory(ForumCategory fc){
+    public String addCategory(ForumCategory fc, @QueryParam("creator") Long categorId){
+        System.out.println("ForumResource/addCategory");
         //Check permissions
-        return forumOrm.addCategory(fc);
+        return forumOrm.addCategory(fc,categorId);
     }
 
     @POST

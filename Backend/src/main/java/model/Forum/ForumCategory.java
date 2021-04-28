@@ -46,6 +46,14 @@ public class ForumCategory {
 
     public ForumCategory(){}
 
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
     public ForumCategory(String category, String creationDate, User creator, List<ForumTopic> topics) {
         this.category = category;
         this.creationDate = creationDate;
