@@ -17,10 +17,13 @@ import model.Phone;
 import java.util.Arrays;
 import java.util.List;
 
+//Logging
+import java.util.logging.Logger;
+
 @QuarkusTest
 @TestMethodOrder(OrderAnnotation.class)
 public class test_user {
-
+    private static final Logger log = Logger.getLogger(test_user.class.getName());
     private static User userA = new User("voxel@web.de", "Camo", "123", "Matthias", "Schneider", "Vorstand", true);
     private static User userB = new User("matze.schneider95@web.de", "Voxel", "123", "Ralf", "Müller", "Mitglied",
             false);
@@ -42,7 +45,7 @@ public class test_user {
     }
 
     public User GetUser(Long id, String username) {
-        System.out.println("ID:" + id + " Username: " + username);
+         log.info("ID:" + id + " Username: " + username);
         if (id != 0 && username == "") {
             Response resp = given().queryParam("userId", id).contentType(MediaType.APPLICATION_JSON).when()
                     .get("/user");
@@ -66,7 +69,7 @@ public class test_user {
         Assertions.assertEquals(javaObj.getRole(), ausDB.getRole());
         Assertions.assertEquals(javaObj.getPassword(), ausDB.getPassword());
         if (javaObj.getId() == null) {
-            System.out.println("Setting ID:" + ausDB.getId() + " to userName: " + javaObj.getUserName());
+             log.info("Setting ID:" + ausDB.getId() + " to userName: " + javaObj.getUserName());
             javaObj.setId(ausDB.getId());
         }
     }
@@ -123,17 +126,17 @@ public class test_user {
     @Order(6)
     void TestUpdateUser() {
         userA.setFirstName("newFirstName");
-        System.out.println("looking for user: "+ userA.getUserName() + "email:" +userA.getFirstName());
+         log.info("looking for user: "+ userA.getUserName() + "email:" +userA.getFirstName());
         given().contentType(MediaType.APPLICATION_JSON).body(userA).when().put("/user").then().statusCode(200)
                 .body(is("User erfolgreich aktualisiert"));
 
         userA.setUserName("newUserName");
-        System.out.println("looking for user: "+ userA.getFirstName() + "email:" +userA.getUserName());
+         log.info("looking for user: "+ userA.getFirstName() + "email:" +userA.getUserName());
         given().contentType(MediaType.APPLICATION_JSON).body(userA).when().put("/user").then().statusCode(200)
                 .body(is("User erfolgreich aktualisiert"));
         
         userA.setEmail("newEmail");
-        System.out.println("looking for user: "+ userA.getUserName() + "email:" +userA.getEmail());
+         log.info("looking for user: "+ userA.getUserName() + "email:" +userA.getEmail());
         given().contentType(MediaType.APPLICATION_JSON).body(userA).when().put("/user").then().statusCode(200)
                 .body(is("User erfolgreich aktualisiert"));
 
@@ -144,7 +147,7 @@ public class test_user {
     void TestUpdateUser2() {
         userA.setUserName("newUserName2");
         userA.setEmail("newEmail2");
-        System.out.println("looking for user: "+ userA.getUserName() + "email:" +userA.getEmail());
+         log.info("looking for user: "+ userA.getUserName() + "email:" +userA.getEmail());
         given().contentType(MediaType.APPLICATION_JSON).body(userA).when().put("/user").then().statusCode(200)
                 .body(is("User erfolgreich aktualisiert"));
     }

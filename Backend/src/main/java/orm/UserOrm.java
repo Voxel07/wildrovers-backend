@@ -14,24 +14,26 @@ import java.time.LocalDate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+//Logging
+import java.util.logging.Logger;
 
 @ApplicationScoped
 public class UserOrm {
-
+    private static final Logger log = Logger.getLogger(UserOrm.class.getName());
     @Inject
     EntityManager em;
 
 
 
     public List<User> getUsers() {
-        System.out.println("UserOrm/getUsers");
+         log.info("UserOrm/getUsers");
 
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u", User.class);
         return query.getResultList();
     }
 
     public List<User> getUserById(Long userId) {
-        System.out.println("UserOrm/getUserById");
+         log.info("UserOrm/getUserById");
 
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE id =: val", User.class);
         query.setParameter("val", userId);
@@ -39,7 +41,7 @@ public class UserOrm {
     }
 
     public List<User> getUserByUsername(String userName) {
-        System.out.println("UserOrm/getUserByUsername");
+         log.info("UserOrm/getUserByUsername");
 
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE userName =: val", User.class);
         query.setParameter("val", userName);
@@ -48,7 +50,7 @@ public class UserOrm {
 
     @Transactional
     public String addUser(User usr) {
-        System.out.println("UserOrm/addUser");
+         log.info("UserOrm/addUser");
 
         // Prüfen dass Username und Email einzigartig sind
         // if (testInputs(usr) == "default") {
@@ -92,7 +94,7 @@ public class UserOrm {
 
     @Transactional
     public String updateUser(User u) {
-        System.out.println("UserOrm/updateUser");
+         log.info("UserOrm/updateUser");
 
         boolean error = false;
         String errorMSG = "";
@@ -138,7 +140,7 @@ public class UserOrm {
 
     @Transactional
     public String loginUser(User usr) {
-        System.out.println("UserOrm/loginUser");
+         log.info("UserOrm/loginUser");
 
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName = :val OR email = :val2" , User.class);
         query.setParameter("val", usr.getUserName());

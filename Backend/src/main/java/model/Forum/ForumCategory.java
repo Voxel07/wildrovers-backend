@@ -1,25 +1,24 @@
 package model.Forum;
-
+// Datentypen
 import java.util.List;
 import java.util.ArrayList;
-
+//Datenbank Gedöns
 import javax.persistence.Entity;
 import javax.persistence.Table;
-
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.SequenceGenerator;
 import javax.persistence.GeneratedValue;
-
 import javax.persistence.Column;
 import javax.persistence.FetchType;
 import javax.persistence.CascadeType;
-
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
-
+//Models
 import model.User;
 
+
+//Security
 @Entity
 @Table(name = "FORUM_CATEGORY")
 public class ForumCategory {

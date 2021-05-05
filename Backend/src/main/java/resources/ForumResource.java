@@ -9,8 +9,6 @@ import javax.enterprise.context.RequestScoped;
 import javax.inject.Inject;
 import javax.swing.text.AttributeSet.ColorAttribute;
 import javax.ws.rs.InternalServerErrorException;
-//Logging zeug
-import org.jboss.logging.Logger;
 //HTTP Requests
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -44,11 +42,14 @@ import javax.annotation.security.RolesAllowed;
 import model.Forum.ForumCategory;
 import model.Forum.ForumPost;
 
+//Logging
+import java.util.logging.Logger;
+
 @Path("/forum")
 // @RequestScoped
 @ApplicationScoped
 public class ForumResource {
-    
+    private static final Logger log = Logger.getLogger(ForumResource.class.getName());
     @Inject
     ForumOrm forumOrm;
 
@@ -58,17 +59,17 @@ public class ForumResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public List<ForumCategory> getCategorys(@QueryParam("categoryId") Long categorId,@QueryParam("category") String category)
     {
-        System.out.println("ForumResource/getCategorys");
+         log.info("ForumResource/getCategorys");
         if(categorId != null){
-            System.out.println("ForumResource/getCategorys/id");
+             log.info("ForumResource/getCategorys/id");
             return forumOrm.getCategoriesById(categorId);
         }
         else if(category != null){
-            System.out.println("ForumResource/getCategorys/name");
+             log.info("ForumResource/getCategorys/name");
             return forumOrm.getCategoriesByName(category);
         }
         else{
-            System.out.println("ForumResource/getCategorys/all");
+             log.info("ForumResource/getCategorys/all");
             return forumOrm.getAllCategories();
         }
     }
@@ -78,7 +79,7 @@ public class ForumResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public String addCategory(ForumCategory fc, @QueryParam("creator") Long categorId){
-        System.out.println("ForumResource/addCategory");
+         log.info("ForumResource/addCategory");
         //Check permissions
         return forumOrm.addCategory(fc,categorId);
     }

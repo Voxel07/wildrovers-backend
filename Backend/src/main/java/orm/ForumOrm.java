@@ -12,7 +12,9 @@ import javax.persistence.TypedQuery;
 import javax.transaction.Transactional;
 import javax.validation.constraints.Null;
 
-
+import java.util.logging.Level;
+//Logging
+import java.util.logging.Logger;
 
 //Zeit
 import java.time.format.DateTimeFormatter;  
@@ -24,23 +26,24 @@ import model.User;
 
 @ApplicationScoped
 public class ForumOrm {
+    private static final Logger log = Logger.getLogger(ForumOrm.class.getName());
     @Inject
     EntityManager em; 
 
     //Basic Get methoeds 
     public List<ForumCategory>getAllCategories(){
-        System.out.println("ForumOrm/getAllCategories");
+       log.info("ForumOrm/getAllCategories");
         TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c", ForumCategory.class);
         return query.getResultList();
     }
     public List<ForumCategory>getCategoriesByName(String category){
-        System.out.println("ForumOrm/getCategoriesByName");
+         log.info("ForumOrm/getCategoriesByName");
         TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c WHERE category =: val", ForumCategory.class);
         query.setParameter("val", category);
         return query.getResultList();
     }
     public List<ForumCategory>getCategoriesById(Long id){
-        System.out.println("ForumOrm/getCategoriesById");
+         log.info("ForumOrm/getCategoriesById");
         TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c WHERE id =: val", ForumCategory.class);
         query.setParameter("val", id);
         return query.getResultList();
@@ -54,7 +57,7 @@ public class ForumOrm {
     */
     @Transactional
     public String addCategory(ForumCategory category, Long categorId){
-        System.out.println("ForumOrm/addCategory");
+         log.info("ForumOrm/addCategory");
         //Check if exists
         // TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory WHERE category =: val", ForumCategory.class);
         // query.setParameter("val", category.getCategory());
@@ -71,14 +74,14 @@ public class ForumOrm {
         try {
             em.persist(category);
         } catch (Exception e) {
-            System.out.println("Exception addCategory" + e.getMessage());
+             log.log(java.util.logging.Level.SEVERE, "Result{0}", e.getMessage());
             return "Error while creating the new Category";
         }
         //Create
         return "Kategorie erfolgreich erstellt";
     }
     public String updateCategory(ForumCategory category){
-        System.out.println("ForumOrm/updateCategory");
+         log.info("ForumOrm/updateCategory");
         //Check if exists
         // if(getCategoriesById(category.getId()).isEmpty()) return "Kategorie exestiert nicht";
         // if((!getCategoriesByName(category.getCategory()).isEmpty())&&)
@@ -86,7 +89,7 @@ public class ForumOrm {
         query.setParameter("val", category.getCategory());
         query.setParameter("val2", category.getId());
         List<ForumCategory> ausdb = query.getResultList();
-        
+
         if(ausdb.isEmpty()) return "Kategorie exestiert nicht";
 
         for (ForumCategory aktCat : ausdb) {
@@ -96,13 +99,13 @@ public class ForumOrm {
         try {
             em.merge(category);
         } catch (Exception e) {
-            System.out.println("Exception updateCategory" + e.getMessage());
+             log.info("Exception updateCategory" + e.getMessage());
             return "Error while updating the Category";
         }
         return "ToDO";
     }
     public String removeCategory(ForumCategory category){
-        System.out.println("ForumOrm/removeCategory");
+         log.info("ForumOrm/removeCategory");
         //Check if exists
         //Get all Topics
         //Get all Posts
@@ -114,20 +117,20 @@ public class ForumOrm {
     }
 
     public List<ForumPost>getPosts(){
-        System.out.println("ForumOrm/getPosts");
+         log.info("ForumOrm/getPosts");
         TypedQuery<ForumPost> query = em.createQuery("SELECT f FROM ForumPost p", ForumPost.class);
         return query.getResultList();
     }
 
     public List<ForumPost>getPostsByUser(Long userId){
-        System.out.println("ForumOrm/getPostsByUser");
+         log.info("ForumOrm/getPostsByUser");
         TypedQuery<ForumPost> query = em.createQuery("SELECT f FROM ForumPost WHERE creator := val", ForumPost.class);
         query.setParameter("val",userId);
         return query.getResultList();
     }
 
     public List<ForumPost>getPostsByCategory(String category){
-        System.out.println("ForumOrm/getPostsByUser");
+         log.info("ForumOrm/getPostsByUser");
         TypedQuery<ForumPost> query = em.createQuery("SELECT f FROM ForumPost WHERE category := val", ForumPost.class);
         query.setParameter("val",category);
         return query.getResultList();
