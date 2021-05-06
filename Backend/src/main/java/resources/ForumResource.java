@@ -23,7 +23,7 @@ import javax.ws.rs.core.MediaType;
 
 //Eigene Imports
 import model.User;
-import orm.ForumOrm;
+import orm.Forum.ForumCategoryOrm;
 import orm.UserOrm;
 import javax.ws.rs.QueryParam;
 
@@ -51,7 +51,7 @@ import java.util.logging.Logger;
 public class ForumResource {
     private static final Logger log = Logger.getLogger(ForumResource.class.getName());
     @Inject
-    ForumOrm forumOrm;
+    ForumCategoryOrm forumCategoryOrm;
 
     @GET
     @Path("category")
@@ -62,15 +62,15 @@ public class ForumResource {
          log.info("ForumResource/getCategorys");
         if(categorId != null){
              log.info("ForumResource/getCategorys/id");
-            return forumOrm.getCategoriesById(categorId);
+            return forumCategoryOrm.getCategoriesById(categorId);
         }
         else if(category != null){
              log.info("ForumResource/getCategorys/name");
-            return forumOrm.getCategoriesByName(category);
+            return forumCategoryOrm.getCategoriesByName(category);
         }
         else{
              log.info("ForumResource/getCategorys/all");
-            return forumOrm.getAllCategories();
+            return forumCategoryOrm.getAllCategories();
         }
     }
 
@@ -81,7 +81,7 @@ public class ForumResource {
     public String addCategory(ForumCategory fc, @QueryParam("creator") Long categorId){
          log.info("ForumResource/addCategory");
         //Check permissions
-        return forumOrm.addCategory(fc,categorId);
+        return forumCategoryOrm.addCategory(fc,categorId);
     }
 
     @POST
@@ -90,7 +90,7 @@ public class ForumResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public String updateCategory(ForumCategory fc){
         //Check permissions
-        return forumOrm.updateCategory(fc);
+        return forumCategoryOrm.updateCategory(fc);
     }
 
     @DELETE
@@ -99,7 +99,7 @@ public class ForumResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public String deleteCategory(ForumCategory fc){
         //Check permissions
-        return forumOrm.removeCategory(fc);
+        return forumCategoryOrm.removeCategory(fc);
 
     }
 }

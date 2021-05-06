@@ -64,7 +64,7 @@ public class UserOrm {
             return "Nutzer bereits bekannt";
         }
 
-       // usr.setRegDate(LocalDate.now());
+        usr.setRegDate(LocalDate.now());
 
         // Nutzer einfügen
         try {
