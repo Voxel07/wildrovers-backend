@@ -65,7 +65,7 @@ public class test_user {
         Assertions.assertEquals(javaObj.getFirstName(), ausDB.getFirstName());
         Assertions.assertEquals(javaObj.getLastName(), ausDB.getLastName());
         Assertions.assertEquals(javaObj.getUserName(), ausDB.getUserName());
-        Assertions.assertEquals(javaObj.getActive(), ausDB.getActive());
+        Assertions.assertEquals(javaObj.isActive(), ausDB.isActive());
         Assertions.assertEquals(javaObj.getRole(), ausDB.getRole());
         Assertions.assertEquals(javaObj.getPassword(), ausDB.getPassword());
         if (javaObj.getId() == null) {

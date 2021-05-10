@@ -9,7 +9,6 @@ import javax.inject.Inject;
 import javax.persistence.EntityManager;
 import javax.persistence.TypedQuery;
 import javax.transaction.Transactional;
-import javax.validation.constraints.Null;
 
 import java.util.logging.Level;
 //Logging
@@ -17,10 +16,10 @@ import java.util.logging.Logger;
 
 //Zeit
 import java.time.format.DateTimeFormatter;  
-import java.time.LocalDateTime;    
+import java.time.LocalDateTime;
 
-import model.Forum.ForumCategory;
 import model.User;
+import model.Forum.ForumCategory;
 
 @ApplicationScoped
 public class ForumCategoryOrm {
@@ -31,32 +30,32 @@ public class ForumCategoryOrm {
 
     //Basic GET methods 
     public List<ForumCategory>getAllCategories(){
-       log.info("ForumOrm/getAllCategories");
+       log.info("ForumCategoryOrm/getAllCategories");
         TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c", ForumCategory.class);
         return query.getResultList();
     }
     public List<ForumCategory>getCategoriesByName(String category){
-        log.info("ForumOrm/getCategoriesByName");
+        log.info("ForumCategoryOrm/getCategoriesByName");
         TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c WHERE category =: val", ForumCategory.class);
         query.setParameter("val", category);
         return query.getResultList();
     }
     public List<ForumCategory>getCategoriesById(Long id){
-        log.info("ForumOrm/getCategoriesById");
+        log.info("ForumCategoryOrm/getCategoriesById");
         TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c WHERE id =: val", ForumCategory.class);
         query.setParameter("val", id);
         return query.getResultList();
     }
     //CRUD operations for Froum Categorys
     /*
-        Brief addCategory
+        NOTE: addCategory
         - Checks if the category name allready exists
         - Creates a formated Time stinrg from the local Server time
         - returns success or the error that accured as a string
     */
     @Transactional
     public String addCategory(ForumCategory category, Long userId){
-         log.info("ForumOrm/addCategory");
+         log.info("ForumCategoryOrm/addCategory");
 
         //Check if exists
         if(!getCategoriesByName(category.getCategory()).isEmpty()) return "Kategorie exestiert bereits";
@@ -83,20 +82,20 @@ public class ForumCategoryOrm {
     }
     /*
         @Brief updateCategory
-        - ToDo: Only Creator/Mod is allowed to update
+        - TODO: Only Creator/Mod is allowed to update
     */
     @Transactional
     public String updateCategory(ForumCategory category){
-        log.info("ForumOrm/updateCategory");
+        log.info("ForumCategoryOrm/updateCategory");
 
         TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c WHERE category =: val OR id =: val2",ForumCategory.class);
         query.setParameter("val", category.getCategory());
         query.setParameter("val2", category.getId());
-        List<ForumCategory> ausdb = query.getResultList();
+        List<ForumCategory> fromDb = query.getResultList();
         //Check if exists
-        if(ausdb.isEmpty()) return "Kategorie exestiert nicht";
+        if(fromDb.isEmpty()) return "Kategorie exestiert nicht";
 
-        for (ForumCategory aktCat : ausdb) {
+        for (ForumCategory aktCat : fromDb) {
             if(aktCat.getCategory().equals(category.getCategory()) && !aktCat.getId().equals(category.getId())) return "Ketegoriename ist bereits vergeben";
         }
         //Update
@@ -110,10 +109,10 @@ public class ForumCategoryOrm {
     }
     /*
         @Brief removeCategory
-        - ToDo everything
+        - TODO: everything
     */
     public String removeCategory(ForumCategory category){
-        log.info("ForumOrm/removeCategory");
+        log.info("ForumCategoryOrm/removeCategory");
         //Check if exists
         //Get all Topics
         //Get all Posts

@@ -16,12 +16,18 @@ import javax.persistence.Id;
 
 import javax.persistence.SequenceGenerator;
 import javax.persistence.Table;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import javax.persistence.GeneratedValue;
 
 import io.quarkus.security.jpa.Password;
 import io.quarkus.security.jpa.Roles;
 import io.quarkus.security.jpa.UserDefinition;
 import io.quarkus.security.jpa.Username;
+import model.Forum.ForumCategory;
+import model.Forum.ForumPost;
+import model.Forum.ForumTopic;
 
 @Entity
 @Table(name = "USER")
@@ -71,17 +77,15 @@ public class User {
     @OneToMany(mappedBy="usr",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
 	private List<Phone> phones = new ArrayList<>();
 
-    // @OneToMany(mappedBy="usr",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
-    // private List<Posts> posts = new ArrayList<>();
+    @OneToMany(mappedBy = "creator",cascade = {CascadeType.ALL},fetch = FetchType.LAZY)
+    private List<ForumCategory> categories = new ArrayList<>();
     
-    // @ManyToMany(fetch = FetchType.LAZY, cascade = {CascadeType.ALL})
-    // @JoinTable(
-    // 		name = "unreadPosts",
-    // 		joinColumns = {@JoinColumn(name = "UserId", referencedColumnName="id")},
-    // 		inverseJoinColumns = {@JoinColumn(name = "PostId", referencedColumnName="id")}
-    // 		)
-    // private  List<Posts> posts = new ArrayList<>();
-
+    @OneToMany(mappedBy = "creator",cascade = {CascadeType.ALL},fetch = FetchType.LAZY)
+    private List<ForumTopic> topics = new ArrayList<>();
+    
+    // @OneToMany(mappedBy="usr",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
+    // private List<ForumPost> posts = new ArrayList<>();
+  
     public User(){
 
     }
@@ -119,7 +123,7 @@ public class User {
     public void setUserName(String username) {
         this.userName = username;
     }
-
+    @JsonIgnore
     public String getPassword() {
         return password;
     }
@@ -173,10 +177,6 @@ public class User {
     	getPhones().remove(phone);
     }
 
-    public boolean getActive() {
-        return isActive;
-    }
-
     public void setActive(boolean isActive) {
         this.isActive = isActive;
     }
@@ -197,7 +197,34 @@ public class User {
         this.regDate = regDate;
     }
 
-  
+    public boolean isActive() {
+        return isActive;
+    }
+
+    public List<ForumCategory> getCategories() {
+        return categories;
+    }
+
+    public void setCategories(List<ForumCategory> categories) {
+        this.categories = categories;
+    }
+
+    public List<ForumTopic> getTopics() {
+        return topics;
+    }
+
+    public void setTopics(List<ForumTopic> topics) {
+        this.topics = topics;
+    }
+
+    // public List<ForumPost> getPosts() {
+    //     return posts;
+    // }
+
+    // public void setPosts(List<ForumPost> posts) {
+    //     this.posts = posts;
+    // }
+
    
 
 

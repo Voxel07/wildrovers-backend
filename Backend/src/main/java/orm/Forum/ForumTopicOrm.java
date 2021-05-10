@@ -1,6 +1,7 @@
 package orm.Forum;
 
-//Datentypen
+import java.util.ArrayList;
+//Additional Data Types
 import java.util.List;
 
 //
@@ -9,22 +10,20 @@ import javax.inject.Inject;
 import javax.persistence.EntityManager;
 import javax.persistence.TypedQuery;
 import javax.transaction.Transactional;
-import javax.validation.constraints.Null;
 
 import java.util.logging.Level;
 //Logging
 import java.util.logging.Logger;
 
-//Zeit
+//Time
 import java.time.format.DateTimeFormatter;  
-import java.time.LocalDateTime;    
+import java.time.LocalDateTime;
 
+import orm.UserOrm;
+import model.User;
 import model.Forum.ForumCategory;
 import model.Forum.ForumPost;
 import model.Forum.ForumTopic;
-import model.User;
-
-import orm.Forum.ForumCategoryOrm;
 
 @ApplicationScoped
 public class ForumTopicOrm {
@@ -32,8 +31,12 @@ public class ForumTopicOrm {
     private static final Logger log = Logger.getLogger(ForumTopicOrm.class.getName());
     @Inject
     EntityManager em; 
-
+    
+    @Inject
     ForumCategoryOrm forumCategoryOrm; 
+
+    @Inject
+    UserOrm userOrm;
 
     //Basic GET methods 
     public List<ForumTopic>getAllTopics(){
@@ -41,31 +44,43 @@ public class ForumTopicOrm {
         TypedQuery<ForumTopic> query = em.createQuery("SELECT t FROM ForumTopic t", ForumTopic.class);
         return query.getResultList();
     }
+    public List<ForumTopic>getTopicById(Long topicId){
+        log.info("ForumTopicOrm/getTopicById");
+        TypedQuery<ForumTopic> query = em.createQuery("SELECT c FROM ForumTopic c WHERE id =: val", ForumTopic.class);
+        query.setParameter("val", topicId);
+        return query.getResultList();
+    }
     public List<ForumTopic>getTopicsByUser(Long userId){
         log.info("ForumTopicOrm/getTopicByUser");
-        TypedQuery<ForumTopic> query = em.createQuery("SELECT t FROM ForumTopic t WHERE user_id := vla", ForumTopic.class);
+        /*
+        TODO:
+            - Add the 
+        */
+        // User u = em.find(User.class,userId);
+        
+        TypedQuery<ForumTopic> query = em.createQuery("SELECT t FROM ForumTopic t WHERE user_id =: val", ForumTopic.class);
         query.setParameter("val", userId);
         return query.getResultList();
     }
     public List<ForumTopic>getTopicsByCategory(Long categoryId){
         log.info("ForumTopicOrm/getTopicByCategory");
-        TypedQuery<ForumTopic> query = em.createQuery("SELECT t FROM ForumTopic t WHERE category_id := vla", ForumTopic.class);
+        TypedQuery<ForumTopic> query = em.createQuery("SELECT t FROM ForumTopic t WHERE category_id =: val", ForumTopic.class);
         query.setParameter("val", categoryId);
         return query.getResultList();
     }
     public List<ForumTopic>getTopicsByTopic(String topic){
-        log.info("ForumTopicOrm/getTopicByCategory");
-        var query = em.createQuery("SELECT t FROM ForumTopic t WHERE topic := vla", ForumTopic.class);
+        log.info("ForumTopicOrm/getTopicsByTopic");
+        TypedQuery<ForumTopic> query = em.createQuery("SELECT t FROM ForumTopic t WHERE topic =: val", ForumTopic.class);
         query.setParameter("val", topic);
         return query.getResultList();
     }
-    //CRUD operations for Froum Categorys
+    //CRUD operations for Forum Categories
     /*
         Brief addTopic
-        - Checks if the Topic allready exists
+        - Checks if the Topic already exists
         - Check if passed Category exists
-        - Create a formated Time string from the local Server time
-        - returns success or the error that accured as a string
+        - Create a formatted Time string from the local Server time
+        - returns success or the error that accrued as a string
     */
     @Transactional
     public String addTopic(ForumTopic topic, Long categoryId, Long userId){
@@ -96,23 +111,28 @@ public class ForumTopicOrm {
             em.persist(topic);
         } catch (Exception e) {
              log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return "Error while creating the new topic";
+            return "Fehler beim erstellen des neuen Tehmas";
         }
-        return "Kategorie erfolgreich erstellt";
+        return "Thema erfolgreich erstellt";
     }
     /*
         Brief updateTopic
         - ToDo
     */
     @Transactional
-    public String updateTopic(){
+    public String updateTopic(ForumTopic ft, Long userId){
+        log.info("ForumTopicOrm/updateTopic");
+
         return "ToDo";
     }
     /*
         Brief updateTopic
         - ToDo
     */
-    @Transactional String updateTopic(Long topicId){
+    @Transactional 
+    public String deleteTopic(ForumTopic topicId){
+        log.info("ForumTopicOrm/deleteTopic");
+
         return "ToDo";
     }
 

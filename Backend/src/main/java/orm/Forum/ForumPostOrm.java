@@ -17,12 +17,12 @@ import java.util.logging.Logger;
 
 //Zeit
 import java.time.format.DateTimeFormatter;  
-import java.time.LocalDateTime;    
+import java.time.LocalDateTime;
 
+import model.User;
 import model.Forum.ForumCategory;
 import model.Forum.ForumPost;
 import model.Forum.ForumTopic;
-import model.User;
 
 @ApplicationScoped
 public class ForumPostOrm {
@@ -58,5 +58,43 @@ public class ForumPostOrm {
         query.setParameter("val",titel);
         return query.getResultList();
     }
+    //Crud operations for ForumPosts
+    /**
+     *  NOTE: addPost
+        -   Checks if Post titel already exists in the same topic
+        - 
+     * @param forumPost Conaines all Content of the Post aka text and picutres
+     * @param topicId 
+     * @param userId
+     * @return
+     */
+    @Transactional
+    public String addPost(ForumPost forumPost,Long topicId,Long userId){
+        return "TODO:";
+    }
+    /**
+     *  
+     * NOTE: updatePost
+     * -    Check permissions. Onyl creator/mods
+     * -    Check if new name exists already exists in the topic   
+     * @param forumPost
+     * @param userId
+     * @return
+     */
+    @Transactional
+    public String updatePost(ForumPost forumPost, Long userId){
+        return "TODO:";
+    }
+    /**
+     * 
+     * @param forumPost
+     * @param userId
+     * @return
+     */
+    @Transactional
+    public String deletePost(ForumPost forumPost, Long userId){
+        return "TODO:";
+    }
+
 
 }

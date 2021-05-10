@@ -23,8 +23,13 @@ import javax.ws.rs.core.MediaType;
 
 //Eigene Imports
 import model.User;
-import orm.Forum.ForumCategoryOrm;
+import model.Forum.ForumCategory;
+import model.Forum.ForumPost;
+import model.Forum.ForumTopic;
 import orm.UserOrm;
+import orm.Forum.ForumCategoryOrm;
+import orm.Forum.ForumTopicOrm;
+
 import javax.ws.rs.QueryParam;
 
 //Emailzeug
@@ -39,9 +44,6 @@ import java.security.Principal;
 import javax.annotation.security.PermitAll;
 import javax.annotation.security.RolesAllowed;
 
-import model.Forum.ForumCategory;
-import model.Forum.ForumPost;
-
 //Logging
 import java.util.logging.Logger;
 
@@ -50,8 +52,12 @@ import java.util.logging.Logger;
 @ApplicationScoped
 public class ForumResource {
     private static final Logger log = Logger.getLogger(ForumResource.class.getName());
+    
     @Inject
     ForumCategoryOrm forumCategoryOrm;
+
+    @Inject
+    ForumTopicOrm forumTopicOrm;
 
     @GET
     @Path("category")
@@ -78,18 +84,24 @@ public class ForumResource {
     @Path("category")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String addCategory(ForumCategory fc, @QueryParam("creator") Long categorId){
+    public String addCategory(ForumCategory fc, @QueryParam("creator") Long userId){
          log.info("ForumResource/addCategory");
-        //Check permissions
-        return forumCategoryOrm.addCategory(fc,categorId);
+        /*
+        ToDo
+        -   Check permissions
+        */
+        return forumCategoryOrm.addCategory(fc,userId);
     }
-
     @POST
     @Path("category")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public String updateCategory(ForumCategory fc){
-        //Check permissions
+        log.info("ForumResource/updateCategory");
+        /*
+        @ToDo
+        -   Check permissions
+        */
         return forumCategoryOrm.updateCategory(fc);
     }
 
@@ -98,8 +110,76 @@ public class ForumResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public String deleteCategory(ForumCategory fc){
-        //Check permissions
+        log.info("ForumResource/deleteCategory");
+        /*
+        @ToDo
+        -   Check permissions
+        */
         return forumCategoryOrm.removeCategory(fc);
+    }
 
+    @GET
+    @Path("topic")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public List<ForumTopic> getTopics(  @QueryParam("topicId") Long topicId,
+                                        @QueryParam("topic") String topic,  
+                                        @QueryParam("user")Long userId,
+                                        @QueryParam("category")Long categoryId)
+    {
+         log.info("ForumResource/getTopics");
+        if(topicId != null){
+             log.info("ForumResource/getTopics/id");
+            return forumTopicOrm.getTopicById(topicId);
+        }
+        else if(topic != null){
+             log.info("ForumResource/getTopics/name");
+            return forumTopicOrm.getTopicsByTopic(topic);
+        }
+        else if(userId != null){
+            log.info("ForumResource/getTopics/user");
+            return forumTopicOrm.getTopicsByUser(userId);
+        }
+        else if(categoryId != null){
+            log.info("ForumResource/getTopics/category");
+            return forumTopicOrm.getTopicsByCategory(categoryId);
+        }
+        else{
+             log.info("ForumResource/getTopics/all");
+            return forumTopicOrm.getAllTopics();
+        }
+    }
+
+    @PUT
+    @Path("topic")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public String addTopic(ForumTopic ft, @QueryParam("category") Long categoryId, @QueryParam("creator") Long userId){
+        log.info("ForumResource/addCategory");
+        /*
+        @ToDo
+        -   Check permissions
+        */
+        return forumTopicOrm.addTopic(ft, categoryId, userId);
+    }
+
+    @POST
+    @Path("topic")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public String updateTopic(ForumTopic ft,@QueryParam("user")Long userId){
+        log.info("ForumResource/updateCategory");
+        /*
+        @ToDo
+        -   Check permissions
+        */
+        return forumTopicOrm.updateTopic(ft, userId);
+    }
+    @DELETE
+    @Path("topic")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public String deleteTopic(ForumTopic ft){
+        return forumTopicOrm.deleteTopic(ft);
     }
 }

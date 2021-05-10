@@ -1,9 +1,6 @@
 package model.Forum;
 
 import model.User;
-import model.Forum.ForumAnswers;
-import model.Forum.ForumCategory;
-
 import java.time.LocalDate;
 import java.util.List;
 import java.util.ArrayList;
@@ -43,6 +40,12 @@ public class ForumPost {
 
     @Column(name = "editDate")
     private LocalDate editDate;
+
+    @Column(name = "likes")
+    private Long likes;
+
+    @Column(name = "dislikes")
+    private Long dislikes;
 
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "creator",referencedColumnName = "id")
