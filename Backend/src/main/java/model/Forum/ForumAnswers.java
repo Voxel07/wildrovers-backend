@@ -14,6 +14,8 @@ import javax.persistence.FetchType;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 
+import model.User;
+
 @Entity
 @Table(name = "FORUM_ANSWERS")
 public class ForumAnswers {
@@ -28,5 +30,9 @@ public class ForumAnswers {
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name="post_id", referencedColumnName="id")
     private ForumPost post;
+
+    @ManyToOne(fetch=FetchType.LAZY)
+    @JoinColumn(name ="user_id", referencedColumnName="id")
+    private User creator;
     
 }

@@ -33,6 +33,9 @@ public class ForumTopic {
     @Column(name = "creationDate")
     private String creationDate;
 
+    @Column(name = "postCount")
+    private Long postCount;
+
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name ="user_id", referencedColumnName="id")
     private User creator;
@@ -100,6 +103,18 @@ public class ForumTopic {
 
     public void setPosts(List<ForumPost> posts) {
         this.posts = posts;
+    }
+
+    public void incrementPostCount() {
+        this.postCount ++;
+    }
+
+    public void decrementPostCount() {
+        this.postCount --;
+    }
+    
+    public void setPostCount(Long postCount){
+        this.postCount = postCount;
     }
     
 }
