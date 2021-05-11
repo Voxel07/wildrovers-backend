@@ -23,13 +23,13 @@ import javax.persistence.CascadeType;
 @Table(name = "FORUM_POSTS")
 public class ForumPost {
     @Id
-    @SequenceGenerator(name = "forumPostSeq", sequenceName = "ZSEQ_FORUNPOST_ID", allocationSize = 1, initialValue = 1)
+    @SequenceGenerator(name = "forumPostSeq", sequenceName = "ZSEQ_fPost_ID", allocationSize = 1, initialValue = 1)
     @GeneratedValue(generator = "forumPost")
 
     @Column(name = "id", unique = true)
     private Long id;
 
-    @Column(name = "titel")
+    @Column(name = "title")
     private String title;
 
     @Column(name = "content")
@@ -47,16 +47,16 @@ public class ForumPost {
     @Column(name = "dislikes")
     private Long dislikes;
 
-    @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "creator",referencedColumnName = "id")
+    @ManyToOne(fetch=FetchType.LAZY)
+    @JoinColumn(name ="user_id", referencedColumnName="id")
     private User creator;
 
     @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "editedBy",referencedColumnName = "id")
+    @JoinColumn(name = "editor_id",referencedColumnName = "id")
     private User editor;
 
     @OneToMany(mappedBy="post",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
-    private List<ForumAnswers> answers = new ArrayList<>();
+    private List<ForumAnswer> answers = new ArrayList<>();
 
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name="topic_id", referencedColumnName="id")

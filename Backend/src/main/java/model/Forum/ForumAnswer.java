@@ -18,7 +18,7 @@ import model.User;
 
 @Entity
 @Table(name = "FORUM_ANSWERS")
-public class ForumAnswers {
+public class ForumAnswer {
 
     @Id
     @SequenceGenerator(name = "fAnswerSeq", sequenceName = "ZSEQ_fAnswer_ID", allocationSize = 1, initialValue = 1)
@@ -34,5 +34,7 @@ public class ForumAnswers {
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name ="user_id", referencedColumnName="id")
     private User creator;
+
+    //TODO: Relation to Picture
     
 }

@@ -36,6 +36,7 @@ public class ForumTopic {
     @Column(name = "postCount")
     private Long postCount;
 
+    //relationships
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name ="user_id", referencedColumnName="id")
     private User creator;

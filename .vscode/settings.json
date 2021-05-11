@@ -10,5 +10,8 @@
         "*/mp-rest/providers/*/priority",
         "mp.openapi.schema.*",
         "smallrye.jwt.sign.key-location"
+    ],
+    "cSpell.words": [
+        "ZSEQ"
     ]
 }

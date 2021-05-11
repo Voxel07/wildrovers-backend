@@ -39,6 +39,7 @@ public class ForumCategory {
     @Column(name = "topicCount")
     private Long topicCount;
 
+    //relationships
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name ="user_id", referencedColumnName="id")
     private User creator;
