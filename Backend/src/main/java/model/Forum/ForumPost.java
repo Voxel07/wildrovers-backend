@@ -60,13 +60,108 @@ public class ForumPost {
 
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name="topic_id", referencedColumnName="id")
-    private ForumCategory topic;
+    private ForumTopic topic;
 
-    //User
-    //Antworten
-    //Kategorie
-    //Likes
-    //Bilder
+    @OneToMany(mappedBy ="post", cascade = {CascadeType.ALL}, fetch = FetchType.LAZY)
+    private List<ForumPicture> pictures = new ArrayList<>();
 
-    
+    public ForumPost(){}
+
+    public ForumPost(String title, String content, LocalDate createDate, LocalDate editDate, Long likes,
+            Long dislikes) {
+        this.title = title;
+        this.content = content;
+        this.createDate = createDate;
+        this.editDate = editDate;
+        this.likes = likes;
+        this.dislikes = dislikes;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public LocalDate getCreateDate() {
+        return createDate;
+    }
+
+    public void setCreateDate(LocalDate createDate) {
+        this.createDate = createDate;
+    }
+
+    public LocalDate getEditDate() {
+        return editDate;
+    }
+
+    public void setEditDate(LocalDate editDate) {
+        this.editDate = editDate;
+    }
+
+    public Long getLikes() {
+        return likes;
+    }
+
+    public void setLikes(Long likes) {
+        this.likes = likes;
+    }
+
+    public Long getDislikes() {
+        return dislikes;
+    }
+
+    public void setDislikes(Long dislikes) {
+        this.dislikes = dislikes;
+    }
+
+    public User getCreator() {
+        return creator;
+    }
+
+    public void setCreator(User creator) {
+        this.creator = creator;
+    }
+
+    public User getEditor() {
+        return editor;
+    }
+
+    public void setEditor(User editor) {
+        this.editor = editor;
+    }
+
+    public List<ForumAnswer> getAnswers() {
+        return answers;
+    }
+
+    public void setAnswers(List<ForumAnswer> answers) {
+        this.answers = answers;
+    }
+
+    public ForumTopic getTopic() {
+        return topic;
+    }
+
+    public void setTopic(ForumTopic topic) {
+        this.topic = topic;
+    }    
 }
