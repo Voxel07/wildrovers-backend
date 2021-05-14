@@ -40,16 +40,22 @@ public class ForumPostOrm {
         query.setParameter("val",userId);
         return query.getResultList();
     }
+    public List<ForumPost>getPostsById(Long postId){
+        log.info("ForumOrm/getPostsByUser");
+       TypedQuery<ForumPost> query = em.createQuery("SELECT f FROM ForumPost WHERE id := val", ForumPost.class);
+       query.setParameter("val",postId);
+       return query.getResultList();
+   }
     public List<ForumPost>getPostsByEditor(Long userId){
         log.info("ForumOrm/getPostsByEditor");
        TypedQuery<ForumPost> query = em.createQuery("SELECT f FROM ForumPost WHERE editedBy := val", ForumPost.class);
        query.setParameter("val",userId);
        return query.getResultList();
    }
-    public List<ForumPost>getPostsByCategory(Long categoryId){
-        log.info("ForumOrm/getPostsByCategory");
-        TypedQuery<ForumPost> query = em.createQuery("SELECT f FROM ForumPost WHERE category := val", ForumPost.class);
-        query.setParameter("val",categoryId);
+    public List<ForumPost>getPostsByTopic(Long topicId){
+        log.info("ForumOrm/getPostsByTopic");
+        TypedQuery<ForumPost> query = em.createQuery("SELECT f FROM ForumPost WHERE topic_id := val", ForumPost.class);
+        query.setParameter("val",topicId);
         return query.getResultList();
     }
     public List<ForumPost>getPostByTitel(String titel){
