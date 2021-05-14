@@ -70,6 +70,7 @@ public class ForumCategoryOrm {
             return "User nicht gefunden";
         } 
         category.setCreator(u);
+        category.setTopicCount(0L);
 
         //add Categroy to db
         try {
@@ -116,7 +117,7 @@ public class ForumCategoryOrm {
         //Check if exists
         //Get all Topics
         //Get all Posts
-        //Get all Ansers
+        //Get all Answers
         //Delete Answers
         //Delete Topics
         //Delete Category

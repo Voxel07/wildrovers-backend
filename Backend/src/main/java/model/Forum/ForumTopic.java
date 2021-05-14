@@ -50,12 +50,12 @@ public class ForumTopic {
 
     public ForumTopic(){}
     
-    public ForumTopic(String topic, String creationDate, User creator, ForumCategory category, List<ForumPost> posts) {
+    public ForumTopic(String topic, String creationDate, User creator, ForumCategory category) {
         this.topic = topic;
         this.creationDate = creationDate;
         this.creator = creator;
         this.category = category;
-        this.posts = posts;
+        this.postCount = 0L;
     }
 
     public Long getId() {

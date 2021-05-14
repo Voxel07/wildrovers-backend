@@ -74,7 +74,7 @@ public class UserResouce {
         }
     }
 
-    @PUT
+    @POST
     // @RolesAllowed("admin,user")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
@@ -92,7 +92,7 @@ public class UserResouce {
         return userOrm.loginUser(user);
     }
 
-    @POST
+    @PUT
     // @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)

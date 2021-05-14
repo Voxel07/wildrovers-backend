@@ -91,10 +91,13 @@ public class ForumTopicOrm {
             return "Thema exestiert bereits";
         } 
         //Check if Category exists
-        if(forumCategoryOrm.getCategoriesById(categoryId).isEmpty()){
+        ForumCategory forumCategory = forumCategoryOrm.getCategoriesById(categoryId).get(0);
+        if(forumCategory == null){
             log.warning("category not found");
             return "Angegbene Kategorie nicht gefunden";
         }
+        forumCategory.incrementTopicCount();
+        topic.setCategory(forumCategory);
         //setCreationDate        
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");  
         LocalDateTime now = LocalDateTime.now();  
@@ -106,6 +109,14 @@ public class ForumTopicOrm {
             return "User nicht gefunden";
         } 
         topic.setCreator(u);
+        topic.setPostCount(0L);
+        //updateCategory
+        try {
+            em.merge(forumCategory);
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            return "Fehler beim updaten der Kategorie";
+        }
         //addTopic
         try {
             em.persist(topic);

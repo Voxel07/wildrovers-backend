@@ -54,6 +54,7 @@ public class ForumCategory {
         this.creationDate = creationDate;
         this.creator = creator;
         this.topics = topics;
+        this.topicCount = 0L;
     }
 
     public Long getId() {
@@ -95,15 +96,15 @@ public class ForumCategory {
         this.topics = topics;
     }
 
-    public void incrementPostCount() {
+    public void incrementTopicCount() {
         this.topicCount ++;
     }
 
-    public void decrementPostCount() {
+    public void decrementTopicCount() {
         this.topicCount --;
     }
     
-    public void setPostCount(Long topicCount){
+    public void setTopicCount(Long topicCount){
         this.topicCount = topicCount;
     }
     
