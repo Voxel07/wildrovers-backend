@@ -76,7 +76,7 @@ public class test_user {
 
     public void CheckUserAddress(User u, Address a) {
         Assertions.assertEquals(u.getAddress().getAddressSupplements(), a.getAddressSupplements());
-        Assertions.assertEquals(u.getAddress().getPostalcode(), a.getPostalcode());
+        Assertions.assertEquals(u.getAddress().getPostcode(), a.getPostcode());
         Assertions.assertEquals(u.getAddress().getState(), a.getState());
         Assertions.assertEquals(u.getAddress().getStreet(), a.getStreet());
     }
@@ -189,7 +189,7 @@ public class test_user {
     @Test
     @Order(12)
     void TestUpdateAddress() {
-        addA.setPostalcode(12345L);
+        addA.setPostcode(12345L);
         addA.setStreet("TestingRoad");
         userA.setAddress(addA);
         CheckUserAddress(GetUser(0L, userA.getUserName()),addA);
