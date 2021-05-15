@@ -24,8 +24,8 @@ public class Address {
     @Column(name = "State")
     private String state;
 
-    @Column(name = "Postalcode")
-    private Long postalcode;
+    @Column(name = "Postcode")
+    private Long postcode;
 
     @Column(name = "StreetNumber")
     private Long streetNumber;
@@ -68,12 +68,12 @@ public class Address {
         this.state = state;
     }
 
-    public Long getPostalcode() {
-        return postalcode;
+    public Long getPostcode() {
+        return postcode;
     }
 
-    public void setPostalcode(Long postalcode) {
-        this.postalcode = postalcode;
+    public void setPostcode(Long postcode) {
+        this.postcode = postcode;
     }
 
     public Long getStreetNumber() {
@@ -95,11 +95,11 @@ public class Address {
 
     }
 
-    public Address(String street, String state, Long postalcode, Long streetNumber,
+    public Address(String street, String state, Long postcode, Long streetNumber,
             String addressSupplements) {
         this.street = street;
         this.state = state;
-        this.postalcode = postalcode;
+        this.postcode = postcode;
         this.streetNumber = streetNumber;
         this.addressSupplements = addressSupplements;
     }
