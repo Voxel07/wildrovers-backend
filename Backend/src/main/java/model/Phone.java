@@ -31,7 +31,7 @@ public class Phone{
   
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name ="user_id", referencedColumnName="id")
-    private User usr;
+    private User user;
     
       
     public Phone() {
@@ -68,11 +68,11 @@ public class Phone{
     
     @JsonbTransient
     public User getUsr() {
-		return usr;
+		return user;
 	}
 
-	public void setUsr(User usr) {
-		this.usr = usr;
+	public void setUsr(User user) {
+		this.user = user;
 	}
 
 	@Override
