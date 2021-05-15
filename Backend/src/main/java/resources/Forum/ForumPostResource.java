@@ -37,7 +37,7 @@ import javax.annotation.security.RolesAllowed;
 
 //Logging
 import java.util.logging.Logger;
-@Path("/forum/topic")
+@Path("/forum/post")
 // @RequestScoped
 @ApplicationScoped
 public class ForumPostResource {
@@ -86,25 +86,35 @@ public class ForumPostResource {
     @PUT
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String addPost(){
+    public String addPost(ForumPost forumPost,@QueryParam("topic")Long topicId, @QueryParam("user")Long userId){
         log.info("ForumPostResource/addPost");
-
-        return "TODO:";
+        /**
+         * TODO:
+         * -    Check permissions
+         */
+        return forumPostOrm.addPost(forumPost, topicId, userId);
     }
+
     @POST
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String updatePost(){
+    public String updatePost(ForumPost forumPost, @QueryParam("user") Long userId){
         log.info("ForumPostResource/updatePost");
-
-        return "TODO:";
+        /**
+         * TODO:
+         * -    Check permissions
+         */
+        return forumPostOrm.updatePost(forumPost, userId);
     }
     @DELETE
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String deletePost(){
+    public String deletePost(ForumPost forumPost, @QueryParam("user") Long userId){
         log.info("ForumPostResource/deletePost");
-
-        return "TODO:";
+        /**
+         * TODO:
+         * -    Check permissions
+         */
+        return forumPostOrm.deletePost(forumPost, userId);
     }
 }

@@ -25,9 +25,11 @@ import io.quarkus.security.jpa.Password;
 import io.quarkus.security.jpa.Roles;
 import io.quarkus.security.jpa.UserDefinition;
 import io.quarkus.security.jpa.Username;
+import model.Forum.ForumAnswer;
 import model.Forum.ForumCategory;
 import model.Forum.ForumPost;
 import model.Forum.ForumTopic;
+import model.Users.ActivityForum;
 
 @Entity
 @Table(name = "USER")
@@ -74,7 +76,11 @@ public class User {
     @JoinColumn(name = "address_id", referencedColumnName = "id")
     private Address address;
 
-    @OneToMany(mappedBy="usr",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "activityForum_id", referencedColumnName = "id")
+    private ActivityForum activityForum;
+
+    @OneToMany(mappedBy="user",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
 	private List<Phone> phones = new ArrayList<>();
 
     @OneToMany(mappedBy = "creator",cascade = {CascadeType.ALL},fetch = FetchType.LAZY)
@@ -83,13 +89,40 @@ public class User {
     @OneToMany(mappedBy = "creator",cascade = {CascadeType.ALL},fetch = FetchType.LAZY)
     private List<ForumTopic> topics = new ArrayList<>();
     
-    // @OneToMany(mappedBy="usr",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
-    // private List<ForumPost> posts = new ArrayList<>();
+    @OneToMany(mappedBy="creator",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
+    private List<ForumPost> posts = new ArrayList<>();
+
+    @OneToMany(mappedBy="creator",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
+    private List<ForumAnswer> answers = new ArrayList<>();
   
     public User(){
 
     }
     
+    public ActivityForum getActivityForum() {
+        return activityForum;
+    }
+
+    public void setActivityForum(ActivityForum activityForum) {
+        this.activityForum = activityForum;
+    }
+
+    public List<ForumPost> getPosts() {
+        return posts;
+    }
+
+    public void setPosts(List<ForumPost> posts) {
+        this.posts = posts;
+    }
+
+    public List<ForumAnswer> getAnswers() {
+        return answers;
+    }
+
+    public void setAnswers(List<ForumAnswer> answers) {
+        this.answers = answers;
+    }
+
     public User(String email, String userName, String password, String firstName, String lastName, String role, Boolean isActive) {
         this.email = email;
         this.userName = userName;

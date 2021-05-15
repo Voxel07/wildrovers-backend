@@ -45,12 +45,12 @@ public class ForumCategoryResource {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public List<ForumCategory> getCategorys(@QueryParam("categoryId") Long categorId,@QueryParam("category") String category)
+    public List<ForumCategory> getCategorys(@QueryParam("categoryId") Long categoryId,@QueryParam("category") String category)
     {
          log.info("ForumResource/getCategorys");
-        if(categorId != null){
+        if(categoryId != null){
              log.info("ForumResource/getCategorys/id");
-            return forumCategoryOrm.getCategoriesById(categorId);
+            return forumCategoryOrm.getCategoriesById(categoryId);
         }
         else if(category != null){
              log.info("ForumResource/getCategorys/name");
@@ -65,35 +65,36 @@ public class ForumCategoryResource {
     @PUT
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String addCategory(ForumCategory fc, @QueryParam("creator") Long userId){
+    public String addCategory(ForumCategory forumCategory, @QueryParam("creator") Long userId){
          log.info("ForumResource/addCategory");
         /*
         ToDo
         -   Check permissions
         */
-        return forumCategoryOrm.addCategory(fc,userId);
+        if(userId == null) return "Fehleder oder falscher Parameter";
+        return forumCategoryOrm.addCategory(forumCategory,userId);
     }
     @POST
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String updateCategory(ForumCategory fc){
+    public String updateCategory(ForumCategory forumCategory){
         log.info("ForumResource/updateCategory");
         /*
         @ToDo
         -   Check permissions
         */
-        return forumCategoryOrm.updateCategory(fc);
+        return forumCategoryOrm.updateCategory(forumCategory);
     }
 
     @DELETE
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String deleteCategory(ForumCategory fc){
+    public String deleteCategory(ForumCategory forumCategory){
         log.info("ForumResource/deleteCategory");
         /*
         @ToDo
         -   Check permissions
         */
-        return forumCategoryOrm.removeCategory(fc);
+        return forumCategoryOrm.removeCategory(forumCategory);
     }
 }
