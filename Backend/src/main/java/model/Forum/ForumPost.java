@@ -51,16 +51,16 @@ public class ForumPost {
     @JoinColumn(name ="user_id", referencedColumnName="id")
     private User creator;
 
+    @ManyToOne(fetch=FetchType.LAZY)
+    @JoinColumn(name="topic_id", referencedColumnName="id")
+    private ForumTopic topic;
+
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "editor_id",referencedColumnName = "id")
     private User editor;
 
     @OneToMany(mappedBy="post",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
-    private List<ForumAnswer> answers = new ArrayList<>();
-
-    @ManyToOne(fetch=FetchType.LAZY)
-    @JoinColumn(name="topic_id", referencedColumnName="id")
-    private ForumTopic topic;
+    private List<ForumAnswer> answers = new ArrayList<>();   
 
     @OneToMany(mappedBy ="post", cascade = {CascadeType.ALL}, fetch = FetchType.LAZY)
     private List<ForumPicture> pictures = new ArrayList<>();

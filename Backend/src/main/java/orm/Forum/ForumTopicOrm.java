@@ -22,7 +22,6 @@ import java.time.LocalDateTime;
 import orm.UserOrm;
 import model.User;
 import model.Forum.ForumCategory;
-import model.Forum.ForumPost;
 import model.Forum.ForumTopic;
 
 @ApplicationScoped
@@ -35,42 +34,36 @@ public class ForumTopicOrm {
     @Inject
     ForumCategoryOrm forumCategoryOrm; 
 
-    @Inject
-    UserOrm userOrm;
+    // @Inject
+    // UserOrm userOrm;
 
     //Basic GET methods 
     public List<ForumTopic>getAllTopics(){
         log.info("ForumTopicOrm/getTopics");
-        TypedQuery<ForumTopic> query = em.createQuery("SELECT t FROM ForumTopic t", ForumTopic.class);
+        TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft", ForumTopic.class);
         return query.getResultList();
     }
     public List<ForumTopic>getTopicById(Long topicId){
         log.info("ForumTopicOrm/getTopicById");
-        TypedQuery<ForumTopic> query = em.createQuery("SELECT c FROM ForumTopic c WHERE id =: val", ForumTopic.class);
+        TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft WHERE id =: val", ForumTopic.class);
         query.setParameter("val", topicId);
         return query.getResultList();
     }
     public List<ForumTopic>getTopicsByUser(Long userId){
-        log.info("ForumTopicOrm/getTopicByUser");
-        /*
-        TODO:
-            - Add the 
-        */
-        // User u = em.find(User.class,userId);
-        
-        TypedQuery<ForumTopic> query = em.createQuery("SELECT t FROM ForumTopic t WHERE user_id =: val", ForumTopic.class);
+        log.info("ForumTopicOrm/getTopicByUser");        
+        TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft WHERE user_id =: val", ForumTopic.class);
         query.setParameter("val", userId);
         return query.getResultList();
     }
     public List<ForumTopic>getTopicsByCategory(Long categoryId){
         log.info("ForumTopicOrm/getTopicByCategory");
-        TypedQuery<ForumTopic> query = em.createQuery("SELECT t FROM ForumTopic t WHERE category_id =: val", ForumTopic.class);
+        TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft WHERE category_id =: val", ForumTopic.class);
         query.setParameter("val", categoryId);
         return query.getResultList();
     }
     public List<ForumTopic>getTopicsByTopic(String topic){
         log.info("ForumTopicOrm/getTopicsByTopic");
-        TypedQuery<ForumTopic> query = em.createQuery("SELECT t FROM ForumTopic t WHERE topic =: val", ForumTopic.class);
+        TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft WHERE topic =: val", ForumTopic.class);
         query.setParameter("val", topic);
         return query.getResultList();
     }
@@ -93,7 +86,7 @@ public class ForumTopicOrm {
         //Check if Category exists
         ForumCategory forumCategory = forumCategoryOrm.getCategoriesById(categoryId).get(0);
         if(forumCategory == null){
-            log.warning("category not found");
+            log.warning("CATEGORY not found");
             return "Angegbene Kategorie nicht gefunden";
         }
         forumCategory.incrementTopicCount();

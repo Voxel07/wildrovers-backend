@@ -50,7 +50,7 @@ public class ForumPostResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public List<ForumPost> getPosts( @QueryParam("post") Long postId,
-                            @QueryParam("topic") String topic,  
+                            @QueryParam("title") String title,  
                             @QueryParam("user")Long userId,
                             @QueryParam("topic")Long topicId,
                             @QueryParam("editor")Long editorId)
@@ -72,9 +72,9 @@ public class ForumPostResource {
             log.info("ForumResource/getPosts/editor");
             return forumPostOrm.getPostsByEditor(editorId);
         }
-        else if(topic != null){
+        else if(title != null){
             log.info("ForumResource/getPosts/category");
-            return forumPostOrm.getPostByTitel(topic);
+            return forumPostOrm.getPostByTitel(title);
         }
         else{
                 log.info("ForumResource/getPosts/all");
