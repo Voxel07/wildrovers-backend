@@ -11,10 +11,10 @@ import javax.persistence.TypedQuery;
 import javax.sound.midi.SysexMessage;
 import javax.transaction.Transactional;
 
-import java.util.logging.Level;
+
 //Logging
 import java.util.logging.Logger;
-
+import java.util.logging.Level;
 //Zeit
 import java.time.format.DateTimeFormatter;  
 import java.time.LocalDateTime;
@@ -103,8 +103,8 @@ public class ForumPostOrm {
         User user = em.find(User.class,userId);
         if(user == null) return "Der angegebene Nutzer wurde nicht gefunden";
         System.out.println("nach user find");
-        // System.out.println("user.getActivityForum().incPostCount();");
-        // user.getActivityForum().incPostCount();
+        System.out.println("user.getActivityForum().incPostCount();");
+        user.getActivityForum().incPostCount();
         System.out.println("topic.incrementPostCount();");
         topic.incrementPostCount();
         System.out.println(" forumPost.setTopic(topic);");

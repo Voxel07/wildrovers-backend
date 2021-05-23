@@ -8,11 +8,10 @@ import javax.persistence.TypedQuery;
 import javax.transaction.Transactional;
 
 import model.User;
+import orm.UserStuff.ActivityForumOrm;
 import resources.GenerateToken;
 
 import java.time.LocalDate;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 //Logging
 import java.util.logging.Logger;
@@ -23,6 +22,8 @@ public class UserOrm {
     @Inject
     EntityManager em;
 
+    @Inject
+    ActivityForumOrm activityForumOrm;
 
 
     public List<User> getUsers() {
@@ -65,6 +66,7 @@ public class UserOrm {
         }
 
         usr.setRegDate(LocalDate.now());
+       
 
         // Nutzer einfügen
         try {
@@ -72,7 +74,12 @@ public class UserOrm {
         } catch (Exception e) {
             return "Fehler beim Nutzer einfügen" + e;
         }
-
+        //NOTE:
+        /**
+         * Needs to be after the User has been persisted to the Database so we can get the ID;
+         */
+        //create Activity logs
+        activityForumOrm.addActivityForum(usr.getId());
         // Id zurückgeben
         return "" + getUserByUsername(usr.getUserName()).get(0).getId();
     }
@@ -112,10 +119,11 @@ public class UserOrm {
             // Überprüfen ob die ID die gleiche ist.
             if (!aktUser.getId().equals(u.getId()) && !error) {
                 // Wenn nicht prüfen ob der Name doppelt ist
-                if (aktUser.getEmail().equals(u.getEmail()) && aktUser.getUserName().equals(u.getUserName())) {
-                    error = true;
-                    errorMSG = "Email und UserName bereits vergeben";
-                } else if (aktUser.getUserName().equals(u.getUserName())) {
+                // if (aktUser.getEmail().equals(u.getEmail()) && aktUser.getUserName().equals(u.getUserName())) {
+                //     error = true;
+                //     errorMSG = "Email und UserName bereits vergeben";
+                // } 
+                if (aktUser.getUserName().equals(u.getUserName())) {
                     error = true;
                     errorMSG = "Username bereits vergeben";
                 }

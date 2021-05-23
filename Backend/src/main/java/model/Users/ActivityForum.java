@@ -40,18 +40,19 @@ public class ActivityForum {
     @Column(name = "answerCount")
     private Long answerCount = 0L;
 
-    @OneToOne(mappedBy = "activityForum")
-    private User user;
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "user_id", referencedColumnName = "id")
+    private User userActivityForum;
 
     public ActivityForum(){
     }
 
-    public ActivityForum(Long categoryCount, Long topicCount, Long potCount, Long answerCount, User user) {
+    public ActivityForum(Long categoryCount, Long topicCount, Long potCount, Long answerCount, User userActivityForum) {
         this.categoryCount = categoryCount;
         this.topicCount = topicCount;
         this.potCount = potCount;
         this.answerCount = answerCount;
-        this.user = user;
+        this.userActivityForum = userActivityForum;
     }
 
     public Long getId() {
@@ -63,11 +64,11 @@ public class ActivityForum {
     }
 
     public User getUser() {
-        return user;
+        return userActivityForum;
     }
 
-    public void setUser(User user) {
-        this.user = user;
+    public void setUser(User userActivityForum) {
+        this.userActivityForum = userActivityForum;
     }
     //----Category
     public Long getCategoryCount() {

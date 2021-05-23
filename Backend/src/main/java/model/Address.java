@@ -1,4 +1,5 @@
 package model;
+import javax.persistence.CascadeType;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -7,9 +8,9 @@ import javax.persistence.Id;
 import javax.persistence.SequenceGenerator;
 import javax.persistence.Table;
 import javax.persistence.OneToOne;
-
+import javax.persistence.JoinColumn;
 @Entity
-@Table(name = "USER")
+@Table(name = "Address")
 public class Address {
     @Id
     @SequenceGenerator(name = "addressSeq", sequenceName = "ZSEQ_ADDRESS_ID", allocationSize = 1, initialValue = 1)
@@ -33,8 +34,9 @@ public class Address {
     @Column(name = "AddressSupplements")
     private String addressSupplements;
 
-    @OneToOne(mappedBy = "address")
-    private User user;
+    @OneToOne(cascade = CascadeType.ALL)
+    // @JoinColumn(name = "user_id", referencedColumnName = "id")
+    private User userAddress;
 
     public Long getId() {
         return id;
@@ -45,11 +47,11 @@ public class Address {
     }
 
     public User getUser() {
-        return user;
+        return userAddress;
     }
 
-    public void setUser(User user) {
-        this.user = user;
+    public void setUser(User userAddress) {
+        this.userAddress = userAddress;
     }
 
     public String getStreet() {

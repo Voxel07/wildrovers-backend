@@ -9,7 +9,7 @@ import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
-import javax.persistence.JoinColumn;
+
 import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
 import javax.persistence.Id;
@@ -72,12 +72,10 @@ public class User {
     @Column(name = "regestrationDate")
     private LocalDate regDate;
 
-    @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "address_id", referencedColumnName = "id")
+    @OneToOne(cascade = CascadeType.ALL, mappedBy = "userAddress")
     private Address address;
 
-    @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "activityForum_id", referencedColumnName = "id")
+    @OneToOne(cascade = CascadeType.ALL, mappedBy = "userActivityForum")
     private ActivityForum activityForum;
 
     @OneToMany(mappedBy="user",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
@@ -249,16 +247,4 @@ public class User {
     public void setTopics(List<ForumTopic> topics) {
         this.topics = topics;
     }
-
-    // public List<ForumPost> getPosts() {
-    //     return posts;
-    // }
-
-    // public void setPosts(List<ForumPost> posts) {
-    //     this.posts = posts;
-    // }
-
-   
-
-
 }
