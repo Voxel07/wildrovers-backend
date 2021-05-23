@@ -83,11 +83,13 @@ public class ForumPostOrm {
         if(topicId == null) return "Es muss ein Tehma angegeben werden";
         if(userId == null) return "Es muss ein User angegebene werden";
 
-        ForumTopic topic = forumTopicOrm.getTopicById(topicId).get(0);
-        if(topic == null){
-            log.warning("TOPIC not found");
-            return "Das angegebene Tehma existiert nicht";
-        }
+        List<ForumTopic> forumTopics =forumTopicOrm.getTopicById(topicId);
+        if(forumTopics.isEmpty()) return "Topic nicht gefunden";
+        ForumTopic topic = forumTopics.get(0);
+        // if(topic == null){
+        //     log.warning("TOPIC not found");
+        //     return "Das angegebene Tehma existiert nicht";
+        // }
         //Check if Post title exists in current Topic
         log.warning("topic: "+ topic.getTopic());
         log.warning("title: "+ forumPost.getTitle());
@@ -112,19 +114,19 @@ public class ForumPostOrm {
         System.out.println(" forumPost.setCreator(user);");
         forumPost.setCreator(user);
 
-        try {
-            em.merge(user);
-        } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return "Fehler beim aktualiseren des Users";
-        }
+        // try {
+        //     em.merge(user);
+        // } catch (Exception e) {
+        //     log.log(Level.SEVERE, "Result{0}", e.getMessage());
+        //     return "Fehler beim aktualiseren des Users";
+        // }
 
-        try {
-            em.merge(topic);
-        } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return "Fehler beim aktualiseren des Themas";
-        }
+        // try {
+        //     em.merge(topic);
+        // } catch (Exception e) {
+        //     log.log(Level.SEVERE, "Result{0}", e.getMessage());
+        //     return "Fehler beim aktualiseren des Themas";
+        // }
 
         try {
             em.persist(forumPost);

@@ -69,6 +69,7 @@ public class ForumCategoryOrm {
             log.warning("User nicht in der DB gefunden");
             return "User nicht gefunden";
         } 
+        u.getActivityForum().incCategoryCount();
         category.setCreator(u);
         category.setTopicCount(0L);
 
