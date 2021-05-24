@@ -193,4 +193,12 @@ public class ForumPost {
     public void setPictures(List<ForumPicture> pictures) {
         this.pictures = pictures;
     }
+
+    public Long getViews() {
+        return views;
+    }
+
+    public void setViews(Long views) {
+        this.views = views;
+    }
 }

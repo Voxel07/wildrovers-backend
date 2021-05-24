@@ -72,6 +72,8 @@ public class ForumAnswerOrm {
         forumAnswer.setCreationDate(dtf.format(now));
         forumAnswer.setPost(forumPost);
         forumAnswer.setCreator(user);
+        forumAnswer.setDislikes(0L);
+        forumAnswer.setLikes(0L);
         forumPost.incAnswerCount();
         user.getActivityForum().incAnswerCount();
         try {

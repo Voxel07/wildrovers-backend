@@ -107,6 +107,9 @@ public class ForumPostOrm {
         forumPost.setTopic(topic);
         forumPost.setCreator(user);
         forumPost.setAnswerCount(0L);
+        forumPost.setDislikes(0L);
+        forumPost.setLikes(0L);
+        forumPost.setViews(0L);
 
         // try {
         //     em.merge(user);
