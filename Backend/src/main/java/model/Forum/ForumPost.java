@@ -35,17 +35,23 @@ public class ForumPost {
     @Column(name = "content")
     private String content;
 
-    @Column(name = "crateDate")
-    private LocalDate createDate;
+    @Column(name = "creationDate")
+    private String creationDate;
 
     @Column(name = "editDate")
-    private LocalDate editDate;
+    private String editDate;
 
-    @Column(name = "likes")
+    @Column(name = "views")
+    private Long views;
+
+    @Column(name = "likes", columnDefinition = "bigint default '0'")
     private Long likes;
 
-    @Column(name = "dislikes")
+    @Column(name = "dislikes", columnDefinition = "bigint default '0'")
     private Long dislikes;
+
+    @Column(name = "answerCount", columnDefinition = "bigint default '0'")
+    private Long answerCount;
 
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name ="user_id", referencedColumnName="id")
@@ -67,11 +73,11 @@ public class ForumPost {
 
     public ForumPost(){}
 
-    public ForumPost(String title, String content, LocalDate createDate, LocalDate editDate, Long likes,
+    public ForumPost(String title, String content, String creationDate, String editDate, Long likes,
             Long dislikes) {
         this.title = title;
         this.content = content;
-        this.createDate = createDate;
+        this.creationDate = creationDate;
         this.editDate = editDate;
         this.likes = likes;
         this.dislikes = dislikes;
@@ -101,19 +107,19 @@ public class ForumPost {
         this.content = content;
     }
 
-    public LocalDate getCreateDate() {
-        return createDate;
+    public String getCreationDate() {
+        return creationDate;
     }
 
-    public void setCreateDate(LocalDate createDate) {
-        this.createDate = createDate;
+    public void setCreationDate(String creationDate) {
+        this.creationDate = creationDate;
     }
 
-    public LocalDate getEditDate() {
+    public String getEditDate() {
         return editDate;
     }
 
-    public void setEditDate(LocalDate editDate) {
+    public void setEditDate(String editDate) {
         this.editDate = editDate;
     }
 
@@ -153,6 +159,13 @@ public class ForumPost {
         return answers;
     }
 
+    public void incAnswerCount(){
+        this.answerCount ++;
+    }
+    public void decAnswerCount(){
+        this.answerCount --;
+    }
+
     public void setAnswers(List<ForumAnswer> answers) {
         this.answers = answers;
     }
@@ -164,4 +177,20 @@ public class ForumPost {
     public void setTopic(ForumTopic topic) {
         this.topic = topic;
     }    
+
+    public Long getAnswerCount() {
+        return answerCount;
+    }
+
+    public void setAnswerCount(Long answerCount) {
+        this.answerCount = answerCount;
+    }
+
+    public List<ForumPicture> getPictures() {
+        return pictures;
+    }
+
+    public void setPictures(List<ForumPicture> pictures) {
+        this.pictures = pictures;
+    }
 }

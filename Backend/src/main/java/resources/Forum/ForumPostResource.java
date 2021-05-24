@@ -57,11 +57,11 @@ public class ForumPostResource {
     {
         log.info("ForumResource/getTopics");
         if(postId != null){
-                log.info("ForumResource/getTopics/id");
+            log.info("ForumResource/getTopics/id");
             return forumPostOrm.getPostsById(postId);
         }
         else if(topicId != null){
-                log.info("ForumResource/getTopics/name");
+            log.info("ForumResource/getTopics/name");
             return forumPostOrm.getPostsByTopic(topicId);
         }
         else if(userId != null){

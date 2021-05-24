@@ -33,7 +33,7 @@ public class ForumTopic {
     @Column(name = "creationDate")
     private String creationDate;
 
-    @Column(name = "postCount")
+    @Column(name = "postCount", columnDefinition = "bigint default 0")
     private Long postCount;
 
     //relationships
@@ -55,7 +55,10 @@ public class ForumTopic {
         this.creationDate = creationDate;
         this.creator = creator;
         this.category = category;
-        this.postCount = 0L;
+    }
+
+    public Long getPostCount() {
+        return postCount;
     }
 
     public Long getId() {

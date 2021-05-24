@@ -44,7 +44,7 @@ public class ForumPostOrm {
         return query.getResultList();
     }
     public List<ForumPost>getPostsById(Long postId){
-        log.info("ForumOrm/getPostsByUser");
+        log.info("ForumOrm/getPostsById");
        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE id =: val", ForumPost.class);
        query.setParameter("val",postId);
        return query.getResultList();
@@ -83,7 +83,7 @@ public class ForumPostOrm {
         if(topicId == null) return "Es muss ein Tehma angegeben werden";
         if(userId == null) return "Es muss ein User angegebene werden";
 
-        List<ForumTopic> forumTopics =forumTopicOrm.getTopicById(topicId);
+        List<ForumTopic> forumTopics = forumTopicOrm.getTopicById(topicId);
         if(forumTopics.isEmpty()) return "Topic nicht gefunden";
         ForumTopic topic = forumTopics.get(0);
         // if(topic == null){
@@ -91,28 +91,22 @@ public class ForumPostOrm {
         //     return "Das angegebene Tehma existiert nicht";
         // }
         //Check if Post title exists in current Topic
-        log.warning("topic: "+ topic.getTopic());
-        log.warning("title: "+ forumPost.getTitle());
         TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE topic_id =: val AND title =: val2",ForumPost.class);
         query.setParameter("val", topicId);
         query.setParameter("val2", forumPost.getTitle());
-        log.warning("Querry erstellt.");
-        // List<ForumPost> tmp = query.getResultList();
-        // log.warning("Result = "+ tmp.size());
         if(!query.getResultList().isEmpty()) return "Ein Post mit diesem Titel exestiert bereit in diesem Thema";
 
-        System.out.println("nach Querry vor user find");
         User user = em.find(User.class,userId);
         if(user == null) return "Der angegebene Nutzer wurde nicht gefunden";
-        System.out.println("nach user find");
-        System.out.println("user.getActivityForum().incPostCount();");
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");  
+        LocalDateTime now = LocalDateTime.now();  
+        forumPost.setCreationDate(dtf.format(now));
+
         user.getActivityForum().incPostCount();
-        System.out.println("topic.incrementPostCount();");
         topic.incrementPostCount();
-        System.out.println(" forumPost.setTopic(topic);");
         forumPost.setTopic(topic);
-        System.out.println(" forumPost.setCreator(user);");
         forumPost.setCreator(user);
+        forumPost.setAnswerCount(0L);
 
         // try {
         //     em.merge(user);
@@ -140,7 +134,7 @@ public class ForumPostOrm {
     /**
      *  
      * NOTE: updatePost
-     * -    Check permissions. Onyl creator/mods
+     * -    Check permissions. Only creator/mods
      * -    Check if new name exists already exists in the topic   
      * @param forumPost
      * @param userId

@@ -35,17 +35,18 @@ public class ForumAnswer {
     @Column(name = "content")
     private String content;
 
-    @Column(name = "crateDate")
-    private LocalDate createDate;
+    @Column(name = "creationDate")
+    private String creationDate;
 
     @Column(name = "editDate")
-    private LocalDate editDate;
+    private String editDate;
 
-    @Column(name = "likes")
+    @Column(name = "likes", columnDefinition = "bigint default '0'")
     private Long likes;
 
-    @Column(name = "dislikes")
+    @Column(name = "dislikes", columnDefinition = "bigint default '0'")
     private Long dislikes;
+
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name="post_id", referencedColumnName="id")
     private ForumPost post;
@@ -59,9 +60,9 @@ public class ForumAnswer {
 
     public ForumAnswer(){}
 
-    public ForumAnswer(String content, LocalDate createDate, LocalDate editDate, Long likes, Long dislikes) {
+    public ForumAnswer(String content, String creationDate, String editDate, Long likes, Long dislikes) {
         this.content = content;
-        this.createDate = createDate;
+        this.creationDate = creationDate;
         this.editDate = editDate;
         this.likes = likes;
         this.dislikes = dislikes;
@@ -83,19 +84,19 @@ public class ForumAnswer {
         this.content = content;
     }
 
-    public LocalDate getCreateDate() {
-        return createDate;
+    public String getCreationDate() {
+        return creationDate;
     }
 
-    public void setCreateDate(LocalDate createDate) {
-        this.createDate = createDate;
+    public void setCreationDate(String creationDate) {
+        this.creationDate = creationDate;
     }
 
-    public LocalDate getEditDate() {
+    public String getEditDate() {
         return editDate;
     }
 
-    public void setEditDate(LocalDate editDate) {
+    public void setEditDate(String editDate) {
         this.editDate = editDate;
     }
 
