@@ -90,8 +90,14 @@ public class User {
     @OneToMany(mappedBy="creator",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
     private List<ForumPost> posts = new ArrayList<>();
 
+    @OneToMany(mappedBy="editor",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
+    private List<ForumPost> editedPosts = new ArrayList<>();
+
     @OneToMany(mappedBy="creator",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
     private List<ForumAnswer> answers = new ArrayList<>();
+
+    @OneToMany(mappedBy="editor",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
+    private List<ForumPost> editedAnswers = new ArrayList<>();
   
     public User(){
 

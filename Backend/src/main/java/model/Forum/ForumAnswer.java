@@ -55,6 +55,10 @@ public class ForumAnswer {
     @JoinColumn(name ="user_id", referencedColumnName="id")
     private User creator;
 
+    @ManyToOne(fetch=FetchType.LAZY)
+    @JoinColumn(name = "editor_id",referencedColumnName = "id")
+    private User editor;
+
     @OneToMany(mappedBy ="answer", cascade = {CascadeType.ALL}, fetch = FetchType.LAZY)
     private List<ForumPicture> pictures = new ArrayList<>();
 
@@ -130,6 +134,14 @@ public class ForumAnswer {
 
     public void setCreator(User creator) {
         this.creator = creator;
+    }
+
+    public User getEditor() {
+        return editor;
+    }
+
+    public void setEditor(User editor) {
+        this.editor = editor;
     }
 
     public List<ForumPicture> getPictures() {

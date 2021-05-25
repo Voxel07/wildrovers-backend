@@ -61,7 +61,7 @@ public class ForumPost {
     @JoinColumn(name="topic_id", referencedColumnName="id")
     private ForumTopic topic;
 
-    @OneToOne(cascade = CascadeType.ALL)
+    @ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "editor_id",referencedColumnName = "id")
     private User editor;
 

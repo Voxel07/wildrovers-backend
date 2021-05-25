@@ -60,9 +60,7 @@ public class ForumAnswerOrm {
 
     @Transactional
     public String addAnswer(ForumAnswer forumAnswer, Long postId, Long userId){
-        log.info("ForumAnswerOrm/addAnswer");
-        if(postId == null) return "Es muss ein Tehma angegeben werden";
-        if(userId == null) return "Es muss ein User angegebene werden";
+        log.info("ForumAnswerOrm/addAnswer"); 
         ForumPost forumPost = em.find(ForumPost.class, postId);
         if(forumPost == null) return "Post nicht gefunden";
         User user = em.find(User.class, userId);
@@ -87,8 +85,29 @@ public class ForumAnswerOrm {
 
     }
     @Transactional
-    public String updateAnswer(){
-        return "TODO:";
+    public String updateAnswer(ForumAnswer forumAnswer, Long userId){
+        log.info("ForumAnswerOrm/updateAnswer");
+        User user = em.find(User.class, userId);
+        System.out.println("vor if");
+        if(user == null) return "User nicht gefunden";
+        System.out.println("vor getCreator");
+        Long creatorId = forumAnswer.getCreator().getId();
+        System.out.println("vor if2");
+        if(!creatorId.equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
+        System.out.println("vor datetime");
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");  
+        LocalDateTime now = LocalDateTime.now();  
+        forumAnswer.setCreationDate(dtf.format(now));
+        forumAnswer.setEditor(user);
+
+        try{
+            em.merge(forumAnswer);
+        }catch(Exception e){
+            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            return "Fehler beim updaten der Antwort";
+        }
+        return "Antwort erfolgreich aktualisert";
+
     }
     @Transactional
     public String deleteAnswer(){

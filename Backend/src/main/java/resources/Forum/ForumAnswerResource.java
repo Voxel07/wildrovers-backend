@@ -70,14 +70,17 @@ public class ForumAnswerResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public String addAnswer(ForumAnswer forumAnswer, @QueryParam("user") Long userId, @QueryParam("post") Long postId){
         log.info("ForumAnswerResource/addAnswer");
+        if(postId == null) return "Es muss ein Tehma angegeben werden";
+        if(userId == null) return "Es muss ein User angegebene werden";
         return forumAnswerOrm.addAnswer(forumAnswer, postId, userId);
     }
     @POST
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String updateAnswer(){
+    public String updateAnswer(ForumAnswer forumAnswer, @QueryParam("user") Long userId){
         log.info("ForumAnswerResource/updateAnswer");
-        return forumAnswerOrm.updateAnswer();
+        if(userId == null) return "Es muss ein User angegebene werden";
+        return forumAnswerOrm.updateAnswer(forumAnswer,userId);
     }
     @DELETE
     @Produces(MediaType.APPLICATION_JSON)
