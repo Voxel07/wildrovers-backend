@@ -75,7 +75,7 @@ public class User {
     @OneToOne(cascade = CascadeType.ALL, mappedBy = "userAddress")
     private Address address;
 
-    @OneToOne(cascade = CascadeType.ALL, mappedBy = "userActivityForum")
+    @OneToOne(cascade = CascadeType.ALL, mappedBy = "user")
     private ActivityForum activityForum;
 
     @OneToMany(mappedBy="user",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
@@ -101,26 +101,6 @@ public class User {
   
     public User(){
 
-    }
-    
-    public ActivityForum getActivityForum() {
-        return activityForum;
-    }
-
-    public void setActivityForum(ActivityForum activityForum) {
-        this.activityForum = activityForum;
-    }
-
-    public List<ForumPost> getPosts() {
-        return posts;
-    }
-
-    public void setPosts(List<ForumPost> posts) {
-        this.posts = posts;
-    }
-
-    public List<ForumAnswer> getAnswers() {
-        return answers;
     }
 
     public void setAnswers(List<ForumAnswer> answers) {
@@ -237,7 +217,7 @@ public class User {
     public boolean isActive() {
         return isActive;
     }
-
+    @JsonbTransient
     public List<ForumCategory> getCategories() {
         return categories;
     }
@@ -245,12 +225,48 @@ public class User {
     public void setCategories(List<ForumCategory> categories) {
         this.categories = categories;
     }
-
+    @JsonbTransient
     public List<ForumTopic> getTopics() {
         return topics;
     }
 
     public void setTopics(List<ForumTopic> topics) {
         this.topics = topics;
+    }
+    @JsonbTransient
+    public List<ForumPost> getEditedPosts() {
+        return editedPosts;
+    }
+
+    public void setEditedPosts(List<ForumPost> editedPosts) {
+        this.editedPosts = editedPosts;
+    }
+    @JsonbTransient
+    public List<ForumPost> getEditedAnswers() {
+        return editedAnswers;
+    }
+
+    public void setEditedAnswers(List<ForumPost> editedAnswers) {
+        this.editedAnswers = editedAnswers;
+    }
+    @JsonbTransient
+    public ActivityForum getActivityForum() {
+        return activityForum;
+    }
+
+    public void setActivityForum(ActivityForum activityForum) {
+        this.activityForum = activityForum;
+    }
+    @JsonbTransient
+    public List<ForumPost> getPosts() {
+        return posts;
+    }
+
+    public void setPosts(List<ForumPost> posts) {
+        this.posts = posts;
+    }
+    @JsonbTransient
+    public List<ForumAnswer> getAnswers() {
+        return answers;
     }
 }

@@ -3,6 +3,7 @@ package model.Forum;
 import java.util.ArrayList;
 import java.util.List;
 import javax.persistence.FetchType;
+import javax.json.bind.annotation.JsonbTransient;
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -84,7 +85,7 @@ public class ForumTopic {
     public void setCreationDate(String creationDate) {
         this.creationDate = creationDate;
     }
-
+    @JsonbTransient
     public User getCreator() {
         return creator;
     }
@@ -92,7 +93,7 @@ public class ForumTopic {
     public void setCreator(User creator) {
         this.creator = creator;
     }
-
+    @JsonbTransient
     public ForumCategory getCategory() {
         return category;
     }
@@ -100,7 +101,7 @@ public class ForumTopic {
     public void setCategory(ForumCategory category) {
         this.category = category;
     }
-
+    @JsonbTransient
     public List<ForumPost> getPosts() {
         return posts;
     }

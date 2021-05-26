@@ -12,6 +12,7 @@ import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.SequenceGenerator;
 import javax.persistence.GeneratedValue;
+import javax.json.bind.annotation.JsonbTransient;
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.FetchType;
@@ -119,7 +120,7 @@ public class ForumAnswer {
     public void setDislikes(Long dislikes) {
         this.dislikes = dislikes;
     }
-
+    @JsonbTransient
     public ForumPost getPost() {
         return post;
     }
@@ -127,7 +128,7 @@ public class ForumAnswer {
     public void setPost(ForumPost post) {
         this.post = post;
     }
-
+    @JsonbTransient
     public User getCreator() {
         return creator;
     }
@@ -135,7 +136,7 @@ public class ForumAnswer {
     public void setCreator(User creator) {
         this.creator = creator;
     }
-
+    @JsonbTransient
     public User getEditor() {
         return editor;
     }
@@ -143,7 +144,7 @@ public class ForumAnswer {
     public void setEditor(User editor) {
         this.editor = editor;
     }
-
+    @JsonbTransient
     public List<ForumPicture> getPictures() {
         return pictures;
     }

@@ -7,6 +7,7 @@ import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.SequenceGenerator;
+import javax.json.bind.annotation.JsonbTransient;
 import javax.persistence.Column;
 import javax.persistence.FetchType;
 
@@ -77,7 +78,7 @@ public class ForumPicture {
     public void setPathToPicture(String pathToPicture) {
         this.pathToPicture = pathToPicture;
     }
-
+    @JsonbTransient
     public ForumAnswer getAnswer() {
         return answer;
     }
@@ -85,7 +86,7 @@ public class ForumPicture {
     public void setAnswer(ForumAnswer answer) {
         this.answer = answer;
     }
-
+    @JsonbTransient
     public ForumPost getPost() {
         return post;
     }

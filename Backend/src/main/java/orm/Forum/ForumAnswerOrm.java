@@ -87,13 +87,22 @@ public class ForumAnswerOrm {
     @Transactional
     public String updateAnswer(ForumAnswer forumAnswer, Long userId){
         log.info("ForumAnswerOrm/updateAnswer");
+
         User user = em.find(User.class, userId);
         System.out.println("vor if");
         if(user == null) return "User nicht gefunden";
+
         System.out.println("vor getCreator");
-        Long creatorId = forumAnswer.getCreator().getId();
+        ForumAnswer forumAnswerAusDB = em.find(ForumAnswer.class, forumAnswer.getId());
+        if(forumAnswerAusDB == null) return "Antwort nicht in der DB gefunden";
+
+        System.out.println(forumAnswerAusDB.toString());
+        User creator = forumAnswer.getCreator();
+        if (creator == null) return "creator nicht gesetzt";
+
         System.out.println("vor if2");
-        if(!creatorId.equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
+        // if(!creatorId.equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
+        
         System.out.println("vor datetime");
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");  
         LocalDateTime now = LocalDateTime.now();  

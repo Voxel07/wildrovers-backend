@@ -11,6 +11,7 @@ import javax.persistence.SequenceGenerator;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Column;
 import javax.persistence.FetchType;
+import javax.json.bind.annotation.JsonbTransient;
 import javax.persistence.CascadeType;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
@@ -78,7 +79,7 @@ public class ForumCategory {
     public void setCreationDate(String creationDate) {
         this.creationDate = creationDate;
     }
-
+    @JsonbTransient
     public User getCreator() {
         return creator;
     }
@@ -86,7 +87,7 @@ public class ForumCategory {
     public void setCreator(User creator) {
         this.creator = creator;
     }
-
+    @JsonbTransient
     public List<ForumTopic> getTopics() {
         return topics;
     }

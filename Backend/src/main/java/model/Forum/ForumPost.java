@@ -16,6 +16,7 @@ import javax.persistence.OneToMany;
 import javax.persistence.ManyToOne;
 import javax.persistence.SequenceGenerator;
 import javax.persistence.Table;
+import javax.json.bind.annotation.JsonbTransient;
 import javax.persistence.CascadeType;
 
 
@@ -138,7 +139,7 @@ public class ForumPost {
     public void setDislikes(Long dislikes) {
         this.dislikes = dislikes;
     }
-
+    @JsonbTransient
     public User getCreator() {
         return creator;
     }
@@ -146,7 +147,7 @@ public class ForumPost {
     public void setCreator(User creator) {
         this.creator = creator;
     }
-
+    @JsonbTransient
     public User getEditor() {
         return editor;
     }
@@ -154,7 +155,7 @@ public class ForumPost {
     public void setEditor(User editor) {
         this.editor = editor;
     }
-
+    @JsonbTransient
     public List<ForumAnswer> getAnswers() {
         return answers;
     }
@@ -165,11 +166,11 @@ public class ForumPost {
     public void decAnswerCount(){
         this.answerCount --;
     }
-
+    
     public void setAnswers(List<ForumAnswer> answers) {
         this.answers = answers;
     }
-
+    @JsonbTransient
     public ForumTopic getTopic() {
         return topic;
     }
@@ -185,7 +186,7 @@ public class ForumPost {
     public void setAnswerCount(Long answerCount) {
         this.answerCount = answerCount;
     }
-
+    @JsonbTransient
     public List<ForumPicture> getPictures() {
         return pictures;
     }
