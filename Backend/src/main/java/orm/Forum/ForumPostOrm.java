@@ -38,22 +38,22 @@ public class ForumPostOrm {
         return query.getResultList();
     }
     public List<ForumPost>getPostsByUser(Long userId){
-         log.info("ForumOrm/getPostsByUser");
+        log.info("ForumOrm/getPostsByUser");
         TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE user_id =: val", ForumPost.class);
         query.setParameter("val",userId);
         return query.getResultList();
     }
     public List<ForumPost>getPostsById(Long postId){
         log.info("ForumOrm/getPostsById");
-       TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE id =: val", ForumPost.class);
-       query.setParameter("val",postId);
-       return query.getResultList();
+        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE id =: val", ForumPost.class);
+        query.setParameter("val",postId);
+        return query.getResultList();
    }
     public List<ForumPost>getPostsByEditor(Long userId){
         log.info("ForumOrm/getPostsByEditor");
-       TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE  editor_id =: val", ForumPost.class);
-       query.setParameter("val",userId);
-       return query.getResultList();
+        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE  editor_id =: val", ForumPost.class);
+        query.setParameter("val",userId);
+        return query.getResultList();
    }
     public List<ForumPost>getPostsByTopic(Long topicId){
         log.info("ForumOrm/getPostsByTopic");
@@ -86,10 +86,10 @@ public class ForumPostOrm {
         List<ForumTopic> forumTopics = forumTopicOrm.getTopicById(topicId);
         if(forumTopics.isEmpty()) return "Topic nicht gefunden";
         ForumTopic topic = forumTopics.get(0);
-        // if(topic == null){
-        //     log.warning("TOPIC not found");
-        //     return "Das angegebene Tehma existiert nicht";
-        // }
+        if(topic == null){
+            log.warning("TOPIC not found");
+            return "Das angegebene Tehma existiert nicht";
+        }
         //Check if Post title exists in current Topic
         TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE topic_id =: val AND title =: val2",ForumPost.class);
         query.setParameter("val", topicId);
@@ -110,20 +110,6 @@ public class ForumPostOrm {
         forumPost.setDislikes(0L);
         forumPost.setLikes(0L);
         forumPost.setViews(0L);
-
-        // try {
-        //     em.merge(user);
-        // } catch (Exception e) {
-        //     log.log(Level.SEVERE, "Result{0}", e.getMessage());
-        //     return "Fehler beim aktualiseren des Users";
-        // }
-
-        // try {
-        //     em.merge(topic);
-        // } catch (Exception e) {
-        //     log.log(Level.SEVERE, "Result{0}", e.getMessage());
-        //     return "Fehler beim aktualiseren des Themas";
-        // }
 
         try {
             em.persist(forumPost);

@@ -12,6 +12,7 @@
         "smallrye.jwt.sign.key-location"
     ],
     "cSpell.words": [
+        "Jsonb",
         "ZSEQ"
     ]
 }

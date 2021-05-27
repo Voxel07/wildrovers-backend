@@ -1,5 +1,6 @@
 package resources.Forum;
 
+import java.text.Normalizer.Form;
 //Datentypen
 import java.util.List;
 
@@ -17,6 +18,7 @@ import io.vertx.core.http.HttpServerRequest;
 
 //HTTP Requests
 import javax.ws.rs.GET;
+import javax.ws.rs.PATCH;
 import javax.ws.rs.PUT;
 import javax.ws.rs.POST;
 import javax.ws.rs.DELETE;
@@ -102,6 +104,12 @@ public class ForumAnswerResource{
         log.info("Request: " + request.response() + "|" + request.host()+ "|" + request.cookieCount()+ "|" + request.remoteAddress()+ "|" + request.localAddress());
         if(userId == null) return "Es muss ein User angegebene werden";
         return forumAnswerOrm.deleteAnswer(forumAnswer,userId);
+    }
+    @PATCH
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public String tmp (){
+        return forumAnswerOrm.deleteAllAnswersFromTopic(1L);
     }
 
 }

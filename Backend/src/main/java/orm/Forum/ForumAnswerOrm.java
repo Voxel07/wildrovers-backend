@@ -1,4 +1,6 @@
 package orm.Forum;
+import java.util.HashMap;
+import java.util.Map.Entry;
 //Datentypen
 import java.util.List;
 //
@@ -132,12 +134,75 @@ public class ForumAnswerOrm {
             em.remove(forumAnswerAusDB);
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return "Fehler beim löschen der Antwort";
+            return "Fehler beim Löschen der Antwort";
         }
 
         creator.getActivityForum().decAnswerCount();
         forumAnswerAusDB.getPost().decAnswerCount();
         
         return "Antwort erfolgreich gelöscht";
+    }
+    /**
+     * No checks, because this function does not have a public endpoint
+     * Gets called when a User is Deleted.
+     */
+
+    @Transactional
+    public String deleteAllAnswersFromUser(Long userId){
+        log.info("ForumAnswerOrm/deleteAllAnswersFromUser");
+
+        try {
+            em.createQuery("DELETE fa FROM ForumAnswer fa WHERE user_id =: val").setParameter("val", userId).executeUpdate();
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            return "Fehler beim Löschen der Antworten";
+        }
+      
+        //Maybe set count to 0
+        // User user = em.find(User.class, userId);
+        // user.getActivityForum().setAnswerCount(0L);
+        return "Antworten erfolgreich gelöscht";
+    }
+
+    /**
+     * No checks, because this function does not have a public endpoint
+     * gets Called when a Topic is deleted so no need to update answer count
+     */
+    @Transactional
+    public String deleteAllAnswersFromTopic(Long postId){
+        log.info("ForumAnswerOrm/deleteAllAnswersFromTopic");
+
+        //Get all answers that will be affected to Update the affected user.
+        List<ForumAnswer> allAnswers = getAnswersByPost(postId);
+        HashMap<User, Long> map = new HashMap<User,Long>();
+        //Loop all answers to count the number of deleted answers per user.
+        for (ForumAnswer forumAnswer : allAnswers) {
+           User u = forumAnswer.getCreator();
+           if(map.containsKey(u))
+           {
+                map.put(u, map.get(u) + 1);
+           }
+           else{
+               map.put(u, 1L);
+           }
+        }
+        try {
+            em.createQuery("DELETE FROM ForumAnswer WHERE post_id =: val").setParameter("val", postId).executeUpdate();
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            return "Fehler beim Löschen der Antworten";
+        }
+
+        for (Entry<User, Long> entry : map.entrySet()) {
+            User k = entry.getKey();
+            Long v = entry.getValue();
+            k.getActivityForum().setAnswerCount(k.getActivityForum().getAnswerCount() - v);
+        }
+        /**
+         * TODO:
+         *  - Update all affected User     
+         */
+
+        return "Antworten erfolgreich gelöscht:";
     }
 }

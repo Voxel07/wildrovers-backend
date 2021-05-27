@@ -3,8 +3,6 @@ package model.Forum;
 import java.util.List;
 import java.util.ArrayList;
 
-import java.time.LocalDate;
-
 import javax.persistence.Entity;
 import javax.persistence.Table;
 
