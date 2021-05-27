@@ -9,7 +9,11 @@ import javax.enterprise.context.RequestScoped;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.UriInfo;
+
+import io.vertx.core.http.HttpServerRequest;
 
 //HTTP Requests
 import javax.ws.rs.GET;
@@ -18,6 +22,7 @@ import javax.ws.rs.POST;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.Path;
 import javax.ws.rs.QueryParam;
+
 
 import model.Forum.ForumAnswer;
 import orm.Forum.ForumAnswerOrm;
@@ -28,11 +33,17 @@ import java.util.logging.Logger;
 @Path("/forum/answer")
 // @RequestScoped
 @ApplicationScoped
-public class ForumAnswerResource {
+public class ForumAnswerResource{
     private static final Logger log = Logger.getLogger(ForumAnswerResource.class.getName());
 
     @Inject
     ForumAnswerOrm forumAnswerOrm;
+
+    @Context
+    UriInfo info;
+
+    @Context
+    HttpServerRequest request;
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -85,8 +96,12 @@ public class ForumAnswerResource {
     @DELETE
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String deleteAnswer(){
+    public String deleteAnswer(ForumAnswer forumAnswer, @QueryParam("user") Long userId){
         log.info("ForumAnswerResource/deleteAnswer");
-        return forumAnswerOrm.deleteAnswer();
+        log.info("Info: " + info.getQueryParameters() + "|" + info.getBaseUri() + "|" + info.getPath() + "|" + info.getAbsolutePath());
+        log.info("Request: " + request.response() + "|" + request.host()+ "|" + request.cookieCount()+ "|" + request.remoteAddress()+ "|" + request.localAddress());
+        if(userId == null) return "Es muss ein User angegebene werden";
+        return forumAnswerOrm.deleteAnswer(forumAnswer,userId);
     }
+
 }

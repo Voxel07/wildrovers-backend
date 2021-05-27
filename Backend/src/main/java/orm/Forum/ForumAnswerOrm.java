@@ -89,28 +89,23 @@ public class ForumAnswerOrm {
         log.info("ForumAnswerOrm/updateAnswer");
 
         User user = em.find(User.class, userId);
-        System.out.println("vor if");
         if(user == null) return "User nicht gefunden";
 
-        System.out.println("vor getCreator");
         ForumAnswer forumAnswerAusDB = em.find(ForumAnswer.class, forumAnswer.getId());
         if(forumAnswerAusDB == null) return "Antwort nicht in der DB gefunden";
 
-        System.out.println(forumAnswerAusDB.toString());
-        User creator = forumAnswer.getCreator();
+        User creator = forumAnswerAusDB.getCreator();
         if (creator == null) return "creator nicht gesetzt";
 
-        System.out.println("vor if2");
-        // if(!creatorId.equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
+        if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
         
-        System.out.println("vor datetime");
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");  
         LocalDateTime now = LocalDateTime.now();  
-        forumAnswer.setCreationDate(dtf.format(now));
-        forumAnswer.setEditor(user);
+        forumAnswerAusDB.setEditDate(dtf.format(now));
+        forumAnswerAusDB.setEditor(user);
 
         try{
-            em.merge(forumAnswer);
+            em.merge(forumAnswerAusDB);
         }catch(Exception e){
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return "Fehler beim updaten der Antwort";
@@ -119,7 +114,30 @@ public class ForumAnswerOrm {
 
     }
     @Transactional
-    public String deleteAnswer(){
-        return "TODO:";
+    public String deleteAnswer(ForumAnswer forumAnswer, Long userId){
+        log.info("ForumAnswerOrm/deleteAnswer");
+
+        User user = em.find(User.class, userId);
+        if(user == null) return "User nicht gefunden";
+
+        ForumAnswer forumAnswerAusDB = em.find(ForumAnswer.class, forumAnswer.getId());
+        if(forumAnswerAusDB == null) return "Antwort nicht in der DB gefunden";
+
+        User creator = forumAnswerAusDB.getCreator();
+        if (creator == null) return "creator nicht gesetzt";
+
+        if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
+        
+        try {
+            em.remove(forumAnswerAusDB);
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            return "Fehler beim löschen der Antwort";
+        }
+
+        creator.getActivityForum().decAnswerCount();
+        forumAnswerAusDB.getPost().decAnswerCount();
+        
+        return "Antwort erfolgreich gelöscht";
     }
 }
