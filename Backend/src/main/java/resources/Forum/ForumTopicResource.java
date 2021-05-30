@@ -103,7 +103,7 @@ public class ForumTopicResource {
     @DELETE
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String deleteTopic(ForumTopic ft){
-        return forumTopicOrm.deleteTopic(ft);
+    public String deleteTopic(ForumTopic ft, @QueryParam("user")Long userId){
+        return forumTopicOrm.deleteTopic(ft,userId);
     }
 }

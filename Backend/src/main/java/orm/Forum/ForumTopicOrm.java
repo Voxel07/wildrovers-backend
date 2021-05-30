@@ -1,8 +1,10 @@
 package orm.Forum;
 
-import java.util.ArrayList;
 //Additional Data Types
+import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map.Entry;
 
 //
 import javax.enterprise.context.ApplicationScoped;
@@ -33,6 +35,9 @@ public class ForumTopicOrm {
     
     @Inject
     ForumCategoryOrm forumCategoryOrm; 
+
+    @Inject
+    ForumPostOrm forumPostOrm;
 
     // @Inject
     // UserOrm userOrm;
@@ -91,7 +96,7 @@ public class ForumTopicOrm {
         //     log.warning("CATEGORY not found");
         //     return "Angegbene Kategorie nicht gefunden";
         // }
-        forumCategory.incrementTopicCount();
+        forumCategory.incTopicCount();
         topic.setCategory(forumCategory);
         //setCreationDate        
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");  
@@ -103,17 +108,11 @@ public class ForumTopicOrm {
             log.warning("User nicht in der DB gefunden");
             return "User nicht gefunden";
         } 
+
         u.getActivityForum().incTopicCount();
         topic.setCreator(u);
         topic.setPostCount(0L);
-        //updateCategory
-        // try {
-        //     em.merge(forumCategory);
-        // } catch (Exception e) {
-        //     log.log(Level.SEVERE, "Result{0}", e.getMessage());
-        //     return "Fehler beim updaten der Kategorie";
-        // }
-        //addTopic
+
         try {
             em.persist(topic);
         } catch (Exception e) {
@@ -127,20 +126,119 @@ public class ForumTopicOrm {
         - ToDo
     */
     @Transactional
-    public String updateTopic(ForumTopic ft, Long userId){
+    public String updateTopic(ForumTopic forumTopic, Long userId){
         log.info("ForumTopicOrm/updateTopic");
 
-        return "ToDo";
+        User user = em.find(User.class, userId);
+        if(user == null) return "User nicht gefunden";
+
+        ForumTopic forumTopicAusDB = em.find(ForumTopic.class, forumTopic.getId());
+        if(forumTopicAusDB == null) return "Thema nicht in der DB gefunden";
+
+        User creator = forumTopicAusDB.getCreator();
+        if (creator == null) return "creator nicht gesetzt";
+
+        if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
+        
+        forumTopicAusDB.setTopic(forumTopic.getTopic());
+
+        try{
+            em.merge(forumTopicAusDB);
+        }catch(Exception e){
+            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            return "Fehler beim updaten der Antwort";
+        }
+        return "Thema erfolgreich aktualisert";
     }
     /*
         Brief updateTopic
         - ToDo
     */
     @Transactional 
-    public String deleteTopic(ForumTopic topicId){
+    public String deleteTopic(ForumTopic forumTopic, Long userId){
         log.info("ForumTopicOrm/deleteTopic");
 
-        return "ToDo";
+        User user = em.find(User.class, userId);
+        if(user == null) return "User nicht gefunden";
+        Long topicId = forumTopic.getId();
+        ForumTopic forumTopicAusDB = em.find(ForumTopic.class, topicId);
+        if(forumTopicAusDB == null) return "Thema nicht in der DB gefunden";
+
+        User creator = forumTopicAusDB.getCreator();
+        if (creator == null) return "creator nicht gesetzt";
+
+        if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
+        
+        try {
+            em.remove(forumTopicAusDB);
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            return "Fehler beim Löschen des Topics";
+        }
+
+        creator.getActivityForum().decTopicCount();
+        forumTopicAusDB.getCategory().decTopicCount();
+        forumPostOrm.deleteAllPostsFromTopic(topicId);
+        
+        return "Thema erfolgreich gelöscht";
+    }
+    /**
+     * No checks, because this function does not have a public endpoint
+     * gets Called when a Topic is deleted so no need to update answer count
+     */
+    @Transactional
+    public String deleteAllTopicsFromUser(Long userId){
+        log.info("ForumAnswerOrm/deleteAllTopicsFromUser");
+
+        try {
+            em.createQuery("DELETE ft FROM ForumTopic ft WHERE user_id =: val").setParameter("val", userId).executeUpdate();
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            return "Fehler beim Löschen der Themen";
+        }
+      
+        //Maybe set count to 0
+        // User user = em.find(User.class, userId);
+        // user.getActivityForum().setAnswerCount(0L);
+        return "Themen erfolgreich gelöscht";
+    }
+
+    /**
+     * No checks, because this function does not have a public endpoint
+     * gets Called when a Topic is deleted so no need to update answer count
+     */
+    @Transactional
+    public String deleteAllTopicsFromCategory(Long categoryId){
+        log.info("ForumCategoryOrm/deleteAllTopicsFromCategory");
+
+        //Get all answers that will be affected to Update the affected user.
+        List<ForumTopic> allTopics = getTopicsByCategory(categoryId);
+        HashMap<User, Long> map = new HashMap<User,Long>();
+        //Loop all answers to count the number of deleted answers per user.
+        for (ForumTopic forumTopic : allTopics) {
+           User u = forumTopic.getCreator();
+           if(map.containsKey(u))
+           {
+                map.put(u, map.get(u) + 1);
+           }
+           else{
+               map.put(u, 1L);
+           }
+           forumPostOrm.deleteAllPostsFromTopic(forumTopic.getId());
+        }
+        try {
+            em.createQuery("DELETE FROM ForumTopic WHERE category_id =: val").setParameter("val", categoryId).executeUpdate();
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            return "Fehler beim Löschen der Antworten";
+        }
+
+        for (Entry<User, Long> entry : map.entrySet()) {
+            User k = entry.getKey();
+            Long v = entry.getValue();
+            k.getActivityForum().setTopicCount(k.getActivityForum().getTopicCount() - v);
+        }
+        return "Topics erfolgreich gelöscht:";
     }
 
     

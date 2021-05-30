@@ -110,11 +110,11 @@ public class ForumTopic {
         this.posts = posts;
     }
 
-    public void incrementPostCount() {
+    public void incPostCount() {
         this.postCount ++;
     }
 
-    public void decrementPostCount() {
+    public void decPostCount() {
         this.postCount --;
     }
     

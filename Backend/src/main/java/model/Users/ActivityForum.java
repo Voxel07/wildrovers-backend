@@ -103,7 +103,7 @@ public class ActivityForum {
         this.topicCount = topicCount;
     }
     //----Post
-    public Long getPotCount() {
+    public Long getPostCount() {
         return potCount;
     }
 
@@ -115,7 +115,7 @@ public class ActivityForum {
         this.potCount --;
     }
 
-    public void setPotCount(Long potCount) {
+    public void setPostCount(Long potCount) {
         this.potCount = potCount;
     }
     //----Answer

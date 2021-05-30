@@ -96,11 +96,11 @@ public class ForumCategory {
         this.topics = topics;
     }
 
-    public void incrementTopicCount() {
+    public void incTopicCount() {
         this.topicCount ++;
     }
 
-    public void decrementTopicCount() {
+    public void decTopicCount() {
         this.topicCount --;
     }
     

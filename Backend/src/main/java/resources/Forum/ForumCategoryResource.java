@@ -77,24 +77,24 @@ public class ForumCategoryResource {
     @POST
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String updateCategory(ForumCategory forumCategory){
+    public String updateCategory(ForumCategory forumCategory,@QueryParam("user")Long userId){
         log.info("ForumResource/updateCategory");
         /*
         @ToDo
         -   Check permissions
         */
-        return forumCategoryOrm.updateCategory(forumCategory);
+        return forumCategoryOrm.updateCategory(forumCategory,userId);
     }
 
     @DELETE
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String deleteCategory(ForumCategory forumCategory){
+    public String deleteCategory(ForumCategory forumCategory, @QueryParam("user")Long userId){
         log.info("ForumResource/deleteCategory");
         /*
         @ToDo
         -   Check permissions
         */
-        return forumCategoryOrm.removeCategory(forumCategory);
+        return forumCategoryOrm.deleteCategory(forumCategory,userId);
     }
 }

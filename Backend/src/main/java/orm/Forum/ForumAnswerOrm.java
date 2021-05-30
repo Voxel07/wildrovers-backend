@@ -1,8 +1,9 @@
 package orm.Forum;
-import java.util.HashMap;
-import java.util.Map.Entry;
+
 //Datentypen
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map.Entry;
 //
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
@@ -101,6 +102,7 @@ public class ForumAnswerOrm {
 
         if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
         
+        forumAnswerAusDB.setContent(forumAnswer.getContent());
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");  
         LocalDateTime now = LocalDateTime.now();  
         forumAnswerAusDB.setEditDate(dtf.format(now));
@@ -198,11 +200,6 @@ public class ForumAnswerOrm {
             Long v = entry.getValue();
             k.getActivityForum().setAnswerCount(k.getActivityForum().getAnswerCount() - v);
         }
-        /**
-         * TODO:
-         *  - Update all affected User     
-         */
-
         return "Antworten erfolgreich gelöscht:";
     }
 }

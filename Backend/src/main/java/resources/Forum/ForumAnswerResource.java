@@ -87,6 +87,7 @@ public class ForumAnswerResource{
         if(userId == null) return "Es muss ein User angegebene werden";
         return forumAnswerOrm.addAnswer(forumAnswer, postId, userId);
     }
+
     @POST
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
@@ -95,6 +96,7 @@ public class ForumAnswerResource{
         if(userId == null) return "Es muss ein User angegebene werden";
         return forumAnswerOrm.updateAnswer(forumAnswer,userId);
     }
+    
     @DELETE
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
@@ -105,11 +107,4 @@ public class ForumAnswerResource{
         if(userId == null) return "Es muss ein User angegebene werden";
         return forumAnswerOrm.deleteAnswer(forumAnswer,userId);
     }
-    @PATCH
-    @Produces(MediaType.APPLICATION_JSON)
-    @Consumes(MediaType.APPLICATION_JSON)
-    public String tmp (){
-        return forumAnswerOrm.deleteAllAnswersFromTopic(1L);
-    }
-
 }

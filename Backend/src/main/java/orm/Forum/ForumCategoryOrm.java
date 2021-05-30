@@ -27,6 +27,8 @@ public class ForumCategoryOrm {
     private static final Logger log = Logger.getLogger(ForumCategoryOrm.class.getName());
     @Inject
     EntityManager em; 
+    @Inject
+    ForumTopicOrm forumTopicOrm;
 
     //Basic GET methods 
     public List<ForumCategory>getAllCategories(){
@@ -87,41 +89,59 @@ public class ForumCategoryOrm {
         - TODO: Only Creator/Mod is allowed to update
     */
     @Transactional
-    public String updateCategory(ForumCategory category){
+    public String updateCategory(ForumCategory forumCategory, Long userId){
         log.info("ForumCategoryOrm/updateCategory");
 
-        TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c WHERE category =: val OR id =: val2",ForumCategory.class);
-        query.setParameter("val", category.getCategory());
-        query.setParameter("val2", category.getId());
-        List<ForumCategory> fromDb = query.getResultList();
-        //Check if exists
-        if(fromDb.isEmpty()) return "Kategorie exestiert nicht";
+        User user = em.find(User.class, userId);
+        if(user == null) return "User nicht gefunden";
 
-        for (ForumCategory aktCat : fromDb) {
-            if(aktCat.getCategory().equals(category.getCategory()) && !aktCat.getId().equals(category.getId())) return "Ketegoriename ist bereits vergeben";
+        ForumCategory forumCategoryAusDB = em.find(ForumCategory.class, forumCategory.getId());
+        if(forumCategoryAusDB == null) return "Kategorie nicht in der DB gefunden";
+
+        User creator = forumCategoryAusDB.getCreator();
+        if (creator == null) return "creator nicht gesetzt";
+
+        if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
+        
+        forumCategoryAusDB.setCategory(forumCategory.getCategory());
+
+        try{
+            em.merge(forumCategoryAusDB);
+        }catch(Exception e){
+            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            return "Fehler beim updaten der Kategorie";
         }
-        //Update
-        try {
-            em.merge(category);
-        } catch (Exception e) {
-             log.info("Exception updateCategory" + e.getMessage());
-            return "Error while updating the Category";
-        }
-        return "Kategorie erfolgreich aktualisiert";
+        return "Kategorie erfolgreich aktualisert";
     }
     /*
         @Brief removeCategory
         - TODO: everything
     */
-    public String removeCategory(ForumCategory category){
+    @Transactional
+    public String deleteCategory(ForumCategory forumCategory, Long userId){
         log.info("ForumCategoryOrm/removeCategory");
-        //Check if exists
-        //Get all Topics
-        //Get all Posts
-        //Get all Answers
-        //Delete Answers
-        //Delete Topics
-        //Delete Category
-        return "ToDo";
+        User user = em.find(User.class, userId);
+        if(user == null) return "User nicht gefunden";
+        Long categoryId = forumCategory.getId();
+        ForumCategory forumCategoryAusDB = em.find(ForumCategory.class, categoryId);
+        if(forumCategoryAusDB == null) return "Thema nicht in der DB gefunden";
+
+        User creator = forumCategoryAusDB.getCreator();
+        if (creator == null) return "creator nicht gesetzt";
+
+        if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
+        
+        try {
+            em.remove(forumCategoryAusDB);
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            return "Fehler beim Löschen der Kategorie";
+        }
+
+        creator.getActivityForum().decCategoryCount();
+        forumTopicOrm.deleteAllTopicsFromCategory(categoryId);
+        user.getActivityForum().decCategoryCount();
+        
+        return "Kategorie erfolgreich gelöscht";
     }
 }
