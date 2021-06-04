@@ -4,11 +4,11 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "quarkusDev (Backend)",
+			"label": "quarkus:dev",
 			"type": "shell",
-			"command": "./gradlew quarkusDev --console=plain",
+			"command": "./mvnw quarkus:dev ",
 			"windows": {
-				"command": ".\\gradlew.bat quarkusDev --console=plain"
+				"command": ".\\mvnw.cmd quarkus:dev "
 			},
 			"isBackground": true,
 			"problemMatcher": [
@@ -23,14 +23,11 @@
 					],
 					"background": {
 						"activeOnStart": true,
-						"beginsPattern": "^.*Starting a Gradle Daemon*",
+						"beginsPattern": "^.*Scanning for projects...*",
 						"endsPattern": "^.*Quarkus .* started in .*\\. Listening on:*"
 					}
 				}
-			],
-			"options": {
-				"cwd": "Backend"
-			}
+			]
 		}
 	]
 }

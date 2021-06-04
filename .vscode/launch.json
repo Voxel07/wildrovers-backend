@@ -6,18 +6,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "java",
-            "name": "Launch GenerateToken",
-            "request": "launch",
-            "mainClass": "resources.GenerateToken",
-            "projectName": "Homepage"
-        },
-        {
-            "preLaunchTask": "quarkusDev (Backend)",
+            "preLaunchTask": "quarkus:dev",
             "type": "java",
             "request": "attach",
             "hostName": "localhost",
-            "name": "Debug Quarkus application (Backend)",
+            "name": "Debug Quarkus application",
             "port": 5005
         }
     ]
