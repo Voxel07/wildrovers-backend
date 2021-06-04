@@ -9,7 +9,6 @@ import javax.transaction.Transactional;
 
 import model.User;
 import orm.UserStuff.ActivityForumOrm;
-import resources.GenerateToken;
 
 import java.time.LocalDate;
 
@@ -147,7 +146,7 @@ public class UserOrm {
     }
 
     @Transactional
-    public String loginUser(User usr) {
+    public Boolean loginUser(User usr) {
          log.info("UserOrm/loginUser");
 
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName = :val OR email = :val2" , User.class);
@@ -155,14 +154,10 @@ public class UserOrm {
         query.setParameter("val2", usr.getEmail());
         // Falls kein User mit dem namen gefunden wurde
         if (query.getResultList().isEmpty()) {
-            return "Kein nutzer mit diesen Namen gefunden";
+            return false;
         }
-        if (query.getSingleResult().getPassword().equals(usr.getPassword())) {
-           
-            return  GenerateToken.generator("user","camo");
-        } else {
-            return "Passwort passt nicht";
-        }
+        return (query.getSingleResult().getPassword().equals(usr.getPassword()));
+       
 
     }
 

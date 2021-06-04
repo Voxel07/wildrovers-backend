@@ -28,23 +28,35 @@ import model.User;
 import orm.UserOrm;
 import javax.ws.rs.QueryParam;
 
+//Coockie
+import javax.ws.rs.core.NewCookie;
+import javax.ws.rs.core.Response;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Date;
+
 //Emailzeug
 import io.quarkus.mailer.Mailer;
 import io.quarkus.mailer.reactive.ReactiveMailer;
 
 //Sicherheits Zeug
 import javax.ws.rs.core.SecurityContext;
-
+import javax.ws.rs.core.Response.Status;
+import javax.ws.rs.core.Context;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import java.security.Principal;
 import javax.annotation.security.PermitAll;
 import javax.annotation.security.RolesAllowed;
 
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.UriInfo;
+import io.vertx.core.http.HttpServerRequest;
+
 @Path("/user")
 // @RequestScoped
 @ApplicationScoped
 public class UserResouce {
-    private static final Logger LOG = Logger.getLogger(UserResouce.class);
+    private static final Logger log = Logger.getLogger(UserResouce.class);
 
    
     @Inject
@@ -56,20 +68,30 @@ public class UserResouce {
     @Inject
     JsonWebToken  jwt;
 
+    @Context
+    UriInfo info;
+
+    @Context
+    HttpServerRequest request;
+
+    @Context
+    HttpHeaders header;
+    
+
     @GET
     // @RolesAllowed("user")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public List<User> getUser(@QueryParam("userId") Long userId, @QueryParam("username") String userName){
-        LOG.info("UserResource/getUser");
+        log.info("UserResource/getUser");
         if (userId != null) {
-            LOG.info("getUserById");
+            log.info("getUserById");
             return userOrm.getUserById(userId);
         } else if (userName != null) {
-            LOG.info("getUserByUsername");
+            log.info("getUserByUsername");
             return userOrm.getUserByUsername(userName);
         } else {
-            LOG.info("getUsers");
+            log.info("getUsers");
             return userOrm.getUsers();
         }
     }
@@ -79,17 +101,37 @@ public class UserResouce {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public String updateUser(User user) {
-        LOG.info("UserResource/updateUser");
+        log.info("UserResource/updateUser");
         return userOrm.updateUser(user);
     }
 
     @POST
     @Path("/login")
-    // @PermitAll
+    @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String login(User user){
-        return userOrm.loginUser(user);
+    public Response login(User user){
+
+        log.info("Info: " + info.getQueryParameters() + "|" + info.getBaseUri() + "|" + info.getPath() + "|" + info.getAbsolutePath());
+        log.info("Request: " + request + "|" + request.host()+ "|" + request.cookieCount()+ "|" + request.remoteAddress()+ "|" + request.localAddress()+ "|" + request.method());
+        log.info("Cookie: " + request.getCookie("LogIn").encode());
+
+        if (Boolean.TRUE.equals(userOrm.loginUser(user))){
+            String token = GenerateToken.generator("user","camo");
+            return Response.ok("Hello, World!"+ token, MediaType.TEXT_PLAIN_TYPE)
+            // set a response header
+            .header("X-FroMage", "Camembert")
+            // set the Expires response header to two days from now
+            .expires(Date.from(Instant.now().plus(Duration.ofDays(2))))
+            // send a new cookie
+            .cookie(new NewCookie("JWT", token))
+            // end of builder API
+            .build();
+        }
+        else{
+            return Response.status(401).build();
+        }
+      
     }
 
     @PUT
@@ -97,7 +139,7 @@ public class UserResouce {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public String addUser(User usr) {
-        LOG.info("UserResource/addUser");
+        log.info("UserResource/addUser");
         return userOrm.addUser(usr);
     }
 
@@ -106,7 +148,7 @@ public class UserResouce {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public String deleteUser(User usr) {
-        LOG.info("UserResource/deleteUser");
+        log.info("UserResource/deleteUser");
         // return userOrm.addUser(usr);
         return "testingdelete";
     }

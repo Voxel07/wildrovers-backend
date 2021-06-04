@@ -9,6 +9,9 @@ import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
+
+import org.json.JSONObject;
+import org.json.JSONException;
 //HTTP Requests
 import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
@@ -20,6 +23,7 @@ import javax.ws.rs.QueryParam;
 
 //Logging
 import java.util.logging.Logger;
+import java.util.logging.Level;
 
 //Eigene Imports
 import model.Forum.ForumPost;
@@ -86,11 +90,28 @@ public class ForumPostResource {
     @PUT
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String addPost(ForumPost forumPost,@QueryParam("topic")Long topicId, @QueryParam("user")Long userId){
+    public String addPost(String postString,@QueryParam("topic")Long topicId, @QueryParam("user")Long userId){
         log.info("ForumPostResource/addPost");
+        JSONObject myJson;
+        try {
+            myJson = new JSONObject(postString);
+        }catch(JSONException err){
+            log.info("Error" + err.toString());
+            return "Error wehen converting";
+        }
+        ForumPost forumPost = new ForumPost();
+
+        forumPost.setTitle(myJson.getString("title"));
+        try {
+            forumPost.setContent(myJson.getJSONObject("content").toString());
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            return "This should never Happen";
+        }
         /**
          * TODO:
          * -    Check permissions
+         * -    Save Pictures
          */
         return forumPostOrm.addPost(forumPost, topicId, userId);
     }

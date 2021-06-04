@@ -33,7 +33,7 @@ public class ForumPost {
     @Column(name = "title")
     private String title;
 
-    @Column(name = "content")
+    @Column(name = "content",columnDefinition = "LONGTEXT")
     private String content;
 
     @Column(name = "creationDate")
@@ -66,7 +66,7 @@ public class ForumPost {
     @JoinColumn(name = "editor_id",referencedColumnName = "id")
     private User editor;
 
-    @OneToMany(mappedBy="post",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
+    @OneToMany(mappedBy="post",cascade = {CascadeType.ALL},fetch = FetchType.LAZY )
     private List<ForumAnswer> answers = new ArrayList<>();   
 
     @OneToMany(mappedBy ="post", cascade = {CascadeType.ALL}, fetch = FetchType.LAZY)
