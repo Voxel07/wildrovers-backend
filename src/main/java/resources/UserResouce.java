@@ -9,8 +9,11 @@ import javax.enterprise.context.RequestScoped;
 import javax.inject.Inject;
 import javax.swing.text.AttributeSet.ColorAttribute;
 import javax.ws.rs.InternalServerErrorException;
+
 //Logging zeug
-import org.jboss.logging.Logger;
+import java.util.logging.Logger;
+import java.util.logging.Level;
+
 //HTTP Requests
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -56,7 +59,7 @@ import io.vertx.core.http.HttpServerRequest;
 // @RequestScoped
 @ApplicationScoped
 public class UserResouce {
-    private static final Logger log = Logger.getLogger(UserResouce.class);
+    private static final Logger log = Logger.getLogger(UserResouce.class.getName());
 
    
     @Inject
@@ -112,10 +115,14 @@ public class UserResouce {
     @Consumes(MediaType.APPLICATION_JSON)
     public Response login(User user){
 
+        /**
+         * TODO: fix query crash when user is not found
+         */
         log.info("Info: " + info.getQueryParameters() + "|" + info.getBaseUri() + "|" + info.getPath() + "|" + info.getAbsolutePath());
         log.info("Request: " + request + "|" + request.host()+ "|" + request.cookieCount()+ "|" + request.remoteAddress()+ "|" + request.localAddress()+ "|" + request.method());
-        log.info("Cookie: " + request.getCookie("LogIn").encode());
+        // log.info("Cookie: " + request.getCookie("LogIn").encode());
 
+       
         if (Boolean.TRUE.equals(userOrm.loginUser(user))){
             String token = GenerateToken.generator("user","camo");
             return Response.ok("Hello, World!"+ token, MediaType.TEXT_PLAIN_TYPE)
@@ -131,6 +138,7 @@ public class UserResouce {
         else{
             return Response.status(401).build();
         }
+      
       
     }
 

@@ -25,6 +25,7 @@ import io.quarkus.security.jpa.Password;
 import io.quarkus.security.jpa.Roles;
 import io.quarkus.security.jpa.UserDefinition;
 import io.quarkus.security.jpa.Username;
+import io.quarkus.elytron.security.common.BcryptUtil;
 import model.Forum.ForumAnswer;
 import model.Forum.ForumCategory;
 import model.Forum.ForumPost;
@@ -110,7 +111,7 @@ public class User {
     public User(String email, String userName, String password, String firstName, String lastName, String role, Boolean isActive) {
         this.email = email;
         this.userName = userName;
-        this.password = password;
+        this.password = BcryptUtil.bcryptHash(password);
         this.firstName = firstName;
         this.lastName = lastName;
         this.role = role;
@@ -268,5 +269,15 @@ public class User {
     @JsonbTransient
     public List<ForumAnswer> getAnswers() {
         return answers;
+    }
+
+    @Override
+    public String toString() {
+        return "User [activityForum=" + activityForum + ", address=" + address + ", answers=" + answers
+                + ", categories=" + categories + ", editedAnswers=" + editedAnswers + ", editedPosts=" + editedPosts
+                + ", email=" + email + ", firstName=" + firstName + ", id=" + id + ", isActive=" + isActive
+                + ", lastLogin=" + lastLogin + ", lastName=" + lastName + ", password=" + password + ", phones="
+                + phones + ", posts=" + posts + ", regDate=" + regDate + ", role=" + role + ", topics=" + topics
+                + ", userName=" + userName + "]";
     }
 }

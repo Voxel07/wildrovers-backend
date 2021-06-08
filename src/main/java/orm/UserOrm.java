@@ -7,6 +7,14 @@ import javax.persistence.EntityManager;
 import javax.persistence.TypedQuery;
 import javax.transaction.Transactional;
 
+import io.quarkus.elytron.security.common.BcryptUtil;
+import org.wildfly.security.password.Password;
+import org.wildfly.security.password.PasswordFactory;
+import org.wildfly.security.password.WildFlyElytronPasswordProvider;
+import org.wildfly.security.password.interfaces.BCryptPassword;
+import org.wildfly.security.password.util.ModularCrypt;
+
+
 import model.User;
 import orm.UserStuff.ActivityForumOrm;
 
@@ -14,6 +22,7 @@ import java.time.LocalDate;
 
 //Logging
 import java.util.logging.Logger;
+import java.util.logging.Level;
 
 @ApplicationScoped
 public class UserOrm {
@@ -52,19 +61,16 @@ public class UserOrm {
     public String addUser(User usr) {
          log.info("UserOrm/addUser");
 
-        // Prüfen dass Username und Email einzigartig sind
-        // if (testInputs(usr) == "default") {
-        //     return "da passt was nicht";
-        // } else {
-        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val2",
-                User.class);
+        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val2", User.class);
         query.setParameter("val1", usr.getUserName());
         query.setParameter("val2", usr.getEmail());
         if (!query.getResultList().isEmpty()) {
             return "Nutzer bereits bekannt";
         }
-
+ 
+        usr.setPassword(BcryptUtil.bcryptHash(usr.getPassword()));
         usr.setRegDate(LocalDate.now());
+        usr.setActive(true);
        
 
         // Nutzer einfügen
@@ -82,21 +88,6 @@ public class UserOrm {
         // Id zurückgeben
         return "" + getUserByUsername(usr.getUserName()).get(0).getId();
     }
-
-    // }
-
-    // public String testInputs(User usr) {
-    //     if (!validateEmail(usr.getEmail())) {
-    //         return "invalid Email";
-    //     }
-    //     return "default";
-    // }
-
-    // public Boolean validateEmail(String email){
-    //     Pattern p = Pattern.compile("/\A[^@]+@([^@\.]+\.)+[^@\.]+\z/");
-    //     Matcher m = p.matcher(email);
-    //     return m.matches();
-    // }
 
     @Transactional
     public String updateUser(User u) {
@@ -145,22 +136,44 @@ public class UserOrm {
         return errorMSG;
     }
 
-    @Transactional
-    public Boolean loginUser(User usr) {
-         log.info("UserOrm/loginUser");
-
-        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName = :val OR email = :val2" , User.class);
-        query.setParameter("val", usr.getUserName());
+    
+    public Boolean loginUser(User usr){
+        log.info("UserOrm/loginUser");
+        log.info(usr.toString());
+        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val2", User.class);
+        query.setParameter("val1", usr.getUserName());
         query.setParameter("val2", usr.getEmail());
         // Falls kein User mit dem namen gefunden wurde
-        if (query.getResultList().isEmpty()) {
+        User u = query.getSingleResult();
+        if (u == null) {
+            log.info("Kein nutzer mit den daten gefunden");
             return false;
         }
-        return (query.getSingleResult().getPassword().equals(usr.getPassword()));
-       
-
+        try {
+           return verifyBCryptPassword(u.getPassword(), usr.getPassword());
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            return false;
+        }
     }
 
+    public static boolean verifyBCryptPassword(String bCryptPasswordHash, String passwordToVerify) throws Exception {
+
+        WildFlyElytronPasswordProvider provider = new WildFlyElytronPasswordProvider();
+
+        // 1. Create a BCrypt Password Factory
+        PasswordFactory passwordFactory = PasswordFactory.getInstance(BCryptPassword.ALGORITHM_BCRYPT, provider);
+
+        // 2. Decode the hashed user password
+        Password userPasswordDecoded = ModularCrypt.decode(bCryptPasswordHash);
+
+        // 3. Translate the decoded user password object to one which is consumable by this factory.
+        Password userPasswordRestored = passwordFactory.translate(userPasswordDecoded);
+
+        // Verify existing user password you want to verify
+        return passwordFactory.verify(userPasswordRestored, passwordToVerify.toCharArray());
+
+    }
     
 
 }

@@ -41,7 +41,7 @@ public class AuthTemplate {
     @RolesAllowed({ "user", "Admin" })
     @Produces(MediaType.TEXT_PLAIN)
     public String helloRolesAllowed(@Context SecurityContext ctx) {
-    	return getResponseString(ctx) + ", birthdate: " + jwt.getClaim("birthdate").toString();
+    	return getResponseString(ctx) + ", birthdate: " + jwt.getClaim("birthdate").toString()+ "role";
     }
     
     @GET
