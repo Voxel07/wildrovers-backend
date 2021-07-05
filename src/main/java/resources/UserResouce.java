@@ -38,9 +38,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 
-//Emailzeug
-import io.quarkus.mailer.Mailer;
-import io.quarkus.mailer.reactive.ReactiveMailer;
 
 //Sicherheits Zeug
 import javax.ws.rs.core.SecurityContext;
@@ -160,18 +157,4 @@ public class UserResouce {
         // return userOrm.addUser(usr);
         return "testingdelete";
     }
-
-    //Blocking sync
-    // @Inject
-    // Mailer mailer;
-
-    //Async
-    // @Inject
-    // ReactiveMailer reactiveMailer;
-
-    
-    // mailer.send(Mail.withText("to@acme.org", "A simple email from quarkus", "This is my body."));
-
-    // Uni<Void> stage = reactiveMailer.send(Mail.withText("to@acme.org", "A reactive email from quarkus", "This is my body."));
-
 }

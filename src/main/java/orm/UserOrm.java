@@ -71,6 +71,8 @@ public class UserOrm {
         usr.setPassword(BcryptUtil.bcryptHash(usr.getPassword()));
         usr.setRegDate(LocalDate.now());
         usr.setActive(true);
+
+        
        
 
         // Nutzer einfügen
@@ -173,6 +175,11 @@ public class UserOrm {
         // Verify existing user password you want to verify
         return passwordFactory.verify(userPasswordRestored, passwordToVerify.toCharArray());
 
+    }
+
+    public static String generateVerivicationId(){
+
+        return "TODO:";
     }
     
 

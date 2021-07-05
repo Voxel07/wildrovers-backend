@@ -41,5 +41,6 @@ settings.gradle
 src/main/resources/META-INF/resources/privateKey.pem
 src/main/resources/META-INF/resources/publicKey.pem
 src/main/resources/META-INF/resources/rsaPrivateKey.pem
+src/main/resources/META-INF/resources/emailKey.pem
 
 target/

@@ -31,6 +31,7 @@ import model.Forum.ForumCategory;
 import model.Forum.ForumPost;
 import model.Forum.ForumTopic;
 import model.Users.ActivityForum;
+import model.Users.Secret;
 
 @Entity
 @Table(name = "USER")
@@ -79,6 +80,9 @@ public class User {
     @OneToOne(cascade = CascadeType.ALL, mappedBy = "user")
     private ActivityForum activityForum;
 
+    @OneToOne(cascade = {CascadeType.ALL}, mappedBy = "user")
+    private Secret keys;
+
     @OneToMany(mappedBy="user",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
 	private List<Phone> phones = new ArrayList<>();
 
@@ -99,6 +103,8 @@ public class User {
 
     @OneToMany(mappedBy="editor",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
     private List<ForumPost> editedAnswers = new ArrayList<>();
+
+  
   
     public User(){
 
