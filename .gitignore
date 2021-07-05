@@ -42,8 +42,4 @@ src/main/resources/META-INF/resources/privateKey.pem
 src/main/resources/META-INF/resources/publicKey.pem
 src/main/resources/META-INF/resources/rsaPrivateKey.pem
 
-target/classes/META-INF/resources/privateKey.pem
-target/classes/META-INF/resources/publicKey.pem
-target/classes/META-INF/resources/rsaPrivateKey.pem
-
 target/
