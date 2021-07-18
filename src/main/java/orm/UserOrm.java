@@ -26,7 +26,9 @@ import java.util.logging.Level;
 
 @ApplicationScoped
 public class UserOrm {
+
     private static final Logger log = Logger.getLogger(UserOrm.class.getName());
+  
     @Inject
     EntityManager em;
 
