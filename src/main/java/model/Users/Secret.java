@@ -43,6 +43,8 @@ public class Secret {
 
     }
 
+    
+
     public Secret(/*String password,*/ Boolean isVerifyed, String verificationId) {
         // this.password = password;
         this.isVerifyed = isVerifyed;
@@ -79,6 +81,14 @@ public class Secret {
 
     public void setVerificationId(String verificationId) {
         this.verificationId = verificationId;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
     }
 
     

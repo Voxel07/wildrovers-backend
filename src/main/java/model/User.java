@@ -277,6 +277,14 @@ public class User {
         return answers;
     }
 
+    public Secret getKeys() {
+        return keys;
+    }
+
+    public void setKeys(Secret keys) {
+        this.keys = keys;
+    }
+
     @Override
     public String toString() {
         return "User [activityForum=" + activityForum + ", address=" + address + ", answers=" + answers

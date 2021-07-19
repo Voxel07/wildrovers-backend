@@ -16,6 +16,7 @@ import org.wildfly.security.password.util.ModularCrypt;
 
 
 import model.User;
+import orm.Secrets.SecretOrm;
 import orm.UserStuff.ActivityForumOrm;
 
 import java.time.LocalDate;
@@ -34,6 +35,9 @@ public class UserOrm {
 
     @Inject
     ActivityForumOrm activityForumOrm;
+
+    @Inject
+    SecretOrm secretOrm;
 
 
     public List<User> getUsers() {
@@ -69,13 +73,10 @@ public class UserOrm {
         if (!query.getResultList().isEmpty()) {
             return "Nutzer bereits bekannt";
         }
- 
+
         usr.setPassword(BcryptUtil.bcryptHash(usr.getPassword()));
         usr.setRegDate(LocalDate.now());
         usr.setActive(true);
-
-        
-       
 
         // Nutzer einfügen
         try {
@@ -89,6 +90,11 @@ public class UserOrm {
          */
         //create Activity logs
         activityForumOrm.addActivityForum(usr.getId());
+
+        /**
+         * Generate Secreat entry and add UUID
+         */
+        usr.getKeys().setVerificationId(secretOrm.generateVerificationId());
         // Id zurückgeben
         return "" + getUserByUsername(usr.getUserName()).get(0).getId();
     }
