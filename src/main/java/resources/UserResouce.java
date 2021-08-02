@@ -66,7 +66,7 @@ public class UserResouce {
     // @SecurityIdentity test;
 
     @Inject
-    JsonWebToken  jwt;
+    JsonWebToken jwt;
 
     @Context
     UriInfo info;

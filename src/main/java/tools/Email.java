@@ -35,6 +35,11 @@ public class Email {
 
     // @Inject
     // MailTemplate hello; 
+    
+    public Response sendVerificationMail(String email,Long userId, String verificationId) {
+            mailer.send(Mail.withText(email, "WildRovers anmeldung", "http://localhost:8080/secrets/verify?verificationId="+verificationId+"&userId="+userId));
+            return Response.accepted().build();
+    }
 
     @GET
     @Path("/simple")

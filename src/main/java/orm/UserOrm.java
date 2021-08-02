@@ -18,6 +18,7 @@ import org.wildfly.security.password.util.ModularCrypt;
 import model.User;
 import orm.Secrets.SecretOrm;
 import orm.UserStuff.ActivityForumOrm;
+import tools.Email;
 
 import java.time.LocalDate;
 
@@ -38,6 +39,9 @@ public class UserOrm {
 
     @Inject
     SecretOrm secretOrm;
+
+    @Inject 
+    Email email;
 
 
     public List<User> getUsers() {
@@ -84,18 +88,27 @@ public class UserOrm {
         } catch (Exception e) {
             return "Fehler beim Nutzer einfügen" + e;
         }
+        
         //NOTE:
         /**
          * Needs to be after the User has been persisted to the Database so we can get the ID;
          */
         //create Activity logs
-        activityForumOrm.addActivityForum(usr.getId());
+        Long userId = usr.getId();
+        activityForumOrm.addActivityForum(userId);
+
+        /*
+         * Generate Secreats
+         */
+        String verificationId =  secretOrm.generateVerificationId();
+        secretOrm.addSecret(userId, false, verificationId);
+        // Id zurückgeben
 
         /**
-         * Generate Secreat entry and add UUID
+         * Send Email so that the user can verify his acc
          */
-        usr.getKeys().setVerificationId(secretOrm.generateVerificationId());
-        // Id zurückgeben
+        email.sendVerificationMail(usr.getEmail(), userId, verificationId);
+
         return "" + getUserByUsername(usr.getUserName()).get(0).getId();
     }
 

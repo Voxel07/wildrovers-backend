@@ -81,7 +81,7 @@ public class User {
     private ActivityForum activityForum;
 
     @OneToOne(cascade = {CascadeType.ALL}, mappedBy = "user")
-    private Secret keys;
+    private Secret secret;
 
     @OneToMany(mappedBy="user",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
 	private List<Phone> phones = new ArrayList<>();
@@ -277,12 +277,12 @@ public class User {
         return answers;
     }
 
-    public Secret getKeys() {
-        return keys;
+    public Secret getSecret() {
+        return secret;
     }
 
-    public void setKeys(Secret keys) {
-        this.keys = keys;
+    public void setSecret(Secret secret) {
+        this.secret = secret;
     }
 
     @Override
