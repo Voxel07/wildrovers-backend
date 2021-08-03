@@ -12,7 +12,7 @@ import javax.ws.rs.core.Response;
 //Emailzeug
 
 import io.quarkus.mailer.Mail;
-import io.quarkus.mailer.MailTemplate;
+
 import io.quarkus.mailer.Mailer;
 import io.quarkus.mailer.reactive.ReactiveMailer;
 
@@ -32,20 +32,10 @@ public class Email {
     //Async
     @Inject
     ReactiveMailer reactiveMailer;
-
-    // @Inject
-    // MailTemplate hello; 
-    
+ 
     public Response sendVerificationMail(String email,Long userId, String verificationId) {
             mailer.send(Mail.withText(email, "WildRovers anmeldung", "http://localhost:8080/secrets/verify?verificationId="+verificationId+"&userId="+userId));
             return Response.accepted().build();
-    }
-
-    @GET
-    @Path("/simple")
-    public Response sendASimpleEmail() {
-        mailer.send(Mail.withText("voxel@vivaldi.net", "A simple email from quarkus", "This is my body"));
-        return Response.accepted().build();
     }
 
     @GET

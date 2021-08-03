@@ -4,7 +4,6 @@ import java.util.List;
 
 //Quarkus zeug
 import javax.enterprise.context.ApplicationScoped;
-import javax.enterprise.context.RequestScoped;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.Produces;
@@ -29,18 +28,6 @@ import java.util.logging.Level;
 import model.Forum.ForumPost;
 import orm.Forum.ForumPostOrm;
 
-//Sicherheits Zeug
-import javax.ws.rs.core.SecurityContext;
-
-import com.google.errorprone.annotations.IncompatibleModifiers;
-
-import org.eclipse.microprofile.jwt.JsonWebToken;
-import java.security.Principal;
-import javax.annotation.security.PermitAll;
-import javax.annotation.security.RolesAllowed;
-
-//Logging
-import java.util.logging.Logger;
 @Path("/forum/post")
 // @RequestScoped
 @ApplicationScoped

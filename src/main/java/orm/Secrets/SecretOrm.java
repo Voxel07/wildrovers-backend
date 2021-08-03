@@ -8,7 +8,6 @@ import javax.transaction.Transactional;
 import javax.inject.Inject;
 
 import model.User;
-import model.Users.Secret;
 import orm.UserOrm;
 //Logging
 import java.util.logging.Logger;

@@ -4,25 +4,19 @@ package resources;
 import java.util.List;
 
 //Quarkus zeug
-import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.context.RequestScoped;
 import javax.inject.Inject;
-import javax.swing.text.AttributeSet.ColorAttribute;
-import javax.ws.rs.InternalServerErrorException;
 
 //Logging zeug
 import java.util.logging.Logger;
-import java.util.logging.Level;
 
 //HTTP Requests
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
-import javax.ws.rs.PATCH;
 import javax.ws.rs.PUT;
 import javax.ws.rs.POST;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
@@ -40,11 +34,8 @@ import java.util.Date;
 
 
 //Sicherheits Zeug
-import javax.ws.rs.core.SecurityContext;
-import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.Context;
 import org.eclipse.microprofile.jwt.JsonWebToken;
-import java.security.Principal;
 import javax.annotation.security.PermitAll;
 import javax.annotation.security.RolesAllowed;
 
@@ -53,17 +44,14 @@ import javax.ws.rs.core.UriInfo;
 import io.vertx.core.http.HttpServerRequest;
 
 @Path("/user")
-// @RequestScoped
-@ApplicationScoped
+@RequestScoped
+// @ApplicationScoped
 public class UserResouce {
     private static final Logger log = Logger.getLogger(UserResouce.class.getName());
 
    
     @Inject
     UserOrm userOrm;
-
-    // @Inject
-    // @SecurityIdentity test;
 
     @Inject
     JsonWebToken jwt;
@@ -79,7 +67,7 @@ public class UserResouce {
     
 
     @GET
-    // @RolesAllowed("user")
+    @RolesAllowed("user")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public List<User> getUser(@QueryParam("userId") Long userId, @QueryParam("username") String userName){
@@ -97,7 +85,7 @@ public class UserResouce {
     }
 
     @POST
-    // @RolesAllowed("admin,user")
+    @RolesAllowed("admin,user")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public String updateUser(User user) {
@@ -135,8 +123,6 @@ public class UserResouce {
         else{
             return Response.status(401).build();
         }
-      
-      
     }
 
     @PUT

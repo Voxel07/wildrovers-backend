@@ -1,12 +1,10 @@
 package resources.Forum;
 
-import java.text.Normalizer.Form;
 //Datentypen
 import java.util.List;
 
 //Quarkus zeug
 import javax.enterprise.context.ApplicationScoped;
-import javax.enterprise.context.RequestScoped;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.Produces;
@@ -18,7 +16,6 @@ import io.vertx.core.http.HttpServerRequest;
 
 //HTTP Requests
 import javax.ws.rs.GET;
-import javax.ws.rs.PATCH;
 import javax.ws.rs.PUT;
 import javax.ws.rs.POST;
 import javax.ws.rs.DELETE;
@@ -33,7 +30,6 @@ import orm.Forum.ForumAnswerOrm;
 import java.util.logging.Logger;
 
 @Path("/forum/answer")
-// @RequestScoped
 @ApplicationScoped
 public class ForumAnswerResource{
     private static final Logger log = Logger.getLogger(ForumAnswerResource.class.getName());

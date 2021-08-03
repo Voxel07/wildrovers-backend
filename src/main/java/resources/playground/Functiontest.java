@@ -26,6 +26,7 @@ public class Functiontest {
         @Produces(MediaType.APPLICATION_JSON)
         @Consumes(MediaType.APPLICATION_JSON)
         public String testUUID(){
+            log.info("Functiontes/testUUID");
             return secretOrm.generateVerificationId();
         }
 
