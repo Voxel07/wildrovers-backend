@@ -23,7 +23,6 @@ public class SecretOrm {
     @Inject
     EntityManager em;
 
-
     public String addSecret(Long userId, Boolean isVerifyed, String verificationId){
         log.info("SecretOrm/addSecret");
 

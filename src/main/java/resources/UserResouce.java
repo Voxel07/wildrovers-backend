@@ -46,10 +46,10 @@ import io.vertx.core.http.HttpServerRequest;
 @Path("/user")
 @RequestScoped
 // @ApplicationScoped
-public class UserResouce {
+public class UserResouce 
+{
     private static final Logger log = Logger.getLogger(UserResouce.class.getName());
 
-   
     @Inject
     UserOrm userOrm;
 
@@ -64,21 +64,26 @@ public class UserResouce {
 
     @Context
     HttpHeaders header;
-    
 
     @GET
     @RolesAllowed("user")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public List<User> getUser(@QueryParam("userId") Long userId, @QueryParam("username") String userName){
+    public List<User> getUser(@QueryParam("userId") Long userId, @QueryParam("username") String userName)
+    {
         log.info("UserResource/getUser");
-        if (userId != null) {
+        if (userId != null) 
+        {
             log.info("getUserById");
             return userOrm.getUserById(userId);
-        } else if (userName != null) {
+        }
+        else if (userName != null) 
+        {
             log.info("getUserByUsername");
             return userOrm.getUserByUsername(userName);
-        } else {
+        } 
+        else 
+        {
             log.info("getUsers");
             return userOrm.getUsers();
         }
@@ -88,7 +93,8 @@ public class UserResouce {
     @RolesAllowed("admin,user")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String updateUser(User user) {
+    public String updateUser(User user) 
+    {
         log.info("UserResource/updateUser");
         return userOrm.updateUser(user);
     }
@@ -98,21 +104,15 @@ public class UserResouce {
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response login(User user){
-
-        /**
-         * TODO: fix query crash when user is not found
-         */
+    public Response login(User user)
+    {
         log.info("Info: " + info.getQueryParameters() + "|" + info.getBaseUri() + "|" + info.getPath() + "|" + info.getAbsolutePath());
         log.info("Request: " + request + "|" + request.host()+ "|" + request.cookieCount()+ "|" + request.remoteAddress()+ "|" + request.localAddress()+ "|" + request.method());
-        // log.info("Cookie: " + request.getCookie("LogIn").encode());
 
-       
-        if (Boolean.TRUE.equals(userOrm.loginUser(user))){
+        if (Boolean.TRUE.equals(userOrm.loginUser(user)))
+        {
             String token = GenerateToken.generator("user","camo");
-            return Response.ok("Hello, World!"+ token, MediaType.TEXT_PLAIN_TYPE)
-            // set a response header
-            .header("X-FroMage", "Camembert")
+            return Response.ok(token, MediaType.TEXT_PLAIN_TYPE)
             // set the Expires response header to two days from now
             .expires(Date.from(Instant.now().plus(Duration.ofDays(2))))
             // send a new cookie
@@ -120,25 +120,28 @@ public class UserResouce {
             // end of builder API
             .build();
         }
-        else{
+        else
+        {
             return Response.status(401).build();
         }
     }
 
     @PUT
-    // @PermitAll
+    @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String addUser(User usr) {
+    public String addUser(User usr) 
+    {
         log.info("UserResource/addUser");
         return userOrm.addUser(usr);
     }
 
     @DELETE
-    // @RolesAllowed("admin,user")
+    @RolesAllowed("admin,user")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String deleteUser(User usr) {
+    public String deleteUser(User usr) 
+    {
         log.info("UserResource/deleteUser");
         // return userOrm.addUser(usr);
         return "testingdelete";

@@ -27,7 +27,8 @@ import java.util.logging.Logger;
 import java.util.logging.Level;
 
 @ApplicationScoped
-public class UserOrm {
+public class UserOrm 
+{
 
     private static final Logger log = Logger.getLogger(UserOrm.class.getName());
   
@@ -44,23 +45,26 @@ public class UserOrm {
     Email email;
 
 
-    public List<User> getUsers() {
-         log.info("UserOrm/getUsers");
+    public List<User> getUsers() 
+    {
+        log.info("UserOrm/getUsers");
 
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u", User.class);
         return query.getResultList();
     }
 
-    public List<User> getUserById(Long userId) {
-         log.info("UserOrm/getUserById");
+    public List<User> getUserById(Long userId) 
+    {
+        log.info("UserOrm/getUserById");
 
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE id =: val", User.class);
         query.setParameter("val", userId);
         return query.getResultList();
     }
 
-    public List<User> getUserByUsername(String userName) {
-         log.info("UserOrm/getUserByUsername");
+    public List<User> getUserByUsername(String userName) 
+    {
+        log.info("UserOrm/getUserByUsername");
 
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE userName =: val", User.class);
         query.setParameter("val", userName);
@@ -68,13 +72,16 @@ public class UserOrm {
     }
 
     @Transactional
-    public String addUser(User usr) {
-         log.info("UserOrm/addUser");
+    public String addUser(User usr) 
+    {
+        log.info("UserOrm/addUser");
 
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val2", User.class);
         query.setParameter("val1", usr.getUserName());
         query.setParameter("val2", usr.getEmail());
-        if (!query.getResultList().isEmpty()) {
+
+        if (!query.getResultList().isEmpty()) 
+        {
             return "Nutzer bereits bekannt";
         }
 
@@ -83,9 +90,12 @@ public class UserOrm {
         usr.setActive(true);
 
         // Nutzer einfügen
-        try {
+        try 
+        {
             em.persist(usr);
-        } catch (Exception e) {
+        } 
+        catch (Exception e) 
+        {
             return "Fehler beim Nutzer einfügen" + e;
         }
         
@@ -113,8 +123,9 @@ public class UserOrm {
     }
 
     @Transactional
-    public String updateUser(User u) {
-         log.info("UserOrm/updateUser");
+    public String updateUser(User u) 
+    {
+        log.info("UserOrm/updateUser");
 
         boolean error = false;
         String errorMSG = "";
@@ -128,53 +139,65 @@ public class UserOrm {
         // Wenn user zurückgekomen sind
         if (userAusDB.isEmpty()) return "Keinen Nutzer mit diesen Daten gefunden";
             // Alle user durchlaufen
-        for (User aktUser : userAusDB) {
+        for (User aktUser : userAusDB) 
+        {
             // Überprüfen ob die ID die gleiche ist.
-            if (!aktUser.getId().equals(u.getId()) && !error) {
-                // Wenn nicht prüfen ob der Name doppelt ist
-                // if (aktUser.getEmail().equals(u.getEmail()) && aktUser.getUserName().equals(u.getUserName())) {
-                //     error = true;
-                //     errorMSG = "Email und UserName bereits vergeben";
-                // } 
-                if (aktUser.getUserName().equals(u.getUserName())) {
+            if (!aktUser.getId().equals(u.getId()) && !error) 
+            {
+                if (aktUser.getUserName().equals(u.getUserName())) 
+                {
                     error = true;
                     errorMSG = "Username bereits vergeben";
                 }
                 // Oder die Email
-                else if (aktUser.getEmail().equals(u.getEmail())) {
+                else if (aktUser.getEmail().equals(u.getEmail())) 
+                {
                     error = true;
                     errorMSG = "Email bereits vergeben";
                 }
             }
         }
         
-        if (!error) {
-            try {
+        if (!error) 
+        {
+            try 
+            {
                 em.merge(u);
                 errorMSG = "User erfolgreich aktualisiert";
-            } catch (Exception e) {
+            } 
+            catch (Exception e) 
+            {
                 errorMSG = "Fehler beim Updaten des User";
             }
         }
         return errorMSG;
     }
 
-    
-    public Boolean loginUser(User usr){
+    public Boolean loginUser(User usr)
+    {
         log.info("UserOrm/loginUser");
-        log.info(usr.toString());
+       
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val2", User.class);
         query.setParameter("val1", usr.getUserName());
         query.setParameter("val2", usr.getEmail());
-        // Falls kein User mit dem namen gefunden wurde
-        User u = query.getSingleResult();
-        if (u == null) {
-            log.info("Kein nutzer mit den daten gefunden");
+        
+        User user;
+        try 
+        {
+            user = query.getSingleResult();
+        } 
+        catch (Exception e) 
+        {
+            log.info("Kein user gefunden");
             return false;
         }
-        try {
-           return verifyBCryptPassword(u.getPassword(), usr.getPassword());
-        } catch (Exception e) {
+
+        try 
+        {
+            return verifyBCryptPassword(user.getPassword(), usr.getPassword());
+        } 
+        catch (Exception e) 
+        {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return false;
         }
@@ -197,11 +220,5 @@ public class UserOrm {
         return passwordFactory.verify(userPasswordRestored, passwordToVerify.toCharArray());
 
     }
-
-    public static String generateVerivicationId(){
-
-        return "TODO:";
-    }
-    
 
 }
