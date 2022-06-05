@@ -27,7 +27,7 @@ public class ForumCategory {
     @Id
     @SequenceGenerator(name = "fCategorySeq", sequenceName = "ZSEQ_fCategory_ID", allocationSize = 1, initialValue = 1)
     @GeneratedValue(generator = "fCategorySeq")
-    
+
     @Column(name = "id", unique = true)
     private Long id;
 
@@ -39,6 +39,9 @@ public class ForumCategory {
 
     @Column(name = "topicCount", columnDefinition = "bigint default 0")
     private Long topicCount;
+
+    @Column(name = "position", columnDefinition = "bigint default 0")
+    private Long position;
 
     //relationships
     @ManyToOne(fetch=FetchType.LAZY)
@@ -72,6 +75,14 @@ public class ForumCategory {
         this.category = category;
     }
 
+    public Long getPosition() {
+        return position;
+    }
+
+    public void setPosition(long order) {
+        this.position = order;
+    }
+
     public String getCreationDate() {
         return creationDate;
     }
@@ -79,6 +90,7 @@ public class ForumCategory {
     public void setCreationDate(String creationDate) {
         this.creationDate = creationDate;
     }
+
     @JsonbTransient
     public User getCreator() {
         return creator;
@@ -87,6 +99,7 @@ public class ForumCategory {
     public void setCreator(User creator) {
         this.creator = creator;
     }
+
     @JsonbTransient
     public List<ForumTopic> getTopics() {
         return topics;
@@ -103,10 +116,10 @@ public class ForumCategory {
     public void decTopicCount() {
         this.topicCount --;
     }
-    
+
     public void setTopicCount(Long topicCount){
         this.topicCount = topicCount;
     }
-    
-    
+
+
 }

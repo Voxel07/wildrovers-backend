@@ -18,6 +18,8 @@ import javax.ws.rs.POST;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.Path;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.ResponseBuilder;
 
 //Logging
 import java.util.logging.Logger;
@@ -25,13 +27,14 @@ import java.util.logging.Logger;
 //Eigene Imports
 import model.Forum.ForumCategory;
 import orm.Forum.ForumCategoryOrm;
+import helper.CustomHttpResponse;
 
 @Path("/forum/category")
 // @RequestScoped
 @ApplicationScoped
 public class ForumCategoryResource {
     private static final Logger log = Logger.getLogger(ForumCategoryResource.class.getName());
-    
+
     @Inject
     ForumCategoryOrm forumCategoryOrm;
 
@@ -58,15 +61,29 @@ public class ForumCategoryResource {
     @PUT
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String addCategory(ForumCategory forumCategory, @QueryParam("creator") Long userId){
+    public Response addCategory(ForumCategory forumCategory, @QueryParam("creator") Long userId){
          log.info("ForumResource/addCategory");
         /*
         ToDo
         -   Check permissions
         */
-        if(userId == null) return "Fehleder oder falscher Parameter";
-        return forumCategoryOrm.addCategory(forumCategory,userId);
+        CustomHttpResponse response = new CustomHttpResponse();
+
+        if(userId == null)
+        {
+            response.setResponseMessage("Fehleder oder falscher Parameter");
+        }
+        else
+        {
+            response = forumCategoryOrm.addCategory(forumCategory,userId);
+        }
+
+        ResponseBuilder rb;
+        rb = Response.ok(response.getResponseMessage()).status(response.getStatuscode());
+
+        return rb.build();
     }
+
     @POST
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)

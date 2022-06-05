@@ -19,7 +19,7 @@ public class SecretOrm {
 
     @Inject
     UserOrm userOrm;
-    
+
     @Inject
     EntityManager em;
 
@@ -32,7 +32,7 @@ public class SecretOrm {
             log.warning("USER not found");
             return "User nicht gefunden";
         }
-        
+
         Secret secret = new Secret(isVerifyed,verificationId);
         secret.setUser(user);
 
@@ -44,15 +44,17 @@ public class SecretOrm {
         }
         return "Secreat erfolgreich erstellt";
     }
-    
-    public String generateVerificationId(){
 
+    public String generateVerificationId()
+    {
         return UUID.randomUUID().toString();
     }
 
     @Transactional
-    public String verifyUser(Long userId, String verificationId){
-            log.info("SecretOrm/verifyUser");
+    public String verifyUser(Long userId, String verificationId)
+    {
+        log.info("SecretOrm/verifyUser");
+
         User user;
         try {
             user = userOrm.getUserById(userId).get(0);
@@ -62,6 +64,9 @@ public class SecretOrm {
         }
         if (!user.getSecret().getVerificationId().equals(verificationId)){
             return "ID stimmt nicht";
+        }
+        if(user.getSecret().getIsVerifyed().equals(true)){
+            return "User ist bereits verifiziert";
         }
         user.getSecret().setIsVerifyed(true);
 
