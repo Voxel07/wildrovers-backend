@@ -16,6 +16,7 @@ import org.wildfly.security.password.util.ModularCrypt;
 
 
 import model.User;
+import orm.Forum.ForumCategoryOrm;
 import orm.Secrets.SecretOrm;
 import orm.UserStuff.ActivityForumOrm;
 import tools.Email;
@@ -27,11 +28,11 @@ import java.util.logging.Logger;
 import java.util.logging.Level;
 
 @ApplicationScoped
-public class UserOrm 
+public class UserOrm
 {
 
     private static final Logger log = Logger.getLogger(UserOrm.class.getName());
-  
+
     @Inject
     EntityManager em;
 
@@ -41,11 +42,13 @@ public class UserOrm
     @Inject
     SecretOrm secretOrm;
 
-    @Inject 
+    @Inject
     Email email;
 
+    @Inject
+    ForumCategoryOrm forumCategoryOrm;
 
-    public List<User> getUsers() 
+    public List<User> getUsers()
     {
         log.info("UserOrm/getUsers");
 
@@ -53,7 +56,7 @@ public class UserOrm
         return query.getResultList();
     }
 
-    public List<User> getUserById(Long userId) 
+    public List<User> getUserById(Long userId)
     {
         log.info("UserOrm/getUserById");
 
@@ -62,7 +65,7 @@ public class UserOrm
         return query.getResultList();
     }
 
-    public List<User> getUserByUsername(String userName) 
+    public List<User> getUserByUsername(String userName)
     {
         log.info("UserOrm/getUserByUsername");
 
@@ -72,7 +75,7 @@ public class UserOrm
     }
 
     @Transactional
-    public String addUser(User usr) 
+    public String addUser(User usr)
     {
         log.info("UserOrm/addUser");
 
@@ -80,7 +83,7 @@ public class UserOrm
         query.setParameter("val1", usr.getUserName());
         query.setParameter("val2", usr.getEmail());
 
-        if (!query.getResultList().isEmpty()) 
+        if (!query.getResultList().isEmpty())
         {
             return "Nutzer bereits bekannt";
         }
@@ -90,15 +93,15 @@ public class UserOrm
         usr.setActive(true);
 
         // Nutzer einfügen
-        try 
+        try
         {
             em.persist(usr);
-        } 
-        catch (Exception e) 
+        }
+        catch (Exception e)
         {
             return "Fehler beim Nutzer einfügen" + e;
         }
-        
+
         //NOTE:
         /**
          * Needs to be after the User has been persisted to the Database so we can get the ID;
@@ -123,80 +126,97 @@ public class UserOrm
     }
 
     @Transactional
-    public String updateUser(User u) 
+    public String updateUser(User u)
     {
         log.info("UserOrm/updateUser");
 
         boolean error = false;
         String errorMSG = "";
-        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val2 OR u.id =: val3",
-                User.class);
-        query.setParameter("val1", u.getUserName());
-        query.setParameter("val2", u.getEmail());
-        query.setParameter("val3", u.getId());
+        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: UserName OR u.email =: Email OR u.id =: Id", User.class); //All values are needed to detect dublicate
+
+        query.setParameter("UserName", u.getUserName());
+        query.setParameter("Email", u.getEmail());
+        query.setParameter("Id", u.getId());
 
         List<User> userAusDB = query.getResultList();
+        if(u.getPassword() != null){
+            u.setPassword(BcryptUtil.bcryptHash(u.getPassword())); //hash the updated Password
+        }
+
         // Wenn user zurückgekomen sind
-        if (userAusDB.isEmpty()) return "Keinen Nutzer mit diesen Daten gefunden";
-            // Alle user durchlaufen
-        for (User aktUser : userAusDB) 
+        if (userAusDB == null) return "Keinen Nutzer mit diesen Daten gefunden";
+        // Check all user to return a the specific reason.
+        // NOTE: short to  userAusDB.size() != 1 ?
+        for (User aktUser : userAusDB)
         {
             // Überprüfen ob die ID die gleiche ist.
-            if (!aktUser.getId().equals(u.getId()) && !error) 
+            if (!aktUser.getId().equals(u.getId()) && !error)
             {
-                if (aktUser.getUserName().equals(u.getUserName())) 
+                if (aktUser.getUserName().equals(u.getUserName()))
                 {
                     error = true;
                     errorMSG = "Username bereits vergeben";
                 }
                 // Oder die Email
-                else if (aktUser.getEmail().equals(u.getEmail())) 
+                else if (aktUser.getEmail().equals(u.getEmail()))
                 {
                     error = true;
                     errorMSG = "Email bereits vergeben";
                 }
             }
         }
-        
-        if (!error) 
-        {
-            try 
-            {
-                em.merge(u);
-                errorMSG = "User erfolgreich aktualisiert";
-            } 
-            catch (Exception e) 
-            {
-                errorMSG = "Fehler beim Updaten des User";
+
+        if (error) return errorMSG; //Return the specific reason.
+
+        //No unique values are harmed, so the first and only entry in the list has to be the correct one.
+        if(!u.getUserName().equals(userAusDB.get(0).getUserName())){
+            try {
+                forumCategoryOrm.updateCategoryUserName(u.getUserName(), userAusDB.get(0).getUserName());
+            } catch (Exception e) {
+
+                return"Fehler beim Updaten der Kategorien"+ e.toString();
             }
+            //TODO: Update Topics, Posts, Answers as well
         }
+
+        try
+        {
+            em.merge(u);
+            errorMSG = "User erfolgreich aktualisiert";
+        }
+        catch (Exception e)
+        {
+            errorMSG = "Fehler beim Updaten des User";
+        }
+
+
         return errorMSG;
     }
 
     public Boolean loginUser(User usr)
     {
         log.info("UserOrm/loginUser");
-       
+
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val2", User.class);
         query.setParameter("val1", usr.getUserName());
         query.setParameter("val2", usr.getEmail());
-        
+
         User user;
-        try 
+        try
         {
             user = query.getSingleResult();
-        } 
-        catch (Exception e) 
+        }
+        catch (Exception e)
         {
             log.info("Kein user gefunden");
             return false;
         }
 
-        try 
+        try
         {
             return verifyBCryptPassword(user.getPassword(), usr.getPassword());
-        } 
-        catch (Exception e) 
+        }
+        catch (Exception e)
         {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return false;

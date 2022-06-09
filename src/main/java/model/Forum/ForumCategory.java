@@ -43,6 +43,20 @@ public class ForumCategory {
     @Column(name = "position", columnDefinition = "bigint default 0")
     private Long position;
 
+    @Column(name = "views", columnDefinition = "bigint default 0")
+    private Long views;
+
+    @Column(name = "userName")
+    private String userName;
+
+    public String getUserName() {
+        return userName;
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
+    }
+
     //relationships
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name ="user_id", referencedColumnName="id")
@@ -53,9 +67,13 @@ public class ForumCategory {
 
     public ForumCategory(){}
 
-    public ForumCategory(String category, String creationDate, User creator, List<ForumTopic> topics) {
+    public ForumCategory(String category, String creationDate, Long topicCount, Long position, Long views, User creator,
+            List<ForumTopic> topics) {
         this.category = category;
         this.creationDate = creationDate;
+        this.topicCount = topicCount;
+        this.position = position;
+        this.views = views;
         this.creator = creator;
         this.topics = topics;
     }
@@ -119,6 +137,18 @@ public class ForumCategory {
 
     public void setTopicCount(Long topicCount){
         this.topicCount = topicCount;
+    }
+
+    public Long getTopicCount() {
+        return topicCount;
+    }
+
+    public Long getViews() {
+        return views;
+    }
+
+    public void setViews(Long views) {
+        this.views = views;
     }
 
 

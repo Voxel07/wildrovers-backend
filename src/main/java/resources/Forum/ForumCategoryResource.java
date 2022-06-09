@@ -43,7 +43,7 @@ public class ForumCategoryResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public List<ForumCategory> getCategorys(@QueryParam("categoryId") Long categoryId,@QueryParam("category") String category)
     {
-         log.info("ForumResource/getCategorys");
+        log.info("ForumResource/getCategorys");
         if(categoryId != null){
              log.info("ForumResource/getCategorys/id");
             return forumCategoryOrm.getCategoriesById(categoryId);

@@ -46,7 +46,7 @@ import io.vertx.core.http.HttpServerRequest;
 @Path("/user")
 @RequestScoped
 // @ApplicationScoped
-public class UserResouce 
+public class UserResouce
 {
     private static final Logger log = Logger.getLogger(UserResouce.class.getName());
 
@@ -72,17 +72,17 @@ public class UserResouce
     public List<User> getUser(@QueryParam("userId") Long userId, @QueryParam("username") String userName)
     {
         log.info("UserResource/getUser");
-        if (userId != null) 
+        if (userId != null)
         {
             log.info("getUserById");
             return userOrm.getUserById(userId);
         }
-        else if (userName != null) 
+        else if (userName != null)
         {
             log.info("getUserByUsername");
             return userOrm.getUserByUsername(userName);
-        } 
-        else 
+        }
+        else
         {
             log.info("getUsers");
             return userOrm.getUsers();
@@ -90,10 +90,10 @@ public class UserResouce
     }
 
     @POST
-    @RolesAllowed("admin,user")
+    // @RolesAllowed("admin,user")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String updateUser(User user) 
+    public String updateUser(User user)
     {
         log.info("UserResource/updateUser");
         return userOrm.updateUser(user);
@@ -130,7 +130,7 @@ public class UserResouce
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String addUser(User usr) 
+    public String addUser(User usr)
     {
         log.info("UserResource/addUser");
         return userOrm.addUser(usr);
@@ -140,7 +140,7 @@ public class UserResouce
     @RolesAllowed("admin,user")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String deleteUser(User usr) 
+    public String deleteUser(User usr)
     {
         log.info("UserResource/deleteUser");
         // return userOrm.addUser(usr);

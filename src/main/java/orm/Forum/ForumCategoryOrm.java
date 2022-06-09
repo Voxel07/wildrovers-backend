@@ -24,7 +24,6 @@ import java.time.LocalDateTime;
 import model.User;
 import model.Forum.ForumCategory;
 import helper.CustomHttpResponse;
-
 @ApplicationScoped
 public class ForumCategoryOrm {
 
@@ -37,7 +36,7 @@ public class ForumCategoryOrm {
     //Basic GET methods
     public List<ForumCategory>getAllCategories(){
        log.info("ForumCategoryOrm/getAllCategories");
-        TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c", ForumCategory.class);
+        TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory AS c JOIN c.creator u WHERE u.id = c.creator", ForumCategory.class);
         return query.getResultList();
     }
     public List<ForumCategory>getCategoriesByName(String category){
@@ -79,6 +78,7 @@ public class ForumCategoryOrm {
             log.warning("User nicht in der DB gefunden");
             return new CustomHttpResponse(555,"User nicht gefunden");
         }
+        category.setUserName(u.getUserName());
 
         //setCreationDate
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");
@@ -194,6 +194,13 @@ public class ForumCategoryOrm {
         log.info("ForumCategoryOrm/insertCategory");
         Query query = em.createNativeQuery("UPDATE FORUM_CATEGORY SET position = position + 1 WHERE position >= :val", ForumCategory.class);
         query.setParameter("val", position);
+        return query.executeUpdate();
+    }
+    public int updateCategoryUserName(String newUserName, String oldUserName){
+        log.info("ForumCategoryOrm/updateCategoryUserName");
+        Query query = em.createNativeQuery("UPDATE FORUM_CATEGORY SET userName =:newUserName WHERE userName =:oldUserName", ForumCategory.class);
+        query.setParameter("newUserName", newUserName);
+        query.setParameter("oldUserName", oldUserName);
         return query.executeUpdate();
     }
 }
