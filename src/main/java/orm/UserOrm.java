@@ -5,6 +5,7 @@ import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import javax.persistence.EntityManager;
 import javax.persistence.TypedQuery;
+import javax.print.DocFlavor.STRING;
 import javax.transaction.Transactional;
 
 import io.quarkus.elytron.security.common.BcryptUtil;
@@ -13,6 +14,8 @@ import org.wildfly.security.password.PasswordFactory;
 import org.wildfly.security.password.WildFlyElytronPasswordProvider;
 import org.wildfly.security.password.interfaces.BCryptPassword;
 import org.wildfly.security.password.util.ModularCrypt;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response.ResponseBuilder;
 
 
 import model.User;
@@ -20,12 +23,20 @@ import orm.Forum.ForumCategoryOrm;
 import orm.Secrets.SecretOrm;
 import orm.UserStuff.ActivityForumOrm;
 import tools.Email;
-
+import resources.GenerateToken;
+import helper.CustomHttpResponse;
 import java.time.LocalDate;
 
 //Logging
 import java.util.logging.Logger;
 import java.util.logging.Level;
+
+//Coockie
+import javax.ws.rs.core.NewCookie;
+import javax.ws.rs.core.Response;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Date;
 
 @ApplicationScoped
 public class UserOrm
@@ -193,14 +204,16 @@ public class UserOrm
         return errorMSG;
     }
 
-    public Boolean loginUser(User usr)
+    public Response loginUser(User usr)
     {
         log.info("UserOrm/loginUser");
 
-        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val2", User.class);
+        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val1", User.class);
         query.setParameter("val1", usr.getUserName());
-        query.setParameter("val2", usr.getEmail());
+        // query.setParameter("val2", usr.getEmail());
+        CustomHttpResponse response = new CustomHttpResponse();
 
+        //Find user in DB
         User user;
         try
         {
@@ -209,18 +222,39 @@ public class UserOrm
         catch (Exception e)
         {
             log.info("Kein user gefunden");
-            return false;
+            return Response.status(401).build();
         }
-
+        //Verify Password
         try
         {
-            return verifyBCryptPassword(user.getPassword(), usr.getPassword());
+            if(!verifyBCryptPassword(user.getPassword(), usr.getPassword()))
+            {
+                log.info("Falsches PW");
+                return Response.status(401).build();
+            }
         }
         catch (Exception e)
         {
+
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return false;
+            return Response.status(401).build();
         }
+
+        //Return cookie
+        return generateCookie(user);
+    }
+
+    public Response generateCookie(User user){
+
+         //TODO:Change name an role
+         String token = GenerateToken.generator(user.getRole(),user.getUserName());
+         return Response.ok(token, MediaType.TEXT_PLAIN_TYPE)
+         // set the Expires response header to two days from now
+         .expires(Date.from(Instant.now().plus(Duration.ofDays(2))))
+         // send a new cookie
+         .cookie(new NewCookie("JWT", token))
+         // end of builder API
+         .build();
     }
 
     public static boolean verifyBCryptPassword(String bCryptPasswordHash, String passwordToVerify) throws Exception {

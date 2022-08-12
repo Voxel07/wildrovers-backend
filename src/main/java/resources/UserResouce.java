@@ -25,13 +25,7 @@ import model.User;
 import orm.UserOrm;
 import javax.ws.rs.QueryParam;
 
-//Coockie
-import javax.ws.rs.core.NewCookie;
 import javax.ws.rs.core.Response;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Date;
-
 
 //Sicherheits Zeug
 import javax.ws.rs.core.Context;
@@ -106,24 +100,8 @@ public class UserResouce
     @Consumes(MediaType.APPLICATION_JSON)
     public Response login(User user)
     {
-        log.info("Info: " + info.getQueryParameters() + "|" + info.getBaseUri() + "|" + info.getPath() + "|" + info.getAbsolutePath());
-        log.info("Request: " + request + "|" + request.host()+ "|" + request.cookieCount()+ "|" + request.remoteAddress()+ "|" + request.localAddress()+ "|" + request.method());
-
-        if (Boolean.TRUE.equals(userOrm.loginUser(user)))
-        {
-            String token = GenerateToken.generator("user","camo");
-            return Response.ok(token, MediaType.TEXT_PLAIN_TYPE)
-            // set the Expires response header to two days from now
-            .expires(Date.from(Instant.now().plus(Duration.ofDays(2))))
-            // send a new cookie
-            .cookie(new NewCookie("JWT", token))
-            // end of builder API
-            .build();
-        }
-        else
-        {
-            return Response.status(401).build();
-        }
+        log.info("UserResource/login");
+        return userOrm.loginUser(user);
     }
 
     @PUT
