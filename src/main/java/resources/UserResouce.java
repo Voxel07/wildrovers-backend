@@ -19,13 +19,14 @@ import javax.ws.rs.DELETE;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 
 //Eigene Imports
 import model.User;
 import orm.UserOrm;
 import javax.ws.rs.QueryParam;
+import helper.CustomHttpResponse;
 
-import javax.ws.rs.core.Response;
 
 //Sicherheits Zeug
 import javax.ws.rs.core.Context;

@@ -8,6 +8,7 @@ import javax.persistence.TypedQuery;
 import javax.print.DocFlavor.STRING;
 import javax.transaction.Transactional;
 
+import io.netty.handler.codec.http.cookie.CookieHeaderNames.SameSite;
 import io.quarkus.elytron.security.common.BcryptUtil;
 import org.wildfly.security.password.Password;
 import org.wildfly.security.password.PasswordFactory;
@@ -208,10 +209,17 @@ public class UserOrm
     {
         log.info("UserOrm/loginUser");
 
+        // try {
+        //     log.info("Waiting 10 sec");
+
+        //     Thread.sleep(3000);
+        // } catch (InterruptedException e1) {
+        //     // TODO Auto-generated catch block
+        //     e1.printStackTrace();
+        // }
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val1", User.class);
         query.setParameter("val1", usr.getUserName());
         // query.setParameter("val2", usr.getEmail());
-        CustomHttpResponse response = new CustomHttpResponse();
 
         //Find user in DB
         User user;
@@ -222,7 +230,8 @@ public class UserOrm
         catch (Exception e)
         {
             log.info("Kein user gefunden");
-            return Response.status(401).build();
+            //TODO: Change text to: "Benutzername oder Password flasch"
+            return Response.status(401).entity("Benutzer nicht gefunden").build();
         }
         //Verify Password
         try
@@ -230,34 +239,40 @@ public class UserOrm
             if(!verifyBCryptPassword(user.getPassword(), usr.getPassword()))
             {
                 log.info("Falsches PW");
-                return Response.status(401).build();
+            //TODO: Change text to: "Benutzername oder Password flasch"
+                return Response.status(401).entity("Falsches Password").build();
+
             }
         }
         catch (Exception e)
         {
-
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return Response.status(401).build();
+            return Response.status(401).entity("Fehler bei der Passwortprüfung").build();
         }
 
         //Return cookie
+
         return generateCookie(user);
     }
 
     public Response generateCookie(User user){
+        log.info("UserOrm/generateCookie");
 
-         //TODO:Change name an role
-         String token = GenerateToken.generator(user.getRole(),user.getUserName());
+        String token = GenerateToken.generator(user.getRole(),user.getUserName());
+        // return token;
          return Response.ok(token, MediaType.TEXT_PLAIN_TYPE)
+         .header("SetCookie", "jwt" + token + "; SameSite=strict")
          // set the Expires response header to two days from now
-         .expires(Date.from(Instant.now().plus(Duration.ofDays(2))))
+        //  .expires(Date.from(Instant.now().plus(Duration.ofDays(2))))
          // send a new cookie
-         .cookie(new NewCookie("JWT", token))
+        //  .cookie(new NewCookie("JWT", token, "hallo","wildwovers.wtf","test",3600,true,true))
          // end of builder API
          .build();
     }
 
-    public static boolean verifyBCryptPassword(String bCryptPasswordHash, String passwordToVerify) throws Exception {
+    public static boolean verifyBCryptPassword(String bCryptPasswordHash, String passwordToVerify)
+    throws Exception
+    {
 
         WildFlyElytronPasswordProvider provider = new WildFlyElytronPasswordProvider();
 
@@ -272,7 +287,6 @@ public class UserOrm
 
         // Verify existing user password you want to verify
         return passwordFactory.verify(userPasswordRestored, passwordToVerify.toCharArray());
-
     }
 
 }
