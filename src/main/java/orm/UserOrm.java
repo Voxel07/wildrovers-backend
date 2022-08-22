@@ -257,17 +257,20 @@ public class UserOrm
 
     public Response generateCookie(User user){
         log.info("UserOrm/generateCookie");
-
+        // user.setPassword(""); //TODO: Why does @JsonIgnore not work in User model
+        User usr = new User();
+        usr.setUserName(user.getUserName());
+        usr.setRole(user.getRole());
         String token = GenerateToken.generator(user.getRole(),user.getUserName());
         // return token;
-         return Response.ok(token, MediaType.TEXT_PLAIN_TYPE)
-         .header("SetCookie", "jwt" + token + "; SameSite=strict")
+        return Response.ok(usr, MediaType.TEXT_PLAIN_TYPE)
+        .header("Set-Cookie", "jwt=" + token + ";SameSite=strict")
          // set the Expires response header to two days from now
-        //  .expires(Date.from(Instant.now().plus(Duration.ofDays(2))))
+        .expires(Date.from(Instant.now().plus(Duration.ofDays(2))))
          // send a new cookie
-        //  .cookie(new NewCookie("JWT", token, "hallo","wildwovers.wtf","test",3600,true,true))
+        .cookie(new NewCookie("JWT", token, "hallo","wildwovers.wtf","test",3600,true,true))
          // end of builder API
-         .build();
+        .build();
     }
 
     public static boolean verifyBCryptPassword(String bCryptPasswordHash, String passwordToVerify)

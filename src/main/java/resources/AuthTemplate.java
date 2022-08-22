@@ -1,5 +1,7 @@
 package resources;
 
+import java.security.PublicKey;
+
 import javax.annotation.security.DenyAll;
 import javax.annotation.security.PermitAll;
 import javax.annotation.security.RolesAllowed;
@@ -90,7 +92,8 @@ public class AuthTemplate {
     @Produces(MediaType.TEXT_PLAIN)
     public JsonWebToken getTokenFromCookie(@CookieParam("jwt") String token) throws ParseException{
     //    return token;
-
+        //Add Path to variable
+        // PublicKey publicKey()
         return parser.verify(token,"MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxS0FJDDeoPOoLAdyMxdh"+
         "wUhmfde/CEva2LgtONi9SJq5GmERQCVUW8Xd6AwtiwJ5mcf43fgHyhLRX2RtyPtA"+
         "K2WX2kqqABud+KVFs1HOc85At6G9NuIm+Nqrz+LGVOwsRb5Spc/Os4FzKYSrKut8"+

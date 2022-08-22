@@ -35,7 +35,7 @@ import model.Users.Secret;
 
 @Entity
 @Table(name = "USER")
-@UserDefinition 
+@UserDefinition
 public class User {
     @Id
     @SequenceGenerator(name = "userSeq", sequenceName = "ZSEQ_USER_ID", allocationSize = 1, initialValue = 1)
@@ -44,24 +44,24 @@ public class User {
     @Column(name = "id", unique = true)
     private Long id;
 
-    @Column(name = "email", unique = true) 
+    @Column(name = "email", unique = true)
     private String email;
 
     @Username
     @Column(name = "userName", unique = true)
     private String userName;
 
-    @Password 
+    @Password
     @Column(name = "password")
     private String password;
 
     @Column(name = "firstName")
     private String firstName;
-    
+
     @Column(name = "lastName")
     private String lastName;
 
-    @Roles 
+    @Roles
     @Column(name ="role")
     private String role;
 
@@ -88,10 +88,10 @@ public class User {
 
     @OneToMany(mappedBy = "creator",cascade = {CascadeType.ALL},fetch = FetchType.LAZY)
     private List<ForumCategory> categories = new ArrayList<>();
-    
+
     @OneToMany(mappedBy = "creator",cascade = {CascadeType.ALL},fetch = FetchType.LAZY)
     private List<ForumTopic> topics = new ArrayList<>();
-    
+
     @OneToMany(mappedBy="creator",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
     private List<ForumPost> posts = new ArrayList<>();
 
@@ -104,8 +104,8 @@ public class User {
     @OneToMany(mappedBy="editor",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
     private List<ForumPost> editedAnswers = new ArrayList<>();
 
-  
-  
+
+
     public User(){
 
     }
@@ -195,7 +195,7 @@ public class User {
     }
     public void setPhones(List<Phone> phones) {
     	this.phones = phones;
-    	
+
     }
     public void removePhone(Phone phone) {
     	getPhones().remove(phone);
@@ -224,6 +224,7 @@ public class User {
     public boolean isActive() {
         return isActive;
     }
+
     @JsonbTransient
     public List<ForumCategory> getCategories() {
         return categories;
@@ -232,6 +233,7 @@ public class User {
     public void setCategories(List<ForumCategory> categories) {
         this.categories = categories;
     }
+
     @JsonbTransient
     public List<ForumTopic> getTopics() {
         return topics;
@@ -240,6 +242,7 @@ public class User {
     public void setTopics(List<ForumTopic> topics) {
         this.topics = topics;
     }
+
     @JsonbTransient
     public List<ForumPost> getEditedPosts() {
         return editedPosts;
@@ -248,6 +251,7 @@ public class User {
     public void setEditedPosts(List<ForumPost> editedPosts) {
         this.editedPosts = editedPosts;
     }
+
     @JsonbTransient
     public List<ForumPost> getEditedAnswers() {
         return editedAnswers;
@@ -256,6 +260,7 @@ public class User {
     public void setEditedAnswers(List<ForumPost> editedAnswers) {
         this.editedAnswers = editedAnswers;
     }
+
     @JsonbTransient
     public ActivityForum getActivityForum() {
         return activityForum;
@@ -264,6 +269,7 @@ public class User {
     public void setActivityForum(ActivityForum activityForum) {
         this.activityForum = activityForum;
     }
+
     @JsonbTransient
     public List<ForumPost> getPosts() {
         return posts;
@@ -272,6 +278,7 @@ public class User {
     public void setPosts(List<ForumPost> posts) {
         this.posts = posts;
     }
+
     @JsonbTransient
     public List<ForumAnswer> getAnswers() {
         return answers;

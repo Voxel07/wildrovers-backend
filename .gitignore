@@ -34,7 +34,6 @@ build/
 
 
 #src
-application.properties
 settings.gradle
 
 #security stuff
@@ -42,5 +41,7 @@ src/main/resources/META-INF/resources/privateKey.pem
 src/main/resources/META-INF/resources/publicKey.pem
 src/main/resources/META-INF/resources/rsaPrivateKey.pem
 src/main/resources/META-INF/resources/emailKey.pem
+
+.env
 
 target/
