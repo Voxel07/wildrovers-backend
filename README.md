@@ -1,4 +1,4 @@
-# getting-started project
+# WildRovers Backend
 
 This project uses Quarkus, the Supersonic Subatomic Java Framework.
 
@@ -31,12 +31,12 @@ The application is now runnable using `java -jar target/quarkus-app/quarkus-run.
 
 ## Creating a native executable
 
-You can create a native executable using: 
+You can create a native executable using:
 ```shell script
 ./mvnw package -Pnative
 ```
 
-Or, if you don't have GraalVM installed, you can run the native executable build in a container using: 
+Or, if you don't have GraalVM installed, you can run the native executable build in a container using:
 ```shell script
 ./mvnw package -Pnative -Dquarkus.native.container-build=true
 ```
@@ -45,10 +45,22 @@ You can then execute your native executable with: `./target/getting-started-1.0.
 
 If you want to learn more about building native executables, please consult https://quarkus.io/guides/maven-tooling.html.
 
-## Provided examples
+# About this Project
+This is the backend for the www.wildrovers.wtf homepage. It provides bunch of Rest endpoinst witch are secured by a role based system.
 
-### RESTEasy JAX-RS example
+## Functinality
+### User Management
+### Forum
 
-REST is easy peasy with this Hello World RESTEasy resource.
+## Model Structure
+The models serve multiple purposes thats why they are structured the following way
+```
+    @NotBlank(message = "The Password must not be blank or empty") //Hybernate validator
+    @Length(min = 3, max=5)
 
-[Related guide section...](https://quarkus.io/guides/getting-started#the-jax-rs-resources)
+    @Password //Quarkus Security
+
+    @Column(name = "password") //SQL ORM Mapping
+    private String password;
+```
+

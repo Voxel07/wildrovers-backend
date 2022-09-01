@@ -25,8 +25,6 @@ import javax.ws.rs.core.Response;
 import model.User;
 import orm.UserOrm;
 import javax.ws.rs.QueryParam;
-import helper.CustomHttpResponse;
-
 
 //Sicherheits Zeug
 import javax.ws.rs.core.Context;
@@ -37,6 +35,10 @@ import javax.annotation.security.RolesAllowed;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.UriInfo;
 import io.vertx.core.http.HttpServerRequest;
+
+//Validator
+import javax.validation.Valid;
+import javax.validation.Validator;
 
 @Path("/user")
 @RequestScoped
@@ -59,6 +61,9 @@ public class UserResouce
 
     @Context
     HttpHeaders header;
+
+    @Inject
+    Validator validator;
 
     @GET
     @RolesAllowed("user")
@@ -109,10 +114,10 @@ public class UserResouce
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String addUser(User usr)
+    public Response addUser(@Valid User usr)
     {
         log.info("UserResource/addUser");
-        return userOrm.addUser(usr);
+        return Response.ok(userOrm.addUser(usr)).build();
     }
 
     @DELETE

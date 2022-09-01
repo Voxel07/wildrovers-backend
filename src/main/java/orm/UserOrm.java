@@ -123,7 +123,7 @@ public class UserOrm
         activityForumOrm.addActivityForum(userId);
 
         /*
-         * Generate Secreats
+         * Generate secrets
          */
         String verificationId =  secretOrm.generateVerificationId();
         secretOrm.addSecret(userId, false, verificationId);
@@ -134,7 +134,7 @@ public class UserOrm
          */
         email.sendVerificationMail(usr.getEmail(), userId, verificationId);
 
-        return "" + getUserByUsername(usr.getUserName()).get(0).getId();
+        return "Nutzer erfolgreich erstellt";
     }
 
     @Transactional
@@ -144,6 +144,7 @@ public class UserOrm
 
         boolean error = false;
         String errorMSG = "";
+
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: UserName OR u.email =: Email OR u.id =: Id", User.class); //All values are needed to detect dublicate
 
         query.setParameter("UserName", u.getUserName());
@@ -233,6 +234,9 @@ public class UserOrm
             //TODO: Change text to: "Benutzername oder Password flasch"
             return Response.status(401).entity("Benutzer nicht gefunden").build();
         }
+
+        if(!user.getSecret().getIsVerifyed().booleanValue()) return Response.status(401).entity("Bitte verifiziere dein Konto").build();
+
         //Verify Password
         try
         {
@@ -263,7 +267,7 @@ public class UserOrm
         usr.setRole(user.getRole());
         String token = GenerateToken.generator(user.getRole(),user.getUserName());
         // return token;
-        return Response.ok(usr, MediaType.TEXT_PLAIN_TYPE)
+        return Response.ok(token, MediaType.TEXT_PLAIN_TYPE)
         .header("Set-Cookie", "jwt=" + token + ";SameSite=strict")
          // set the Expires response header to two days from now
         .expires(Date.from(Instant.now().plus(Duration.ofDays(2))))

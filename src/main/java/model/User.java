@@ -33,6 +33,10 @@ import model.Forum.ForumTopic;
 import model.Users.ActivityForum;
 import model.Users.Secret;
 
+//Validator
+import javax.validation.constraints.NotBlank;
+import org.hibernate.validator.constraints.Length;
+
 @Entity
 @Table(name = "USER")
 @UserDefinition
@@ -44,20 +48,26 @@ public class User {
     @Column(name = "id", unique = true)
     private Long id;
 
+    @NotBlank(message = "Die E-Mail muss gesetzt sein.")
     @Column(name = "email", unique = true)
     private String email;
 
+    @NotBlank(message = "Der Benutzername muss gesetzt sein.")
     @Username
     @Column(name = "userName", unique = true)
     private String userName;
 
+    @NotBlank(message = "Das Passwort muss gesetzt sein.")
+    @Length(min = 8, max = 256)
     @Password
     @Column(name = "password")
     private String password;
 
+    @NotBlank(message = "Der Vorname muss gesetzt sein.")
     @Column(name = "firstName")
     private String firstName;
 
+    @NotBlank(message = "Der Nachname muss gesetzt sein.")
     @Column(name = "lastName")
     private String lastName;
 
