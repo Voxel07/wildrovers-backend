@@ -25,8 +25,10 @@ import orm.Secrets.SecretOrm;
 import orm.UserStuff.ActivityForumOrm;
 import tools.Email;
 import resources.GenerateToken;
-import helper.CustomHttpResponse;
 import java.time.LocalDate;
+import javax.json.Json;
+import javax.json.JsonObject;
+
 
 //Logging
 import java.util.logging.Logger;
@@ -87,7 +89,7 @@ public class UserOrm
     }
 
     @Transactional
-    public String addUser(User usr)
+    public Response addUser(User usr)
     {
         log.info("UserOrm/addUser");
 
@@ -97,12 +99,13 @@ public class UserOrm
 
         if (!query.getResultList().isEmpty())
         {
-            return "Nutzer bereits bekannt";
+            return Response.status(406).entity("Nutzer bereits bekannt").build();
         }
 
         usr.setPassword(BcryptUtil.bcryptHash(usr.getPassword()));
         usr.setRegDate(LocalDate.now());
         usr.setActive(true);
+        usr.setRole("guest"); //Default role is Guest for now
 
         // Nutzer einfügen
         try
@@ -111,7 +114,8 @@ public class UserOrm
         }
         catch (Exception e)
         {
-            return "Fehler beim Nutzer einfügen" + e;
+            //TODO: Remove e from error message
+            return Response.status(500).entity("Fehler beim Nutzer einfügen"+ e).build();
         }
 
         //NOTE:
@@ -134,7 +138,8 @@ public class UserOrm
          */
         email.sendVerificationMail(usr.getEmail(), userId, verificationId);
 
-        return "Nutzer erfolgreich erstellt";
+        return Response.status(201).entity("Nutzer erfolgreich erstellt").build();
+
     }
 
     @Transactional
@@ -209,6 +214,8 @@ public class UserOrm
     public Response loginUser(User usr)
     {
         log.info("UserOrm/loginUser");
+        if(usr.getUserName() == null && usr.getEmail() == null) return  Response.status(401).entity("Gib was an").build();
+        if(usr.getPassword() == null) return  Response.status(401).entity("Password nicht gesetzt").build();
 
         // try {
         //     log.info("Waiting 10 sec");
@@ -256,6 +263,7 @@ public class UserOrm
 
         //Return cookie
 
+
         return generateCookie(user);
     }
 
@@ -267,12 +275,21 @@ public class UserOrm
         usr.setRole(user.getRole());
         String token = GenerateToken.generator(user.getRole(),user.getUserName());
         // return token;
-        return Response.ok(token, MediaType.TEXT_PLAIN_TYPE)
-        .header("Set-Cookie", "jwt=" + token + ";SameSite=strict")
+
+        JsonObject object = Json.createObjectBuilder()
+        .add("JWT", token)
+        .add("USER", Json.createObjectBuilder()
+                .add("Name", user.getUserName())
+                .add("Role", user.getRole()).build()
+                )
+        .build();
+        return Response.ok(object, MediaType.TEXT_PLAIN_TYPE)
+        // .header("Set-Cookie", new NewCookie("JWT", token, "hallo","wildwovers.wtf","test",3600,true,true))
+        .header("Set-Cookie", "JWT=" + token + ";SameSite=strict, HttpOnly=true")
          // set the Expires response header to two days from now
         .expires(Date.from(Instant.now().plus(Duration.ofDays(2))))
          // send a new cookie
-        .cookie(new NewCookie("JWT", token, "hallo","wildwovers.wtf","test",3600,true,true))
+        // .cookie(new NewCookie("JWT", token, "hallo","wildwovers.wtf","test",3600,true,true))
          // end of builder API
         .build();
     }

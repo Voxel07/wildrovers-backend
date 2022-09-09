@@ -117,7 +117,7 @@ public class UserResouce
     public Response addUser(@Valid User usr)
     {
         log.info("UserResource/addUser");
-        return Response.ok(userOrm.addUser(usr)).build();
+        return userOrm.addUser(usr);
     }
 
     @DELETE
