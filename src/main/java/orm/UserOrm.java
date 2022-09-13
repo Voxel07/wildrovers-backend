@@ -24,9 +24,8 @@ import orm.Forum.ForumCategoryOrm;
 import orm.Secrets.SecretOrm;
 import orm.UserStuff.ActivityForumOrm;
 import tools.Email;
-import resources.GenerateToken;
+import resources.JWT;
 import java.time.LocalDate;
-import javax.json.Json;
 import javax.json.JsonObject;
 
 
@@ -37,10 +36,6 @@ import java.util.logging.Level;
 //Coockie
 import javax.ws.rs.core.NewCookie;
 import javax.ws.rs.core.Response;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Date;
-
 @ApplicationScoped
 public class UserOrm
 {
@@ -261,36 +256,13 @@ public class UserOrm
             return Response.status(401).entity("Fehler bei der Passwortprüfung").build();
         }
 
-        //Return cookie
+        //Return cookie and Auth Object
+        /*For now there is no refresh token */
+        String token = JWT.generator(user.getRole(),user.getUserName());
+        JsonObject reactAuthObject = JWT.createReactAuthObject(token,user);
+        NewCookie cookie = JWT.generateCookie(token);
 
-
-        return generateCookie(user);
-    }
-
-    public Response generateCookie(User user){
-        log.info("UserOrm/generateCookie");
-        // user.setPassword(""); //TODO: Why does @JsonIgnore not work in User model
-        User usr = new User();
-        usr.setUserName(user.getUserName());
-        usr.setRole(user.getRole());
-        String token = GenerateToken.generator(user.getRole(),user.getUserName());
-        // return token;
-
-        JsonObject object = Json.createObjectBuilder()
-        .add("JWT", token)
-        .add("USER", Json.createObjectBuilder()
-                .add("Name", user.getUserName())
-                .add("Role", user.getRole()).build()
-                )
-        .build();
-        return Response.ok(object, MediaType.TEXT_PLAIN_TYPE)
-        // .header("Set-Cookie", new NewCookie("JWT", token, "hallo","wildwovers.wtf","test",3600,true,true))
-        .header("Set-Cookie", "JWT=" + token + ";SameSite=strict, HttpOnly=true")
-         // set the Expires response header to two days from now
-        .expires(Date.from(Instant.now().plus(Duration.ofDays(2))))
-         // send a new cookie
-        // .cookie(new NewCookie("JWT", token, "hallo","wildwovers.wtf","test",3600,true,true))
-         // end of builder API
+        return Response.status(200).entity(reactAuthObject).header("Set-Cookie", cookie)
         .build();
     }
 

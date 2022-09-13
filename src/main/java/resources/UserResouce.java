@@ -121,7 +121,7 @@ public class UserResouce
     }
 
     @DELETE
-    @RolesAllowed("admin,user")
+    @RolesAllowed({ "user", "admin" })
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public String deleteUser(User usr)
