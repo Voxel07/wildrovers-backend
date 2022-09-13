@@ -15,6 +15,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import orm.Secrets.SecretOrm;
+import javax.ws.rs.core.NewCookie;
+import javax.ws.rs.core.Cookie;
 
 @Path("/tests")
 
@@ -48,9 +50,22 @@ public class Functiontest {
             .add("Auth", "ja")
             .build();
 
+            NewCookie klaus = new NewCookie("rolf", "4567", "/","localhost","test",3600,true,true);
 
+            return Response.status(200).entity(object)
+            .cookie(klaus)
+            .build();
+        }
 
-            return Response.status(418).entity(object).build();
+        @GET
+        @Path("/remove")
+        @Produces(MediaType.APPLICATION_JSON)
+        public Response removeCookie()
+        {
+            NewCookie klaus = new NewCookie("rolf", "deleted", "/","localhost","test",0,true,true);
+
+            return Response.status(200).entity("object").header("Set-Cookie", klaus).build();
         }
 }
+
 

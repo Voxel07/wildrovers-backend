@@ -262,8 +262,11 @@ public class UserOrm
         JsonObject reactAuthObject = JWT.createReactAuthObject(token,user);
         NewCookie cookie = JWT.generateCookie(token);
 
-        return Response.status(200).entity(reactAuthObject).header("Set-Cookie", cookie)
-        .build();
+        return Response.status(200).entity(reactAuthObject).cookie(cookie).build();
+    }
+
+    public Response logoutUser(){
+        return Response.ok(JWT.removeCookie()).build();
     }
 
     public static boolean verifyBCryptPassword(String bCryptPasswordHash, String passwordToVerify)

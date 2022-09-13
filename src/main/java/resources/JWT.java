@@ -76,7 +76,11 @@ public class JWT {
     }
 
     public static NewCookie generateCookie(String token){
-      return new NewCookie("JWT", token, "/","wildwovers.wtf","test",3600,true,true);
-  }
+      return new NewCookie("__refresh_Token__", token, "/","localhost","test",3600*24*30,true,true);
+    }
+
+    public static NewCookie removeCookie(){
+      return new NewCookie("__refresh_Token__", "deleted", "/","localhost:3000","test",0,true,true);
+    }
 
 }

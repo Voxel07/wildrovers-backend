@@ -47,23 +47,17 @@ public class UserResouce
 {
     private static final Logger log = Logger.getLogger(UserResouce.class.getName());
 
-    @Inject
-    UserOrm userOrm;
+    @Inject UserOrm userOrm;
 
-    @Inject
-    JsonWebToken jwt;
+    @Inject JsonWebToken jwt;
 
-    @Context
-    UriInfo info;
+    @Context UriInfo info;
 
-    @Context
-    HttpServerRequest request;
+    @Context HttpServerRequest request;
 
-    @Context
-    HttpHeaders header;
+    @Context HttpHeaders header;
 
-    @Inject
-    Validator validator;
+    @Inject Validator validator;
 
     @GET
     @RolesAllowed("user")
@@ -108,6 +102,17 @@ public class UserResouce
     {
         log.info("UserResource/login");
         return userOrm.loginUser(user);
+    }
+
+    @POST
+    @Path("/logout")
+    @PermitAll
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response logout()
+    {
+        log.info("UserResource/logout");
+        return userOrm.logoutUser();
     }
 
     @PUT
