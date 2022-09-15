@@ -34,13 +34,13 @@ public class ForumTopicResource {
     @Inject
     ForumTopicOrm forumTopicOrm;
 
-   
+
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public List<ForumTopic> getTopics(  @QueryParam("topicId") Long topicId,
-                                        @QueryParam("topic") String topic,  
+                                        @QueryParam("topic") String topic,
                                         @QueryParam("user")Long userId,
                                         @QueryParam("category")Long categoryId)
     {

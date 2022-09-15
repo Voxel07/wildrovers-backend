@@ -1,5 +1,7 @@
 package orm.Forum;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 //Datentypen
 import java.util.List;
 
@@ -9,6 +11,7 @@ import javax.inject.Inject;
 import javax.persistence.EntityManager;
 import javax.persistence.TypedQuery;
 import javax.transaction.Transactional;
+import javax.ws.rs.core.Response;
 import javax.persistence.Query;
 
 
@@ -36,7 +39,7 @@ public class ForumCategoryOrm {
     //Basic GET methods
     public List<ForumCategory>getAllCategories(){
        log.info("ForumCategoryOrm/getAllCategories");
-        TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory AS c JOIN c.creator u WHERE u.id = c.creator", ForumCategory.class);
+        TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c ORDER BY position ASC", ForumCategory.class);
         return query.getResultList();
     }
     public List<ForumCategory>getCategoriesByName(String category){
@@ -65,20 +68,41 @@ public class ForumCategoryOrm {
         - returns success or the error that accured as a string
     */
     @Transactional
-    public CustomHttpResponse addCategory(ForumCategory category, Long userId){
+    public Response addCategory(ForumCategory category, Long userId){
         log.info("ForumCategoryOrm/addCategory");
-
-        if(category.getCategory() == null) return new CustomHttpResponse(555,"Kategorie nicht gesetzt"); //Check if Values are set
-        if(category.getCategory().length() < 4) return new CustomHttpResponse(555,"Kategorie zu kurz"); //Check length requirment
-        if(!getCategoriesByName(category.getCategory()).isEmpty()) return new CustomHttpResponse(555,"Kategorie exestiert bereits"); //Check if category already exists
+        Response.status(555).entity("Kategorie nicht gesetzt");
+        if(category.getCategory() == null) return Response.status(401).entity("Kategorie nicht gesetzt").build(); //Check if Values are set
+        if(category.getCategory().length() < 4) return Response.status(401).entity("Kategorie zu kurz").build(); //Check length requirment
+        if(!getCategoriesByName(category.getCategory()).isEmpty()) return Response.status(401).entity("Kategorie existiert bereits").build(); //Check if category already exists
 
         //get corresponding user from db. Exit if not found
-        User u = em.find(User.class, userId);
-        if(u == null){
+        User user = em.find(User.class, userId);
+        if(user == null){
             log.warning("User nicht in der DB gefunden");
-            return new CustomHttpResponse(555,"User nicht gefunden");
+            return Response.status(555).entity("User nicht gefunden").build();
         }
-        category.setUserName(u.getUserName());
+
+        if(category.getVisibility() !=null){
+            List<String> allowedVis =  new ArrayList<>();
+            allowedVis.add("Besucher");
+            allowedVis.add("Frischling");
+            allowedVis.add("Mitglied");
+            allowedVis.add("Vorstand");
+            allowedVis.add("Admin");
+
+            int index = allowedVis.indexOf(user.getRole());
+            if (index == -1) return Response.status(401).entity("Rolle nicht gefunden").build();
+
+            for(int vis = index ; vis < 3; vis++){
+                allowedVis.remove(index+1);
+            }
+
+            if(!allowedVis.contains(category.getVisibility())) return Response.status(401).entity("Die angeebene Nutzergrupper existiert nicht").build();
+        }
+        else{
+            category.setVisibility("Guest");
+        }
+        category.setUserName(user.getUserName());
 
         //setCreationDate
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");
@@ -112,7 +136,7 @@ public class ForumCategoryOrm {
                 insertCategory(category.getPosition());
             } catch (Exception e) {
                 log.log(Level.SEVERE, "Result{0}", e.getMessage());
-                return new CustomHttpResponse(555,"Reihenfolge konnte nicht geändert werden");
+                return Response.status(401).entity("Reihenfolge konnte nicht geändert werden").build();
             }
         }
 
@@ -121,14 +145,14 @@ public class ForumCategoryOrm {
             em.persist(category);
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return new CustomHttpResponse(555,"Error while creating the new Category");
+            return Response.status(401).entity("Error while creating the new Category").build();
         }
 
         //Update User
-        u.getActivityForum().incCategoryCount();
-        category.setCreator(u);
+        user.getActivityForum().incCategoryCount();
+        category.setCreator(user);
         category.setTopicCount(0L);
-        return new CustomHttpResponse(200,"Kategorie erfolgreich erstellt");
+        return Response.status(201).entity("Kategorie erfolgreich erstellt").build();
     }
 
     @Transactional

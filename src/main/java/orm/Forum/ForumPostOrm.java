@@ -16,22 +16,25 @@ import javax.transaction.Transactional;
 import java.util.logging.Logger;
 import java.util.logging.Level;
 //Zeit
-import java.time.format.DateTimeFormatter;  
+import java.time.format.DateTimeFormatter;
 import java.time.LocalDateTime;
 
 import model.User;
 import model.Forum.ForumPost;
 import model.Forum.ForumTopic;
+import orm.UserOrm;
 
 @ApplicationScoped
 public class ForumPostOrm {
     private static final Logger log = Logger.getLogger(ForumPostOrm.class.getName());
     @Inject
-    EntityManager em; 
+    EntityManager em;
     @Inject
     ForumTopicOrm forumTopicOrm;
     @Inject
     ForumAnswerOrm forumAnswerOrm;
+    @Inject
+    UserOrm userOrm;
 
 
     public List<ForumPost>getAllPosts(){
@@ -69,13 +72,31 @@ public class ForumPostOrm {
         query.setParameter("val",title);
         return query.getResultList();
     }
+    public ForumPost getLatestPost(Long topicId){
+        log.info("ForumPostOrm/getLatestPost "+ topicId);
+        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE topic_id =: val ORDER BY creationDate DESC", ForumPost.class);
+        query.setParameter("val", topicId);
+        query.setMaxResults(1);
+        ForumPost fp = new ForumPost();
+        try {
+            fp = query.getSingleResult();
+        } catch (Exception e) {
+           return fp;
+        }
+        log.info("Creator:" + fp.getCreator());
+
+        fp.setCreator(fp.getCreator());
+
+        return fp;
+    }
+
     //Crud operations for ForumPosts
     /**
      *  NOTE: addPost
         -   Checks if Post titel already exists in the same topic
-        - 
+        -
      * @param forumPost Conaines all Content of the Post aka text and picutres
-     * @param topicId 
+     * @param topicId
      * @param userId
      * @return
      */
@@ -100,8 +121,8 @@ public class ForumPostOrm {
 
         User user = em.find(User.class,userId);
         if(user == null) return "Der angegebene Nutzer wurde nicht gefunden";
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");  
-        LocalDateTime now = LocalDateTime.now();  
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");
+        LocalDateTime now = LocalDateTime.now();
         forumPost.setCreationDate(dtf.format(now));
 
         user.getActivityForum().incPostCount();
@@ -123,10 +144,10 @@ public class ForumPostOrm {
         return "Post erfolgreich erstellt";
     }
     /**
-     *  
+     *
      * NOTE: updatePost
      * -    Check permissions. Only creator/mods
-     * -    Check if new name exists already exists in the topic   
+     * -    Check if new name exists already exists in the topic
      * @param forumPost
      * @param userId
      * @return
@@ -145,10 +166,10 @@ public class ForumPostOrm {
         if (creator == null) return "creator nicht gesetzt";
 
         if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
-        
+
         forumPostAusDB.setContent(forumPost.getContent());
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");  
-        LocalDateTime now = LocalDateTime.now();  
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");
+        LocalDateTime now = LocalDateTime.now();
         forumPostAusDB.setEditDate(dtf.format(now));
         forumPostAusDB.setEditor(user);
 
@@ -161,7 +182,7 @@ public class ForumPostOrm {
         return "Antwort erfolgreich aktualisert";
     }
     /**
-     * 
+     *
      * @param forumPost
      * @param userId
      * @return
@@ -180,7 +201,7 @@ public class ForumPostOrm {
         if (creator == null) return "creator nicht gesetzt";
 
         if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
-        
+
         try {
             em.remove(forumPostAusDB);
         } catch (Exception e) {
@@ -191,7 +212,7 @@ public class ForumPostOrm {
         creator.getActivityForum().decPostCount();
         forumPostAusDB.getTopic().decPostCount();
         forumAnswerOrm.deleteAllAnswersFromTopic(postId);
-        
+
         return "Post erfolgreich gelöscht";
     }
     /**
@@ -208,7 +229,7 @@ public class ForumPostOrm {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return "Fehler beim Löschen der Posts";
         }
-      
+
         //Maybe set count to 0
         // User user = em.find(User.class, userId);
         // user.getActivityForum().setAnswerCount(0L);

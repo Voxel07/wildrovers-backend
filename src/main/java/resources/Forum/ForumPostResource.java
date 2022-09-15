@@ -41,7 +41,7 @@ public class ForumPostResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public List<ForumPost> getPosts( @QueryParam("post") Long postId,
-                            @QueryParam("title") String title,  
+                            @QueryParam("title") String title,
                             @QueryParam("user")Long userId,
                             @QueryParam("topic")Long topicId,
                             @QueryParam("editor")Long editorId)
@@ -71,8 +71,15 @@ public class ForumPostResource {
                 log.info("ForumResource/getPosts/all");
             return forumPostOrm.getAllPosts();
         }
-
     }
+
+    @GET
+    @Path("/latest")
+    @Produces(MediaType.APPLICATION_JSON)
+    public ForumPost getLatestPost(@QueryParam("topic") Long topicId){
+        return forumPostOrm.getLatestPost(topicId);
+    }
+
 
     @PUT
     @Produces(MediaType.APPLICATION_JSON)

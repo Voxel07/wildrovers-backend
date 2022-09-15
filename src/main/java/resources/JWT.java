@@ -24,11 +24,11 @@ public class JWT {
     /**
      * Generate JWT token
      */
-    public static String generator(String role , String name) {
+    public static String generator(String role , Long userId) {
 
       return Jwt
             .issuer("wildrovers") //needs to match application properties
-            .upn(name)
+            .upn(Long.toString(userId))
             .groups(new HashSet<>(Arrays.asList(role)))
             .expiresAt(Instant.now().plus(Duration.ofDays(30)))
             .jws()

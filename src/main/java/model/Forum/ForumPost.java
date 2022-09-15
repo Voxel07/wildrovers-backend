@@ -67,7 +67,7 @@ public class ForumPost {
     private User editor;
 
     @OneToMany(mappedBy="post",cascade = {CascadeType.ALL},fetch = FetchType.LAZY )
-    private List<ForumAnswer> answers = new ArrayList<>();   
+    private List<ForumAnswer> answers = new ArrayList<>();
 
     @OneToMany(mappedBy ="post", cascade = {CascadeType.ALL}, fetch = FetchType.LAZY)
     private List<ForumPicture> pictures = new ArrayList<>();
@@ -166,7 +166,7 @@ public class ForumPost {
     public void decAnswerCount(){
         this.answerCount --;
     }
-    
+
     public void setAnswers(List<ForumAnswer> answers) {
         this.answers = answers;
     }
@@ -177,7 +177,7 @@ public class ForumPost {
 
     public void setTopic(ForumTopic topic) {
         this.topic = topic;
-    }    
+    }
 
     public Long getAnswerCount() {
         return answerCount;

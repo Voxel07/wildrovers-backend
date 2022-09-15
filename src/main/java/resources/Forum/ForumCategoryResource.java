@@ -8,9 +8,8 @@ import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.Produces;
-
-
 import javax.ws.rs.core.MediaType;
+
 //HTTP Requests
 import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
@@ -27,7 +26,12 @@ import java.util.logging.Logger;
 //Eigene Imports
 import model.Forum.ForumCategory;
 import orm.Forum.ForumCategoryOrm;
-import helper.CustomHttpResponse;
+
+//Sicherheits Zeug
+import javax.ws.rs.core.Context;
+import javax.annotation.security.PermitAll;
+import javax.annotation.security.RolesAllowed;
+import javax.ws.rs.core.SecurityContext;
 
 @Path("/forum/category")
 // @RequestScoped
@@ -41,8 +45,7 @@ public class ForumCategoryResource {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public List<ForumCategory> getCategorys(@QueryParam("categoryId") Long categoryId,@QueryParam("category") String category)
-    {
+    public List<ForumCategory> getCategorys(@QueryParam("categoryId") Long categoryId,@QueryParam("category") String category){
         log.info("ForumResource/getCategorys");
         if(categoryId != null){
              log.info("ForumResource/getCategorys/id");
@@ -59,30 +62,25 @@ public class ForumCategoryResource {
     }
 
     @PUT
+    @RolesAllowed({"Frischling", "Mitglied", "Admin"})
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response addCategory(ForumCategory forumCategory, @QueryParam("creator") Long userId){
-         log.info("ForumResource/addCategory");
-        /*
-        ToDo
-        -   Check permissions
-        */
-        CustomHttpResponse response = new CustomHttpResponse();
+    public Response addCategory(ForumCategory forumCategory, @Context SecurityContext ctx){
+        log.info("ForumResource/addCategory");
+        Long userId = Long.parseLong(ctx.getUserPrincipal().getName());
+        log.info(ctx.getUserPrincipal().getName());
 
-        if(userId == null)
+        ctx.getUserPrincipal();
+
+        if(userId == null || forumCategory == null)
         {
-            response.setResponseMessage("Fehleder oder falscher Parameter");
+            return Response.status(401).entity("Fehleder oder falscher Parameter").build();
         }
         else
         {
-            response = forumCategoryOrm.addCategory(forumCategory,userId);
+            return forumCategoryOrm.addCategory(forumCategory,userId);
         }
-
-        ResponseBuilder rb;
-        rb = Response.ok(response.getResponseMessage()).status(response.getStatuscode());
-
-        return rb.build();
-    }
+     }
 
     @POST
     @Produces(MediaType.APPLICATION_JSON)

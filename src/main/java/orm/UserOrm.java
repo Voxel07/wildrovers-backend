@@ -100,7 +100,7 @@ public class UserOrm
         usr.setPassword(BcryptUtil.bcryptHash(usr.getPassword()));
         usr.setRegDate(LocalDate.now());
         usr.setActive(true);
-        usr.setRole("guest"); //Default role is Guest for now
+        usr.setRole("Besucher"); //Default role is Guest for now
 
         // Nutzer einfügen
         try
@@ -258,7 +258,7 @@ public class UserOrm
 
         //Return cookie and Auth Object
         /*For now there is no refresh token */
-        String token = JWT.generator(user.getRole(),user.getUserName());
+        String token = JWT.generator(user.getRole(),user.getId());
         JsonObject reactAuthObject = JWT.createReactAuthObject(token,user);
         NewCookie cookie = JWT.generateCookie(token);
 

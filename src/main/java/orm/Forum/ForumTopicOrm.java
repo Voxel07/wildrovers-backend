@@ -122,6 +122,7 @@ public class ForumTopicOrm {
         u.getActivityForum().incTopicCount();
         topic.setCreator(u);
         topic.setPostCount(0L);
+        topic.setViews(0L);
 
         try {
             em.persist(topic);

@@ -43,8 +43,8 @@ public class ForumCategory {
     @Column(name = "position", columnDefinition = "bigint default 0")
     private Long position;
 
-    @Column(name = "views", columnDefinition = "bigint default 0")
-    private Long views;
+    @Column(name = "visibility")
+    private String visibility;
 
     @Column(name = "userName")
     private String userName;
@@ -67,13 +67,13 @@ public class ForumCategory {
 
     public ForumCategory(){}
 
-    public ForumCategory(String category, String creationDate, Long topicCount, Long position, Long views, User creator,
+    public ForumCategory(String category, String creationDate, Long topicCount, Long position, String visibility, User creator,
             List<ForumTopic> topics) {
         this.category = category;
         this.creationDate = creationDate;
         this.topicCount = topicCount;
         this.position = position;
-        this.views = views;
+        this.visibility = visibility;
         this.creator = creator;
         this.topics = topics;
     }
@@ -143,12 +143,12 @@ public class ForumCategory {
         return topicCount;
     }
 
-    public Long getViews() {
-        return views;
+    public String getVisibility() {
+        return visibility;
     }
 
-    public void setViews(Long views) {
-        this.views = views;
+    public void setVisibility(String visibility) {
+        this.visibility = visibility;
     }
 
 

@@ -28,7 +28,6 @@ import javax.ws.rs.QueryParam;
 
 //Sicherheits Zeug
 import javax.ws.rs.core.Context;
-import org.eclipse.microprofile.jwt.JsonWebToken;
 import javax.annotation.security.PermitAll;
 import javax.annotation.security.RolesAllowed;
 
@@ -48,8 +47,6 @@ public class UserResouce
     private static final Logger log = Logger.getLogger(UserResouce.class.getName());
 
     @Inject UserOrm userOrm;
-
-    @Inject JsonWebToken jwt;
 
     @Context UriInfo info;
 

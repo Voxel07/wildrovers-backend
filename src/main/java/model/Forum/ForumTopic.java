@@ -37,11 +37,14 @@ public class ForumTopic {
     @Column(name = "postCount", columnDefinition = "bigint default 0")
     private Long postCount;
 
+    @Column(name = "views")
+    private Long views;
+
     //relationships
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name ="user_id", referencedColumnName="id")
     private User creator;
-   
+
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name ="category_id", referencedColumnName="id")
     private ForumCategory category;
@@ -50,7 +53,7 @@ public class ForumTopic {
     private List<ForumPost> posts = new ArrayList<>();
 
     public ForumTopic(){}
-    
+
     public ForumTopic(String topic, String creationDate, User creator, ForumCategory category) {
         this.topic = topic;
         this.creationDate = creationDate;
@@ -117,9 +120,16 @@ public class ForumTopic {
     public void decPostCount() {
         this.postCount --;
     }
-    
+
     public void setPostCount(Long postCount){
         this.postCount = postCount;
     }
-    
+
+    public Long getViews() {
+        return views;
+    }
+
+    public void setViews(Long views) {
+        this.views = views;
+    }
 }
