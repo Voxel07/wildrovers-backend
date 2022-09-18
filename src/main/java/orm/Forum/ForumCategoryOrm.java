@@ -90,17 +90,21 @@ public class ForumCategoryOrm {
             allowedVis.add("Vorstand");
             allowedVis.add("Admin");
 
-            int index = allowedVis.indexOf(user.getRole());
-            if (index == -1) return Response.status(401).entity("Rolle nicht gefunden").build();
+            log.info(category.getVisibility());
+            if(!allowedVis.contains(category.getVisibility())) return Response.status(401).entity("Die angeebene Nutzergrupper existiert nicht").build();
 
+            //Should never be triggered. Role is saved in the jwt
+            int index = allowedVis.indexOf(user.getRole());
+            if (index == -1) return Response.status(401).entity("Pfusch nicht an deinem Nutzer rum").build();
+
+            //Ensure that the user has the same rights as the visibilty groub
             for(int vis = index ; vis < 3; vis++){
                 allowedVis.remove(index+1);
             }
-
-            if(!allowedVis.contains(category.getVisibility())) return Response.status(401).entity("Die angeebene Nutzergrupper existiert nicht").build();
+            if(!allowedVis.contains(category.getVisibility())) return Response.status(401).entity("Die angegebene Nutzergruppe hat mehr Rechte als deine eigen").build();
         }
         else{
-            category.setVisibility("Guest");
+            category.setVisibility("Besucher");
         }
         category.setUserName(user.getUserName());
 
