@@ -22,6 +22,7 @@ import java.util.logging.Logger;
 //Zeit
 import java.time.format.DateTimeFormatter;
 import java.time.LocalDateTime;
+import tools.Time;
 
 //Custom stuff
 import model.User;
@@ -106,12 +107,10 @@ public class ForumCategoryOrm {
         else{
             category.setVisibility("Besucher");
         }
-        category.setUserName(user.getUserName());
 
-        //setCreationDate
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");
-        LocalDateTime now = LocalDateTime.now();
-        category.setCreationDate(dtf.format(now));
+        category.setUserName(user.getUserName());
+        category.setCreationDate(Time.currentTimeInMillis());
+
 
         //Position stuff
         long numOfExistingCat = getCategoryCnt();

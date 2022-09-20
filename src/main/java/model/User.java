@@ -82,7 +82,7 @@ public class User {
     private LocalDate lastLogin;
 
     @Column(name = "regestrationDate")
-    private LocalDate regDate;
+    private Long regDate;
 
     @OneToOne(cascade = CascadeType.ALL, mappedBy = "userAddress")
     private Address address;
@@ -223,11 +223,11 @@ public class User {
         this.lastLogin = lastLogin;
     }
 
-    public LocalDate getRegDate() {
+    public Long getRegDate() {
         return regDate;
     }
 
-    public void setRegDate(LocalDate regDate) {
+    public void setRegDate(Long regDate) {
         this.regDate = regDate;
     }
 

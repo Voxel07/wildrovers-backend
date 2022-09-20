@@ -35,7 +35,7 @@ public class ForumCategory {
     private String category;
 
     @Column(name = "creationDate")
-    private String creationDate;
+    private Long creationDate;
 
     @Column(name = "topicCount", columnDefinition = "bigint default 0")
     private Long topicCount;
@@ -67,7 +67,7 @@ public class ForumCategory {
 
     public ForumCategory(){}
 
-    public ForumCategory(String category, String creationDate, Long topicCount, Long position, String visibility, User creator,
+    public ForumCategory(String category, Long creationDate, Long topicCount, Long position, String visibility, User creator,
             List<ForumTopic> topics) {
         this.category = category;
         this.creationDate = creationDate;
@@ -101,11 +101,11 @@ public class ForumCategory {
         this.position = order;
     }
 
-    public String getCreationDate() {
+    public Long getCreationDate() {
         return creationDate;
     }
 
-    public void setCreationDate(String creationDate) {
+    public void setCreationDate(long creationDate) {
         this.creationDate = creationDate;
     }
 

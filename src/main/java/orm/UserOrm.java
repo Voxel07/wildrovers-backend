@@ -19,14 +19,14 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response.ResponseBuilder;
 
 
+//Eigene
 import model.User;
 import orm.Forum.ForumCategoryOrm;
 import orm.Secrets.SecretOrm;
 import orm.UserStuff.ActivityForumOrm;
 import tools.Email;
 import resources.JWT;
-import java.time.LocalDate;
-import javax.json.JsonObject;
+import tools.Time;
 
 
 //Logging
@@ -98,7 +98,7 @@ public class UserOrm
         }
 
         usr.setPassword(BcryptUtil.bcryptHash(usr.getPassword()));
-        usr.setRegDate(LocalDate.now());
+        usr.setRegDate(Time.currentTimeInMillis());
         usr.setActive(true);
         usr.setRole("Besucher"); //Default role is Guest for now
 
