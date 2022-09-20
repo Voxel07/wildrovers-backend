@@ -26,6 +26,7 @@ import java.util.logging.Logger;
 //Eigene Imports
 import model.Forum.ForumCategory;
 import orm.Forum.ForumCategoryOrm;
+import model.Users.Roles;
 
 //Sicherheits Zeug
 import javax.ws.rs.core.Context;
@@ -62,7 +63,7 @@ public class ForumCategoryResource {
     }
 
     @PUT
-    @RolesAllowed({"Frischling", "Mitglied", "Admin"})
+    @RolesAllowed({Roles.FRESHMAN, Roles.MEMBER, Roles.ADMIN})
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response addCategory(ForumCategory forumCategory, @Context SecurityContext ctx){

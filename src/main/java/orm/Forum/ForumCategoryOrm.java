@@ -28,6 +28,7 @@ import tools.Time;
 import model.User;
 import model.Forum.ForumCategory;
 import helper.CustomHttpResponse;
+import model.Users.Roles;
 @ApplicationScoped
 public class ForumCategoryOrm {
 
@@ -84,12 +85,8 @@ public class ForumCategoryOrm {
         }
 
         if(category.getVisibility() !=null){
-            List<String> allowedVis =  new ArrayList<>();
-            allowedVis.add("Besucher");
-            allowedVis.add("Frischling");
-            allowedVis.add("Mitglied");
-            allowedVis.add("Vorstand");
-            allowedVis.add("Admin");
+
+            List<String> allowedVis = Roles.getRoles();
 
             log.info(category.getVisibility());
             if(!allowedVis.contains(category.getVisibility())) return Response.status(401).entity("Die angeebene Nutzergrupper existiert nicht").build();

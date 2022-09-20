@@ -5,19 +5,16 @@ import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import javax.persistence.EntityManager;
 import javax.persistence.TypedQuery;
-import javax.print.DocFlavor.STRING;
 import javax.transaction.Transactional;
 
-import io.netty.handler.codec.http.cookie.CookieHeaderNames.SameSite;
 import io.quarkus.elytron.security.common.BcryptUtil;
 import org.wildfly.security.password.Password;
 import org.wildfly.security.password.PasswordFactory;
 import org.wildfly.security.password.WildFlyElytronPasswordProvider;
 import org.wildfly.security.password.interfaces.BCryptPassword;
 import org.wildfly.security.password.util.ModularCrypt;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response.ResponseBuilder;
 
+import javax.json.JsonObject;
 
 //Eigene
 import model.User;
