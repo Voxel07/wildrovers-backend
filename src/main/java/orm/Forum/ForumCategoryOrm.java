@@ -27,7 +27,6 @@ import tools.Time;
 //Custom stuff
 import model.User;
 import model.Forum.ForumCategory;
-import helper.CustomHttpResponse;
 import model.Users.Roles;
 @ApplicationScoped
 public class ForumCategoryOrm {
@@ -108,7 +107,28 @@ public class ForumCategoryOrm {
         category.setUserName(user.getUserName());
         category.setCreationDate(Time.currentTimeInMillis());
 
+        if (!positionCategory(category)) return Response.status(401).entity("Reihenfolge konnte nicht geändert werden").build();
 
+        //add Categroy to db
+        try {
+            em.persist(category);
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            return Response.status(401).entity("Error while creating the new Category").build();
+        }
+
+        //Update User
+        user.getActivityForum().incCategoryCount();
+        category.setCreator(user);
+        category.setTopicCount(0L);
+        return Response.status(201).entity("Kategorie erfolgreich erstellt").build();
+    }
+
+    /*
+     * Helper function for AddCategory
+     * This ensures that the "POSITION" value is handled correctly
+     */
+    private boolean positionCategory(ForumCategory category){
         //Position stuff
         long numOfExistingCat = getCategoryCnt();
         long position;
@@ -117,10 +137,11 @@ public class ForumCategoryOrm {
         if(category.getPosition() == null){
             category.setPosition(numOfExistingCat);
         }
-        else{ //Ensure that the postion is valid
+        else //Ensure that the postion is valid
+        {
             position = category.getPosition();
             if(numOfExistingCat < position){ //Set Number was to big, new Entry will be placed at the end
-                category.setPosition(numOfExistingCat);
+                category.setPosition(numOfExistingCat+1);
             }
             else if(numOfExistingCat == position){
                 //nothing to do
@@ -136,23 +157,10 @@ public class ForumCategoryOrm {
                 insertCategory(category.getPosition());
             } catch (Exception e) {
                 log.log(Level.SEVERE, "Result{0}", e.getMessage());
-                return Response.status(401).entity("Reihenfolge konnte nicht geändert werden").build();
+                return false;
             }
         }
-
-        //add Categroy to db
-        try {
-            em.persist(category);
-        } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return Response.status(401).entity("Error while creating the new Category").build();
-        }
-
-        //Update User
-        user.getActivityForum().incCategoryCount();
-        category.setCreator(user);
-        category.setTopicCount(0L);
-        return Response.status(201).entity("Kategorie erfolgreich erstellt").build();
+        return true;
     }
 
     @Transactional
