@@ -12,14 +12,14 @@ import javax.inject.Inject;
 import javax.persistence.EntityManager;
 import javax.persistence.TypedQuery;
 import javax.transaction.Transactional;
+import javax.ws.rs.core.Response;
 
 import java.util.logging.Level;
 //Logging
 import java.util.logging.Logger;
 
 //Time
-import java.time.format.DateTimeFormatter;
-import java.time.LocalDateTime;
+import tools.Time;
 
 import orm.UserOrm;
 import model.User;
@@ -91,16 +91,16 @@ public class ForumTopicOrm {
         - returns success or the error that accrued as a string
     */
     @Transactional
-    public String addTopic(ForumTopic topic, Long categoryId, Long userId){
+    public Response addTopic(ForumTopic topic, Long categoryId, Long userId){
         log.info("ForumTopicOrm/addTopic");
         //Check if Topic exists
         if(!getTopicsByTopic(topic.getTopic()).isEmpty()){
             log.warning("duplicate topic");
-            return "Thema exestiert bereits";
+            return Response.status(401).entity("Thema exestiert bereits").build();
         }
         //Check if Category exists
         List<ForumCategory> forumCategorys = forumCategoryOrm.getCategoriesById(categoryId);
-        if(forumCategorys.isEmpty()) return "Kategorie nicht gefunden";
+        if(forumCategorys.isEmpty()) return Response.status(401).entity("Kategorie nicht gefunden").build();
         ForumCategory forumCategory = forumCategorys.get(0);
         // if(forumCategory == null){
         //     log.warning("CATEGORY not found");
@@ -109,14 +109,12 @@ public class ForumTopicOrm {
         forumCategory.incTopicCount();
         topic.setCategory(forumCategory);
         //setCreationDate
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");
-        LocalDateTime now = LocalDateTime.now();
-        topic.setCreationDate(dtf.format(now));
+        topic.setCreationDate(Time.currentTimeInMillis());
         //get corresponding user from db. Exit if not found
         User u = em.find(User.class, userId);
         if(u == null){
             log.warning("User nicht in der DB gefunden");
-            return "User nicht gefunden";
+            return Response.status(401).entity("User nicht gefunden").build();
         }
 
         u.getActivityForum().incTopicCount();
@@ -128,9 +126,9 @@ public class ForumTopicOrm {
             em.persist(topic);
         } catch (Exception e) {
              log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return "Fehler beim erstellen des neuen Tehmas";
+            return Response.status(500).entity("Fehler beim erstellen des neuen Tehmas").build();
         }
-        return "Thema erfolgreich erstellt";
+        return Response.status(201).entity("Thema erfolgreich erstellt").build();
     }
     /*
         Brief updateTopic

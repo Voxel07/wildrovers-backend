@@ -32,7 +32,7 @@ public class ForumTopic {
     private String topic;
 
     @Column(name = "creationDate")
-    private String creationDate;
+    private Long creationDate;
 
     @Column(name = "postCount", columnDefinition = "bigint default 0")
     private Long postCount;
@@ -54,7 +54,7 @@ public class ForumTopic {
 
     public ForumTopic(){}
 
-    public ForumTopic(String topic, String creationDate, User creator, ForumCategory category) {
+    public ForumTopic(String topic, Long creationDate, User creator, ForumCategory category) {
         this.topic = topic;
         this.creationDate = creationDate;
         this.creator = creator;
@@ -81,11 +81,11 @@ public class ForumTopic {
         this.topic = topic;
     }
 
-    public String getCreationDate() {
+    public Long getCreationDate() {
         return creationDate;
     }
 
-    public void setCreationDate(String creationDate) {
+    public void setCreationDate(long creationDate) {
         this.creationDate = creationDate;
     }
     @JsonbTransient
