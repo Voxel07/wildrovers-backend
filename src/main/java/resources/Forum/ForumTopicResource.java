@@ -9,6 +9,7 @@ import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 //HTTP Requests
 import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
@@ -16,6 +17,10 @@ import javax.ws.rs.POST;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.Path;
 import javax.ws.rs.QueryParam;
+import javax.annotation.security.RolesAllowed;
+import model.Users.Roles;
+import javax.ws.rs.core.SecurityContext;
+import javax.ws.rs.core.Context;
 
 
 //Logging
@@ -68,15 +73,22 @@ public class ForumTopicResource {
     }
 
     @PUT
+    @RolesAllowed({Roles.FRESHMAN, Roles.MEMBER, Roles.ADMIN})
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String addTopic(ForumTopic ft, @QueryParam("category") Long categoryId, @QueryParam("creator") Long userId){
+    public Response addTopic(ForumTopic forumTopic, @QueryParam("category") Long categoryId, @Context SecurityContext ctx){
         log.info("ForumResource/addCategory");
-        /*
-        @ToDo
-        -   Check permissions
-        */
-        return forumTopicOrm.addTopic(ft, categoryId, userId);
+        Long userId = Long.parseLong(ctx.getUserPrincipal().getName());
+        log.info(ctx.getUserPrincipal().getName());
+
+        if(userId == null || forumTopic.getTopic() == null)
+        {
+            return Response.status(401).entity("Fehleder oder falscher Parameter").build();
+        }
+        else
+        {
+            return forumTopicOrm.addTopic(forumTopic, categoryId, userId);
+        }
     }
 
     @POST

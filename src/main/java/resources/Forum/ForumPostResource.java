@@ -9,7 +9,7 @@ import javax.ws.rs.Consumes;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
-import org.json.JSONObject;
+
 import org.json.JSONException;
 //HTTP Requests
 import javax.ws.rs.GET;
@@ -27,6 +27,11 @@ import java.util.logging.Level;
 //Eigene Imports
 import model.Forum.ForumPost;
 import orm.Forum.ForumPostOrm;
+import model.Forum.Pictures;
+
+import javax.ws.rs.core.Context;
+import io.netty.handler.codec.http.multipart.FileUpload;
+import io.vertx.core.http.HttpServerRequest;
 
 @Path("/forum/post")
 // @RequestScoped
@@ -36,6 +41,9 @@ public class ForumPostResource {
 
     @Inject
     ForumPostOrm forumPostOrm;
+
+    @Context
+    HttpServerRequest request;
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -84,30 +92,39 @@ public class ForumPostResource {
     @PUT
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String addPost(String postString,@QueryParam("topic")Long topicId, @QueryParam("user")Long userId){
+    public String addPost(ForumPost forumPost,@QueryParam("topic")Long topicId, @QueryParam("user")Long userId){
         log.info("ForumPostResource/addPost");
-        JSONObject myJson;
-        try {
-            myJson = new JSONObject(postString);
-        }catch(JSONException err){
-            log.info("Error" + err.toString());
-            return "Error wehen converting";
-        }
-        ForumPost forumPost = new ForumPost();
+        // JSONObject myJson;
+        // try {
+        //     myJson = new JSONObject(postString);
+        // }catch(JSONException err){
+        //     log.info("Error" + err.toString());
+        //     return "Error wehen converting";
+        // }
+        // ForumPost forumPost = new ForumPost();
 
-        forumPost.setTitle(myJson.getString("title"));
-        try {
-            forumPost.setContent(myJson.getJSONObject("content").toString());
-        } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return "This should never Happen";
-        }
+        // forumPost.setTitle(myJson.getString("title"));
+        // try {
+        //     forumPost.setContent(myJson.getJSONObject("content").toString());
+        // } catch (Exception e) {
+        //     log.log(Level.SEVERE, "Result{0}", e.getMessage());
+        //     return "This should never Happen";
+        // }
         /**
          * TODO:
          * -    Check permissions
          * -    Save Pictures
          */
         return forumPostOrm.addPost(forumPost, topicId, userId);
+    }
+    @POST
+    @Path("/img")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    public String saveImages(Pictures pic ){
+        // FileUpload test = pic.file;
+        // log.info(""+test.definedLength());
+        return "saved";
     }
 
     @POST
