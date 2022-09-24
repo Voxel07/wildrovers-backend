@@ -37,10 +37,10 @@ public class ForumPost {
     private String content;
 
     @Column(name = "creationDate")
-    private String creationDate;
+    private Long creationDate;
 
     @Column(name = "editDate")
-    private String editDate;
+    private Long editDate;
 
     @Column(name = "views")
     private Long views;
@@ -74,7 +74,7 @@ public class ForumPost {
 
     public ForumPost(){}
 
-    public ForumPost(String title, String content, String creationDate, String editDate, Long likes,
+    public ForumPost(String title, String content, Long creationDate, Long editDate, Long likes,
             Long dislikes) {
         this.title = title;
         this.content = content;
@@ -108,19 +108,19 @@ public class ForumPost {
         this.content = content;
     }
 
-    public String getCreationDate() {
+    public Long getCreationDate() {
         return creationDate;
     }
 
-    public void setCreationDate(String creationDate) {
+    public void setCreationDate(Long creationDate) {
         this.creationDate = creationDate;
     }
 
-    public String getEditDate() {
+    public Long getEditDate() {
         return editDate;
     }
 
-    public void setEditDate(String editDate) {
+    public void setEditDate(Long editDate) {
         this.editDate = editDate;
     }
 
@@ -194,6 +194,11 @@ public class ForumPost {
     public void setPictures(List<ForumPicture> pictures) {
         this.pictures = pictures;
     }
+
+    public void setPicture(ForumPicture picture) {
+        this.pictures.add(picture);
+    }
+
 
     public Long getViews() {
         return views;

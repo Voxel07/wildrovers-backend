@@ -1,14 +1,19 @@
 package resources.Forum;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
 //Datentypen
 import java.util.List;
 
 //Quarkus zeug
 import javax.enterprise.context.ApplicationScoped;
+import javax.imageio.ImageIO;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
-
+import javax.ws.rs.core.Response;
 
 import org.json.JSONException;
 //HTTP Requests
@@ -16,6 +21,7 @@ import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
 import javax.ws.rs.POST;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.FormParam;
 import javax.ws.rs.Path;
 import javax.ws.rs.QueryParam;
 
@@ -29,9 +35,11 @@ import model.Forum.ForumPost;
 import orm.Forum.ForumPostOrm;
 import model.Forum.Pictures;
 
+//Security
+import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.Context;
-import io.netty.handler.codec.http.multipart.FileUpload;
-import io.vertx.core.http.HttpServerRequest;
+import javax.annotation.security.RolesAllowed;
+import model.Users.Roles;
 
 @Path("/forum/post")
 // @RequestScoped
@@ -43,7 +51,7 @@ public class ForumPostResource {
     ForumPostOrm forumPostOrm;
 
     @Context
-    HttpServerRequest request;
+    SecurityContext ctx;
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -90,41 +98,39 @@ public class ForumPostResource {
 
 
     @PUT
+    @RolesAllowed({Roles.FRESHMAN, Roles.MEMBER, Roles.ADMIN})
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String addPost(ForumPost forumPost,@QueryParam("topic")Long topicId, @QueryParam("user")Long userId){
+    public Response addPost(ForumPost forumPost,@QueryParam("topic")Long topicId){
         log.info("ForumPostResource/addPost");
-        // JSONObject myJson;
-        // try {
-        //     myJson = new JSONObject(postString);
-        // }catch(JSONException err){
-        //     log.info("Error" + err.toString());
-        //     return "Error wehen converting";
-        // }
-        // ForumPost forumPost = new ForumPost();
+        Long userId = Long.parseLong(ctx.getUserPrincipal().getName());
 
-        // forumPost.setTitle(myJson.getString("title"));
-        // try {
-        //     forumPost.setContent(myJson.getJSONObject("content").toString());
-        // } catch (Exception e) {
-        //     log.log(Level.SEVERE, "Result{0}", e.getMessage());
-        //     return "This should never Happen";
-        // }
-        /**
-         * TODO:
-         * -    Check permissions
-         * -    Save Pictures
-         */
-        return forumPostOrm.addPost(forumPost, topicId, userId);
+        if(userId == null || forumPost == null)
+        {
+            return Response.status(401).entity("Fehleder oder falscher Parameter").build();
+        }
+        else
+        {
+            return forumPostOrm.addPost(forumPost, topicId, userId);
+        }
     }
     @POST
     @Path("/img")
+    @RolesAllowed({Roles.FRESHMAN, Roles.MEMBER, Roles.ADMIN})
     @Produces(MediaType.APPLICATION_JSON)
-    @Consumes(MediaType.MULTIPART_FORM_DATA)
-    public String saveImages(Pictures pic ){
-        // FileUpload test = pic.file;
-        // log.info(""+test.definedLength());
-        return "saved";
+    @Consumes(MediaType.APPLICATION_JSON)
+    // @Consumes(MediaType.MULTIPART_FORM_DATA)
+    public Response saveImages(Pictures pic){
+        Long userId = Long.parseLong(ctx.getUserPrincipal().getName());
+            log.info("ID:"+ pic.getPostId());
+        if(userId == null || pic.getFiles().isEmpty())
+        {
+            return Response.status(401).entity("Fehleder oder falscher Parameter").build();
+        }
+        else
+        {
+            return forumPostOrm.saveImages(pic, userId);
+        }
     }
 
     @POST

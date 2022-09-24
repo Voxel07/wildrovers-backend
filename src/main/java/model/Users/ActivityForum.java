@@ -30,8 +30,8 @@ public class ActivityForum {
     @Column(name = "topicCount")
     private Long topicCount = 0L;
 
-    @Column(name = "potCount")
-    private Long potCount = 0L;
+    @Column(name = "postCount")
+    private Long postCount = 0L;
 
     @Column(name = "answerCount")
     private Long answerCount = 0L;
@@ -43,10 +43,10 @@ public class ActivityForum {
     public ActivityForum(){
     }
 
-    public ActivityForum(Long categoryCount, Long topicCount, Long potCount, Long answerCount, User user) {
+    public ActivityForum(Long categoryCount, Long topicCount, Long postCount, Long answerCount, User user) {
         this.categoryCount = categoryCount;
         this.topicCount = topicCount;
-        this.potCount = potCount;
+        this.postCount = postCount;
         this.answerCount = answerCount;
         this.user = user;
     }
@@ -100,19 +100,19 @@ public class ActivityForum {
     }
     //----Post
     public Long getPostCount() {
-        return potCount;
+        return postCount;
     }
 
     public void incPostCount(){
-        this.potCount++;
+        this.postCount++;
     }
 
     public void decPostCount(){
-        this.potCount --;
+        this.postCount --;
     }
 
-    public void setPostCount(Long potCount) {
-        this.potCount = potCount;
+    public void setPostCount(Long postCount) {
+        this.postCount = postCount;
     }
     //----Answer
     public Long getAnswerCount() {
@@ -129,5 +129,5 @@ public class ActivityForum {
     public void setAnswerCount(Long answerCount) {
         this.answerCount = answerCount;
     }
-    
+
 }

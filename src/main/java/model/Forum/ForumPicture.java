@@ -14,7 +14,7 @@ import javax.persistence.FetchType;
 @Entity
 @Table(name = "FORUM_PICTURE")
 public class ForumPicture {
-   
+
     @Id
     @SequenceGenerator(name = "fPictureSeq", sequenceName = "ZSEQ_fPicture_ID",allocationSize = 1,initialValue = 1)
     @GeneratedValue(generator = "fPictureSeq")
@@ -34,16 +34,14 @@ public class ForumPicture {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "answer_id", referencedColumnName = "id")
     private ForumAnswer answer;
-    
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "post_id", referencedColumnName = "id")
     private ForumPost post;
 
     public ForumPicture(){}
 
-    public ForumPicture(String title, String creationDate, String pathToPicture) {
-        this.title = title;
-        this.creationDate = creationDate;
+    public ForumPicture(String pathToPicture) {
         this.pathToPicture = pathToPicture;
     }
 
@@ -94,6 +92,4 @@ public class ForumPicture {
     public void setPost(ForumPost post) {
         this.post = post;
     }
-
-    
 }
