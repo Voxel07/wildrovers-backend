@@ -104,7 +104,6 @@ public class ForumCategoryOrm {
             category.setVisibility("Besucher");
         }
 
-        category.setUserName(user.getUserName());
         category.setCreationDate(Time.currentTimeInMillis());
 
         if (!positionCategory(category)) return Response.status(401).entity("Reihenfolge konnte nicht geändert werden").build();
@@ -173,7 +172,7 @@ public class ForumCategoryOrm {
         ForumCategory forumCategoryAusDB = em.find(ForumCategory.class, forumCategory.getId());
         if(forumCategoryAusDB == null) return "Kategorie nicht in der DB gefunden";
 
-        User creator = forumCategoryAusDB.getCreator();
+        User creator = forumCategoryAusDB.getCreatorObj();
         if (creator == null) return "creator nicht gesetzt";
 
         if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
@@ -201,7 +200,7 @@ public class ForumCategoryOrm {
         ForumCategory forumCategoryAusDB = em.find(ForumCategory.class, categoryId);
         if(forumCategoryAusDB == null) return "Thema nicht in der DB gefunden";
 
-        User creator = forumCategoryAusDB.getCreator();
+        User creator = forumCategoryAusDB.getCreatorObj();
         if (creator == null) return "creator nicht gesetzt";
 
         if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";

@@ -140,8 +140,11 @@ public class ForumPost {
         this.dislikes = dislikes;
     }
     @JsonbTransient
-    public User getCreator() {
+    public User getCreatorObj(){
         return creator;
+    }
+    public String getCreator() {
+        return creator.getUserName();
     }
 
     public void setCreator(User creator) {

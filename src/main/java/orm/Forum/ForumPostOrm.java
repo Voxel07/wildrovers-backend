@@ -102,7 +102,7 @@ public class ForumPostOrm {
         }
         log.info("Creator:" + fp.getCreator());
 
-        fp.setCreator(fp.getCreator());
+        fp.setCreator(fp.getCreatorObj());
 
         return fp;
     }
@@ -250,7 +250,7 @@ public class ForumPostOrm {
         ForumPost forumPostAusDB = em.find(ForumPost.class, forumPost.getId());
         if(forumPostAusDB == null) return "Antwort nicht in der DB gefunden";
 
-        User creator = forumPostAusDB.getCreator();
+        User creator = forumPostAusDB.getCreatorObj();
         if (creator == null) return "creator nicht gesetzt";
 
         if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
@@ -284,7 +284,7 @@ public class ForumPostOrm {
         ForumPost forumPostAusDB = em.find(ForumPost.class, postId);
         if(forumPostAusDB == null) return "Antwort nicht in der DB gefunden";
 
-        User creator = forumPostAusDB.getCreator();
+        User creator = forumPostAusDB.getCreatorObj();
         if (creator == null) return "creator nicht gesetzt";
 
         if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
@@ -336,7 +336,7 @@ public class ForumPostOrm {
         HashMap<User, Long> map = new HashMap<User,Long>();
         //Loop all answers to count the number of deleted answers per user.
         for (ForumPost forumPost : allPosts) {
-           User u = forumPost.getCreator();
+           User u = forumPost.getCreatorObj();
            if(map.containsKey(u))
            {
                 map.put(u, map.get(u) + 1);

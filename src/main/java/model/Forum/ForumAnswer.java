@@ -27,7 +27,7 @@ public class ForumAnswer {
     @Id
     @SequenceGenerator(name = "fAnswerSeq", sequenceName = "ZSEQ_fAnswer_ID", allocationSize = 1, initialValue = 1)
     @GeneratedValue(generator = "fAnswerSeq")
-    
+
     @Column(name = "id", unique = true)
     private Long id;
 
@@ -126,9 +126,13 @@ public class ForumAnswer {
     public void setPost(ForumPost post) {
         this.post = post;
     }
+
     @JsonbTransient
-    public User getCreator() {
+    public User getCreatorObj(){
         return creator;
+    }
+    public String getCreator() {
+        return creator.getUserName();
     }
 
     public void setCreator(User creator) {
@@ -150,5 +154,5 @@ public class ForumAnswer {
     public void setPictures(List<ForumPicture> pictures) {
         this.pictures = pictures;
     }
-    
+
 }

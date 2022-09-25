@@ -16,8 +16,8 @@ import java.util.logging.Logger;
 import java.util.logging.Level;
 
 //Time
-import java.time.format.DateTimeFormatter;  
-import java.time.LocalDateTime;    
+import java.time.format.DateTimeFormatter;
+import java.time.LocalDateTime;
 
 import model.Forum.ForumAnswer;
 import model.Forum.ForumPost;
@@ -27,9 +27,9 @@ import model.User;
 public class ForumAnswerOrm {
     private static final Logger log = Logger.getLogger(ForumAnswerOrm.class.getName());
     @Inject
-    EntityManager em; 
+    EntityManager em;
     @Inject
-    ForumAnswerOrm forumAnswerOrm; 
+    ForumAnswerOrm forumAnswerOrm;
 
     public List<ForumAnswer>getAllAnswers(){
         log.info("ForumOrm/getAnswers");
@@ -63,13 +63,13 @@ public class ForumAnswerOrm {
 
     @Transactional
     public String addAnswer(ForumAnswer forumAnswer, Long postId, Long userId){
-        log.info("ForumAnswerOrm/addAnswer"); 
+        log.info("ForumAnswerOrm/addAnswer");
         ForumPost forumPost = em.find(ForumPost.class, postId);
         if(forumPost == null) return "Post nicht gefunden";
         User user = em.find(User.class, userId);
         if(user == null) return "User nicht gefunden";
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");  
-        LocalDateTime now = LocalDateTime.now();  
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");
+        LocalDateTime now = LocalDateTime.now();
         forumAnswer.setCreationDate(dtf.format(now));
         forumAnswer.setPost(forumPost);
         forumAnswer.setCreator(user);
@@ -97,14 +97,14 @@ public class ForumAnswerOrm {
         ForumAnswer forumAnswerAusDB = em.find(ForumAnswer.class, forumAnswer.getId());
         if(forumAnswerAusDB == null) return "Antwort nicht in der DB gefunden";
 
-        User creator = forumAnswerAusDB.getCreator();
+        User creator = forumAnswerAusDB.getCreatorObj();
         if (creator == null) return "creator nicht gesetzt";
 
         if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
-        
+
         forumAnswerAusDB.setContent(forumAnswer.getContent());
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");  
-        LocalDateTime now = LocalDateTime.now();  
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");
+        LocalDateTime now = LocalDateTime.now();
         forumAnswerAusDB.setEditDate(dtf.format(now));
         forumAnswerAusDB.setEditor(user);
 
@@ -127,11 +127,11 @@ public class ForumAnswerOrm {
         ForumAnswer forumAnswerAusDB = em.find(ForumAnswer.class, forumAnswer.getId());
         if(forumAnswerAusDB == null) return "Antwort nicht in der DB gefunden";
 
-        User creator = forumAnswerAusDB.getCreator();
+        User creator = forumAnswerAusDB.getCreatorObj();
         if (creator == null) return "creator nicht gesetzt";
 
         if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
-        
+
         try {
             em.remove(forumAnswerAusDB);
         } catch (Exception e) {
@@ -141,7 +141,7 @@ public class ForumAnswerOrm {
 
         creator.getActivityForum().decAnswerCount();
         forumAnswerAusDB.getPost().decAnswerCount();
-        
+
         return "Antwort erfolgreich gelöscht";
     }
     /**
@@ -159,7 +159,7 @@ public class ForumAnswerOrm {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return "Fehler beim Löschen der Antworten";
         }
-      
+
         //Maybe set count to 0
         // User user = em.find(User.class, userId);
         // user.getActivityForum().setAnswerCount(0L);
@@ -179,7 +179,7 @@ public class ForumAnswerOrm {
         HashMap<User, Long> map = new HashMap<User,Long>();
         //Loop all answers to count the number of deleted answers per user.
         for (ForumAnswer forumAnswer : allAnswers) {
-           User u = forumAnswer.getCreator();
+           User u = forumAnswer.getCreatorObj();
            if(map.containsKey(u))
            {
                 map.put(u, map.get(u) + 1);

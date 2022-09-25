@@ -39,8 +39,6 @@ public class ForumTopicResource {
     @Inject
     ForumTopicOrm forumTopicOrm;
 
-
-
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)

@@ -89,8 +89,11 @@ public class ForumTopic {
         this.creationDate = creationDate;
     }
     @JsonbTransient
-    public User getCreator() {
+    public User getCreatorObj(){
         return creator;
+    }
+    public String getCreator() {
+        return creator.getUserName();
     }
 
     public void setCreator(User creator) {

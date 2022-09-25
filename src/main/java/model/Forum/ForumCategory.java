@@ -46,17 +46,6 @@ public class ForumCategory {
     @Column(name = "visibility")
     private String visibility;
 
-    @Column(name = "userName")
-    private String userName;
-
-    public String getUserName() {
-        return userName;
-    }
-
-    public void setUserName(String userName) {
-        this.userName = userName;
-    }
-
     //relationships
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name ="user_id", referencedColumnName="id")
@@ -110,8 +99,12 @@ public class ForumCategory {
     }
 
     @JsonbTransient
-    public User getCreator() {
+    public User getCreatorObj(){
         return creator;
+    }
+
+    public String getCreator() {
+        return creator.getUserName();
     }
 
     public void setCreator(User creator) {

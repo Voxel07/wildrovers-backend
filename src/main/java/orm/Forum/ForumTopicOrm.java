@@ -144,7 +144,7 @@ public class ForumTopicOrm {
         ForumTopic forumTopicAusDB = em.find(ForumTopic.class, forumTopic.getId());
         if(forumTopicAusDB == null) return "Thema nicht in der DB gefunden";
 
-        User creator = forumTopicAusDB.getCreator();
+        User creator = forumTopicAusDB.getCreatorObj();
         if (creator == null) return "creator nicht gesetzt";
 
         if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
@@ -173,7 +173,7 @@ public class ForumTopicOrm {
         ForumTopic forumTopicAusDB = em.find(ForumTopic.class, topicId);
         if(forumTopicAusDB == null) return "Thema nicht in der DB gefunden";
 
-        User creator = forumTopicAusDB.getCreator();
+        User creator = forumTopicAusDB.getCreatorObj();
         if (creator == null) return "creator nicht gesetzt";
 
         if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
@@ -225,7 +225,7 @@ public class ForumTopicOrm {
         HashMap<User, Long> map = new HashMap<User,Long>();
         //Loop all answers to count the number of deleted answers per user.
         for (ForumTopic forumTopic : allTopics) {
-           User u = forumTopic.getCreator();
+           User u = forumTopic.getCreatorObj();
            if(map.containsKey(u))
            {
                 map.put(u, map.get(u) + 1);
