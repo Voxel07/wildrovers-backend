@@ -10,6 +10,7 @@ import javax.inject.Inject;
 import javax.persistence.EntityManager;
 import javax.persistence.TypedQuery;
 import javax.transaction.Transactional;
+import javax.ws.rs.core.Response;
 
 //Logging
 import java.util.logging.Logger;
@@ -22,14 +23,14 @@ import java.time.LocalDateTime;
 import model.Forum.ForumAnswer;
 import model.Forum.ForumPost;
 import model.User;
+import tools.Time;
 
 @ApplicationScoped
 public class ForumAnswerOrm {
     private static final Logger log = Logger.getLogger(ForumAnswerOrm.class.getName());
     @Inject
     EntityManager em;
-    @Inject
-    ForumAnswerOrm forumAnswerOrm;
+
 
     public List<ForumAnswer>getAllAnswers(){
         log.info("ForumOrm/getAnswers");
@@ -62,15 +63,14 @@ public class ForumAnswerOrm {
     }
 
     @Transactional
-    public String addAnswer(ForumAnswer forumAnswer, Long postId, Long userId){
+    public Response addAnswer(ForumAnswer forumAnswer, Long postId, Long userId){
         log.info("ForumAnswerOrm/addAnswer");
         ForumPost forumPost = em.find(ForumPost.class, postId);
-        if(forumPost == null) return "Post nicht gefunden";
+        if(forumPost == null) return Response.status(401).entity("Post nicht gefunden").build();
         User user = em.find(User.class, userId);
-        if(user == null) return "User nicht gefunden";
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");
-        LocalDateTime now = LocalDateTime.now();
-        forumAnswer.setCreationDate(dtf.format(now));
+        if(user == null) return Response.status(401).entity("User nicht gefunden").build();
+
+        forumAnswer.setCreationDate(Time.currentTimeInMillis());
         forumAnswer.setPost(forumPost);
         forumAnswer.setCreator(user);
         forumAnswer.setDislikes(0L);
@@ -81,10 +81,10 @@ public class ForumAnswerOrm {
             em.persist(forumAnswer);
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return "Fehler beim erstellen der Antwort";
+            return Response.status(401).entity("Fehler beim erstellen der Antwort").build();
         }
 
-        return "Antwort erfolgreich erstellt";
+        return Response.status(201).entity("Antwort erfolgreich erstellt").build();
 
     }
     @Transactional

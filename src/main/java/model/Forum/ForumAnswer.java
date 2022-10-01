@@ -35,7 +35,7 @@ public class ForumAnswer {
     private String content;
 
     @Column(name = "creationDate")
-    private String creationDate;
+    private Long creationDate;
 
     @Column(name = "editDate")
     private String editDate;
@@ -63,7 +63,7 @@ public class ForumAnswer {
 
     public ForumAnswer(){}
 
-    public ForumAnswer(String content, String creationDate, String editDate, Long likes, Long dislikes) {
+    public ForumAnswer(String content, Long creationDate, String editDate, Long likes, Long dislikes) {
         this.content = content;
         this.creationDate = creationDate;
         this.editDate = editDate;
@@ -87,11 +87,11 @@ public class ForumAnswer {
         this.content = content;
     }
 
-    public String getCreationDate() {
+    public Long getCreationDate() {
         return creationDate;
     }
 
-    public void setCreationDate(String creationDate) {
+    public void setCreationDate(long creationDate) {
         this.creationDate = creationDate;
     }
 

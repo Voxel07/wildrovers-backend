@@ -3,6 +3,7 @@ package resources.Forum;
 //Datentypen
 import java.util.List;
 
+import javax.annotation.security.RolesAllowed;
 //Quarkus zeug
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
@@ -26,6 +27,10 @@ import javax.ws.rs.QueryParam;
 import model.Forum.ForumAnswer;
 import orm.Forum.ForumAnswerOrm;
 
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.SecurityContext;
+import model.Users.Roles;
+
 //Logging
 import java.util.logging.Logger;
 
@@ -42,6 +47,7 @@ public class ForumAnswerResource{
 
     @Context
     HttpServerRequest request;
+    @Context SecurityContext ctx;
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -75,13 +81,21 @@ public class ForumAnswerResource{
 
     }
     @PUT
+    @RolesAllowed({Roles.FRESHMAN, Roles.MEMBER, Roles.ADMIN})
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String addAnswer(ForumAnswer forumAnswer, @QueryParam("user") Long userId, @QueryParam("post") Long postId){
+    public Response addAnswer(ForumAnswer forumAnswer, @QueryParam("post") Long postId){
         log.info("ForumAnswerResource/addAnswer");
-        if(postId == null) return "Es muss ein Tehma angegeben werden";
-        if(userId == null) return "Es muss ein User angegebene werden";
-        return forumAnswerOrm.addAnswer(forumAnswer, postId, userId);
+        Long userId = Long.parseLong(ctx.getUserPrincipal().getName());
+
+        if(userId == null || forumAnswer == null)
+        {
+            return Response.status(401).entity("Fehleder oder falscher Parameter").build();
+        }
+        else
+        {
+            return forumAnswerOrm.addAnswer(forumAnswer, postId, userId);
+        }
     }
 
     @POST
@@ -92,7 +106,7 @@ public class ForumAnswerResource{
         if(userId == null) return "Es muss ein User angegebene werden";
         return forumAnswerOrm.updateAnswer(forumAnswer,userId);
     }
-    
+
     @DELETE
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
