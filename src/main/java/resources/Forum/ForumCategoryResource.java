@@ -48,6 +48,13 @@ public class ForumCategoryResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public List<ForumCategory> getCategorys(@QueryParam("categoryId") Long categoryId,@QueryParam("category") String category){
         log.info("ForumResource/getCategorys");
+        // try {
+        //     log.info("Waiting 10 sec");
+
+        //     Thread.sleep(3000);
+        // } catch (InterruptedException e1) {
+        //     e1.printStackTrace();
+        // }
         if(categoryId != null){
              log.info("ForumResource/getCategorys/id");
             return forumCategoryOrm.getCategoriesById(categoryId);
@@ -70,8 +77,6 @@ public class ForumCategoryResource {
         log.info("ForumResource/addCategory");
         Long userId = Long.parseLong(ctx.getUserPrincipal().getName());
         log.info(ctx.getUserPrincipal().getName());
-
-        ctx.getUserPrincipal();
 
         if(userId == null || forumCategory == null)
         {
