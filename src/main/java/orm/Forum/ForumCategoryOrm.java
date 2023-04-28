@@ -1,7 +1,5 @@
 package orm.Forum;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 //Datentypen
 import java.util.List;
 
@@ -20,8 +18,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 //Zeit
-import java.time.format.DateTimeFormatter;
-import java.time.LocalDateTime;
 import tools.Time;
 
 //Custom stuff
@@ -71,10 +67,7 @@ public class ForumCategoryOrm {
     @Transactional
     public Response addCategory(ForumCategory category, Long userId){
         log.info("ForumCategoryOrm/addCategory");
-        Response.status(555).entity("Kategorie nicht gesetzt");
-        if(category.getCategory() == null) return Response.status(401).entity("Kategorie nicht gesetzt").build(); //Check if Values are set
-        if(category.getCategory().length() < 4) return Response.status(401).entity("Kategorie zu kurz").build(); //Check length requirment
-        if(!getCategoriesByName(category.getCategory()).isEmpty()) return Response.status(401).entity("Kategorie existiert bereits").build(); //Check if category already exists
+        if(!getCategoriesByName(category.getCategory()).isEmpty()) return Response.status(406).entity("Kategorie existiert bereits").build(); //Check if category already exists
 
         //get corresponding user from db. Exit if not found
         User user = em.find(User.class, userId);
@@ -87,18 +80,19 @@ public class ForumCategoryOrm {
 
             List<String> allowedVis = Roles.getRoles();
 
-            log.info(category.getVisibility());
-            if(!allowedVis.contains(category.getVisibility())) return Response.status(401).entity("Die angeebene Nutzergrupper existiert nicht").build();
+            if(!allowedVis.contains(category.getVisibility())) return Response.status(406).entity("Die angeebene Nutzergrupper existiert nicht").build();
 
             //Should never be triggered. Role is saved in the jwt
             int index = allowedVis.indexOf(user.getRole());
-            if (index == -1) return Response.status(401).entity("Pfusch nicht an deinem Nutzer rum").build();
+            if (index == -1) return Response.status(406).entity("Pfusch nicht an deinem Nutzer rum").build();
+
 
             //Ensure that the user has the same rights as the visibilty groub
-            for(int vis = index ; vis < 3; vis++){
+            for(int vis = index ; vis < allowedVis.size(); vis++){
                 allowedVis.remove(index+1);
             }
-            if(!allowedVis.contains(category.getVisibility())) return Response.status(401).entity("Die angegebene Nutzergruppe hat mehr Rechte als deine eigen").build();
+
+            if(!allowedVis.contains(category.getVisibility())) return Response.status(406).entity("Die angegebene Nutzergruppe hat mehr Rechte als deine eigen").build();
         }
         else{
             category.setVisibility("Besucher");
@@ -106,14 +100,14 @@ public class ForumCategoryOrm {
 
         category.setCreationDate(Time.currentTimeInMillis());
 
-        if (!positionCategory(category)) return Response.status(401).entity("Reihenfolge konnte nicht geändert werden").build();
+        if (!positionCategory(category)) return Response.status(406).entity("Reihenfolge konnte nicht geändert werden").build();
 
         //add Categroy to db
         try {
             em.persist(category);
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return Response.status(401).entity("Error while creating the new Category").build();
+            return Response.status(406).entity("Error while creating the new Category").build();
         }
 
         //Update User
@@ -192,31 +186,31 @@ public class ForumCategoryOrm {
         - TODO: everything
     */
     @Transactional
-    public String deleteCategory(ForumCategory forumCategory, Long userId){
+    public Response deleteCategory(ForumCategory forumCategory, Long userId){
         log.info("ForumCategoryOrm/removeCategory");
         User user = em.find(User.class, userId);
-        if(user == null) return "User nicht gefunden";
+        if(user == null) return Response.status(406).entity("User nicht gefunden").build();
         Long categoryId = forumCategory.getId();
         ForumCategory forumCategoryAusDB = em.find(ForumCategory.class, categoryId);
-        if(forumCategoryAusDB == null) return "Thema nicht in der DB gefunden";
+        if(forumCategoryAusDB == null) return Response.status(406).entity("Kategorie nicht in der DB gefunden").build();
 
         User creator = forumCategoryAusDB.getCreatorObj();
-        if (creator == null) return "creator nicht gesetzt";
+        if (creator == null) return Response.status(406).entity("Ersteller nicht gesetzt").build();
 
-        if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
+        if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return Response.status(406).entity("Nur der Ersteller oder Mods dürfen das").build();
 
         try {
             em.remove(forumCategoryAusDB);
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return "Fehler beim Löschen der Kategorie";
+            return Response.status(406).entity("Fehler beim Löschen der Kategorie").build();
         }
 
         creator.getActivityForum().decCategoryCount();
         forumTopicOrm.deleteAllTopicsFromCategory(categoryId);
         user.getActivityForum().decCategoryCount();
 
-        return "Kategorie erfolgreich gelöscht";
+        return Response.status(200).entity("Kategorie erfolgreich gelöscht").build();
     }
 
     //Custom SQL Querys

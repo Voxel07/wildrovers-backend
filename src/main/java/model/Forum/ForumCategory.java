@@ -5,6 +5,12 @@ import java.util.ArrayList;
 //Datenbank Gedöns
 import javax.persistence.Entity;
 import javax.persistence.Table;
+import javax.validation.constraints.Digits;
+import javax.validation.constraints.Max;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Size;
+
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.SequenceGenerator;
@@ -15,8 +21,13 @@ import javax.json.bind.annotation.JsonbTransient;
 import javax.persistence.CascadeType;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
+
+// helper
+import helper.Deserialization;
+import javax.json.bind.annotation.JsonbTypeDeserializer;
 //Models
 import model.User;
+
 
 
 //Security
@@ -31,6 +42,8 @@ public class ForumCategory {
     @Column(name = "id", unique = true)
     private Long id;
 
+    @NotBlank(message = "Category is required")
+    @Size(min = 4, max = 100, message = "Category must be between 4 and 100 characters")
     @Column(name = "category", unique = true)
     private String category;
 
@@ -40,6 +53,9 @@ public class ForumCategory {
     @Column(name = "topicCount", columnDefinition = "bigint default 0")
     private Long topicCount;
 
+    @JsonbTypeDeserializer(Deserialization.class)
+    @Digits(integer = 10, fraction = 0, message = "Position muss eine Nummer sein")
+    @Min(value = 0, message = "Position must be at least 0")
     @Column(name = "position", columnDefinition = "bigint default 0")
     private Long position;
 

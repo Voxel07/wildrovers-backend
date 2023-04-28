@@ -6,6 +6,7 @@ import java.util.List;
 //Quarkus zeug
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
+import javax.validation.Valid;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
@@ -19,6 +20,8 @@ import javax.ws.rs.Path;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
+
+import io.quarkus.arc.All;
 
 //Logging
 import java.util.logging.Logger;
@@ -73,7 +76,7 @@ public class ForumCategoryResource {
     @RolesAllowed({Roles.FRESHMAN, Roles.MEMBER, Roles.ADMIN})
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response addCategory(ForumCategory forumCategory, @Context SecurityContext ctx){
+    public Response addCategory(@Valid ForumCategory forumCategory, @Context SecurityContext ctx){
         log.info("ForumResource/addCategory");
         Long userId = Long.parseLong(ctx.getUserPrincipal().getName());
         log.info(ctx.getUserPrincipal().getName());
@@ -101,14 +104,23 @@ public class ForumCategoryResource {
     }
 
     @DELETE
+    @RolesAllowed({Roles.FRESHMAN, Roles.MEMBER, Roles.ADMIN})
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String deleteCategory(ForumCategory forumCategory, @QueryParam("user")Long userId){
+    public Response deleteCategory(ForumCategory forumCategory,  @Context SecurityContext ctx){
+        Long userId = Long.parseLong(ctx.getUserPrincipal().getName());
         log.info("ForumResource/deleteCategory");
         /*
         @ToDo
         -   Check permissions
         */
-        return forumCategoryOrm.deleteCategory(forumCategory,userId);
+        if(userId == null || forumCategory == null)
+        {
+            return Response.status(401).entity("Fehleder oder falscher Parameter").build();
+        }
+        else
+        {
+            return forumCategoryOrm.deleteCategory(forumCategory,userId);
+        }
     }
 }
