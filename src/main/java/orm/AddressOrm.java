@@ -22,7 +22,7 @@ public class AddressOrm {
 
         Address a = new Address();
 
-        TypedQuery<Address> query = em.createQuery("SELECT u FROM Address u WHERE userId =: val", Address.class);
+        TypedQuery<Address> query = em.createQuery("SELECT a FROM Address a WHERE a.userAddress.id = :val", Address.class);
         query.setParameter("val", userId);
 
         try {
