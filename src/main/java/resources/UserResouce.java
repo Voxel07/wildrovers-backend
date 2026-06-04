@@ -50,72 +50,70 @@ import java.util.logging.Level;
 @Path("/user")
 @RequestScoped
 // @ApplicationScoped
-public class UserResouce
-{
+public class UserResouce {
     private static final Logger log = Logger.getLogger(UserResouce.class.getName());
 
-    @Inject UserOrm userOrm;
+    @Inject
+    UserOrm userOrm;
 
-    @Inject helper.UserPrincipalResolver userPrincipalResolver;
+    @Inject
+    helper.UserPrincipalResolver userPrincipalResolver;
 
-    @Inject tools.HtmlSanitizer htmlSanitizer;
+    @Inject
+    tools.HtmlSanitizer htmlSanitizer;
 
     @ConfigProperty(name = "user.photos.upload-dir", defaultValue = "${user.home}/wildrovers-uploads/user-photos")
     String uploadDir;
 
-    @Context UriInfo info;
+    @Context
+    UriInfo info;
 
-    @Context HttpServerRequest request;
+    @Context
+    HttpServerRequest request;
 
-    @Context HttpHeaders header;
+    @Context
+    HttpHeaders header;
 
-    @Inject Validator validator;
+    @Inject
+    Validator validator;
 
     @GET
     @Path("/me")
     @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getMe()
-    {
+    public Response getMe() {
         log.info("UserResource/getMe");
         User user = userPrincipalResolver.resolveUser();
-        if (user == null)
-        {
+        if (user == null) {
             return Response.status(401).entity("Benutzer nicht eingeloggt oder unbekannt").build();
         }
+        user.setEventsAttended(userOrm.getEventsAttendedCount(user.getId()));
         return Response.ok(user).build();
     }
 
     @GET
-    @RolesAllowed("user")
+    @RolesAllowed({ "Admin", "Vorstand" })
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public List<User> getUser(@QueryParam("userId") Long userId, @QueryParam("username") String userName)
-    {
+    public List<User> getUser(@QueryParam("userId") Long userId, @QueryParam("username") String userName) {
         log.info("UserResource/getUser");
-        if (userId != null)
-        {
+        if (userId != null) {
             log.info("getUserById");
             return userOrm.getUserById(userId);
-        }
-        else if (userName != null)
-        {
+        } else if (userName != null) {
             log.info("getUserByUsername");
             return userOrm.getUserByUsername(userName);
-        }
-        else
-        {
+        } else {
             log.info("getUsers");
             return userOrm.getUsers();
         }
     }
 
     @POST
-    // @RolesAllowed("admin,user")
+    @RolesAllowed({ "Admin", "Vorstand" })
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String updateUser(User user)
-    {
+    public String updateUser(User user) {
         log.info("UserResource/updateUser");
         return userOrm.updateUser(user);
     }
@@ -125,8 +123,7 @@ public class UserResouce
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response login(User user)
-    {
+    public Response login(User user) {
         log.info("UserResource/login");
         return userOrm.loginUser(user);
     }
@@ -136,8 +133,7 @@ public class UserResouce
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response logout()
-    {
+    public Response logout() {
         log.info("UserResource/logout");
         return userOrm.logoutUser();
     }
@@ -146,8 +142,7 @@ public class UserResouce
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response addUser(@Valid User usr)
-    {
+    public Response addUser(@Valid User usr) {
         log.info("UserResource/addUser");
         return userOrm.addUser(usr);
     }
@@ -156,8 +151,7 @@ public class UserResouce
     @RolesAllowed({ "user", "admin" })
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String deleteUser(User usr)
-    {
+    public String deleteUser(User usr) {
         log.info("UserResource/deleteUser");
         // return userOrm.addUser(usr);
         return "testingdelete";
@@ -178,8 +172,13 @@ public class UserResouce
         if (profileData.getPhrase() != null) {
             phrase = htmlSanitizer.sanitizeTitle(profileData.getPhrase());
         }
-        userOrm.updateUserProfile(user.getId(), phrase, profileData.getBirthday());
-        return Response.ok(userOrm.getUserById(user.getId()).get(0)).build();
+        try {
+            userOrm.updateUserProfile(user.getId(), phrase, profileData.getBirthday(), profileData.getFirstName(),
+                    profileData.getLastName(), profileData.getEmail());
+            return Response.ok(userOrm.getUserById(user.getId()).get(0)).build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(400).entity(e.getMessage()).build();
+        }
     }
 
     @POST
@@ -216,7 +215,7 @@ public class UserResouce
 
             ImageIO.write(scaled, "jpg", destPath.toFile());
 
-            String photoUrl = "/api/user/photo/" + user.getId();
+            String photoUrl = "/user/photo/" + user.getId();
             userOrm.updateUserPhotoUrl(user.getId(), photoUrl);
 
             jakarta.json.JsonObject result = jakarta.json.Json.createObjectBuilder()
@@ -257,7 +256,8 @@ public class UserResouce
     private BufferedImage scaleImage(BufferedImage src, int maxDim) {
         int w = src.getWidth();
         int h = src.getHeight();
-        if (w <= maxDim && h <= maxDim) return src;
+        if (w <= maxDim && h <= maxDim)
+            return src;
         double ratio = (double) maxDim / Math.max(w, h);
         int newW = (int) Math.round(w * ratio);
         int newH = (int) Math.round(h * ratio);

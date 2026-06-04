@@ -10,6 +10,7 @@ import model.Forum.Polls.Polls;
 import model.Users.Roles;
 import orm.Forum.ForumPollOrm;
 import helper.UserPrincipalResolver;
+import java.util.List;
 
 @Path("/forum/poll")
 @ApplicationScoped
@@ -37,12 +38,12 @@ public class ForumPollResource {
     @POST
     @Path("/vote")
     @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
-    public Response vote(@QueryParam("poll") Long pollId, @QueryParam("option") Long optionId) {
+    public Response vote(@QueryParam("poll") Long pollId, @QueryParam("option") List<Long> optionIds) {
         Long userId = userPrincipalResolver.resolveUserId();
         if (userId == null) {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Nicht angemeldet").build();
         }
-        return forumPollOrm.vote(pollId, optionId, userId);
+        return forumPollOrm.vote(pollId, optionIds, userId);
     }
 
     @GET

@@ -102,11 +102,11 @@ public class EventResource {
             ForumPost post = new ForumPost();
             post.setTitle("Event: " + event.getTitle());
             String postContent = "<p><strong>Termin:</strong> " + formatEventDateForPost(event.getEventDate()) + "</p>"
-                               + "<p><strong>Ort:</strong> " + event.getLocation() + "</p>"
-                               + "<hr/>"
-                               + "<p>" + (event.getDescription() != null ? event.getDescription() : "") + "</p>";
+                    + "<p><strong>Ort:</strong> " + event.getLocation() + "</p>"
+                    + "<hr/>"
+                    + "<p>" + (event.getDescription() != null ? event.getDescription() : "") + "</p>";
             post.setContent(postContent);
-            Response postResponse = forumPostOrm.addPost(post, 2L, user.getId());
+            Response postResponse = forumPostOrm.addPost(post, 1L, user.getId());
             if (postResponse.getStatus() == 201) {
                 postId = (Long) postResponse.getEntity();
                 String forumUrl = "http://localhost:5173/Forum/Post/" + postId;
@@ -136,7 +136,8 @@ public class EventResource {
     }
 
     private String formatEventDateForPost(java.time.LocalDateTime dateTime) {
-        if (dateTime == null) return "";
+        if (dateTime == null)
+            return "";
         return dateTime.format(DateTimeFormatter.ofPattern("dd.MM.yyyy 'um' HH:mm 'Uhr'"));
     }
 
@@ -158,7 +159,8 @@ public class EventResource {
 
         // Authorization check: creator or Admin
         if (!existing.getCreator().getId().equals(user.getId()) && !user.getRole().equals("Admin")) {
-            return Response.status(403).entity("Nur der Ersteller oder ein Administrator darf dieses Event bearbeiten.").build();
+            return Response.status(403).entity("Nur der Ersteller oder ein Administrator darf dieses Event bearbeiten.")
+                    .build();
         }
 
         // Sanitize and copy fields
@@ -204,7 +206,8 @@ public class EventResource {
 
         // Authorization check: creator or Admin
         if (!existing.getCreator().getId().equals(user.getId()) && !user.getRole().equals("Admin")) {
-            return Response.status(403).entity("Nur der Ersteller oder ein Administrator darf dieses Event löschen.").build();
+            return Response.status(403).entity("Nur der Ersteller oder ein Administrator darf dieses Event löschen.")
+                    .build();
         }
 
         // 1. Delete from Google Calendar
@@ -245,9 +248,8 @@ public class EventResource {
         }
 
         jakarta.persistence.TypedQuery<EventAttendance> query = em.createQuery(
-            "SELECT a FROM EventAttendance a WHERE a.user.id = :userId AND a.event.id = :eventId",
-            EventAttendance.class
-        );
+                "SELECT a FROM EventAttendance a WHERE a.user.id = :userId AND a.event.id = :eventId",
+                EventAttendance.class);
         query.setParameter("userId", user.getId());
         query.setParameter("eventId", eventId);
 

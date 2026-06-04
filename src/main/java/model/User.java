@@ -112,6 +112,12 @@ public class User {
     @Column(name = "ribbon")
     private String ribbon;
 
+    @Column(name = "yearlyFeePaid", columnDefinition = "boolean default false")
+    private Boolean yearlyFeePaid = false;
+
+    @jakarta.persistence.Transient
+    private Long eventsAttended = 0L;
+
     @JsonIgnore
     @JsonbTransient
     @ManyToOne(fetch = FetchType.LAZY)
@@ -374,6 +380,22 @@ public class User {
 
     public void setRibbon(String ribbon) {
         this.ribbon = ribbon;
+    }
+
+    public Boolean getYearlyFeePaid() {
+        return yearlyFeePaid != null ? yearlyFeePaid : false;
+    }
+
+    public void setYearlyFeePaid(Boolean yearlyFeePaid) {
+        this.yearlyFeePaid = yearlyFeePaid;
+    }
+
+    public Long getEventsAttended() {
+        return eventsAttended;
+    }
+
+    public void setEventsAttended(Long eventsAttended) {
+        this.eventsAttended = eventsAttended;
     }
 
     @JsonIgnore

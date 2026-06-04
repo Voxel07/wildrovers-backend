@@ -10,6 +10,7 @@ import model.Forum.Polls.Polls;
 import model.Forum.Polls.PollOptions;
 import model.User;
 import java.util.logging.Logger;
+import java.util.List;
 
 @ApplicationScoped
 public class ForumPollOrm {
@@ -32,7 +33,8 @@ public class ForumPollOrm {
         }
 
         if (!model.Users.Roles.hasRequiredRole(user.getRole(), post.getTopic().getCategory().getVisibility())) {
-            return Response.status(Response.Status.FORBIDDEN).entity("Du hast keine Berechtigung für diese Kategorie.").build();
+            return Response.status(Response.Status.FORBIDDEN).entity("Du hast keine Berechtigung für diese Kategorie.")
+                    .build();
         }
 
         // Check if user is creator of post or admin
@@ -59,8 +61,8 @@ public class ForumPollOrm {
     }
 
     @Transactional
-    public Response vote(Long pollId, Long optionId, Long userId) {
-        log.info("ForumPollOrm/vote on poll: " + pollId + ", option: " + optionId + " by user: " + userId);
+    public Response vote(Long pollId, List<Long> optionIds, Long userId) {
+        log.info("ForumPollOrm/vote on poll: " + pollId + ", options: " + optionIds + " by user: " + userId);
         Polls poll = em.find(Polls.class, pollId);
         if (poll == null) {
             return Response.status(Response.Status.NOT_FOUND).entity("Umfrage nicht gefunden").build();
@@ -71,8 +73,10 @@ public class ForumPollOrm {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Benutzer nicht gefunden").build();
         }
 
-        if (!model.Users.Roles.hasRequiredRole(user.getRole(), poll.getPost().getTopic().getCategory().getVisibility())) {
-            return Response.status(Response.Status.FORBIDDEN).entity("Du hast keine Berechtigung für diese Kategorie.").build();
+        if (!model.Users.Roles.hasRequiredRole(user.getRole(),
+                poll.getPost().getTopic().getCategory().getVisibility())) {
+            return Response.status(Response.Status.FORBIDDEN).entity("Du hast keine Berechtigung für diese Kategorie.")
+                    .build();
         }
 
         // Check if user has already voted
@@ -80,15 +84,24 @@ public class ForumPollOrm {
             return Response.status(Response.Status.BAD_REQUEST).entity("Du hast bereits abgestimmt").build();
         }
 
-        PollOptions option = em.find(PollOptions.class, optionId);
-        if (option == null || !option.getPoll().getId().equals(pollId)) {
-            return Response.status(Response.Status.BAD_REQUEST).entity("Ungültige Option").build();
+        if (optionIds == null || optionIds.isEmpty()) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Keine Optionen ausgewählt").build();
         }
 
-        option.setVotes(option.getVotes() + 1);
+        // If not multiple selection and multiple selected, block
+        if (!Boolean.TRUE.equals(poll.getAllowMultiple()) && optionIds.size() > 1) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("Mehrfachauswahl ist für diese Umfrage nicht erlaubt").build();
+        }
+        for (Long optionId : optionIds) {
+            PollOptions option = em.find(PollOptions.class, optionId);
+            if (option == null || !option.getPoll().getId().equals(pollId)) {
+                return Response.status(Response.Status.BAD_REQUEST).entity("Ungültige Option").build();
+            }
+            option.setVotes((option.getVotes() != null ? option.getVotes() : 0L) + 1);
+            em.merge(option);
+        }
         poll.getVotedUsers().add(user);
-
-        em.merge(option);
         em.merge(poll);
 
         return Response.ok("Stimme erfolgreich gezählt").build();
@@ -96,9 +109,11 @@ public class ForumPollOrm {
 
     public boolean hasVoted(Long pollId, Long userId) {
         Polls poll = em.find(Polls.class, pollId);
-        if (poll == null) return false;
+        if (poll == null)
+            return false;
         User user = em.find(User.class, userId);
-        if (user == null) return false;
+        if (user == null)
+            return false;
         return poll.getVotedUsers().contains(user);
     }
 }

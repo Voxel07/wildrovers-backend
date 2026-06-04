@@ -11,7 +11,6 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import jakarta.transaction.Transactional;
 
-
 //Logging
 import java.util.logging.Logger;
 import java.util.logging.Level;
@@ -63,8 +62,7 @@ public class ForumPostOrm {
     @Inject
     ImageExtractor imageExtractor;
 
-    @ConfigProperty(name = "forum.images.upload-dir",
-                    defaultValue = "${user.home}/wildrovers-uploads/forum")
+    @ConfigProperty(name = "forum.images.upload-dir", defaultValue = "${user.home}/wildrovers-uploads/forum")
     String uploadDir;
 
     // Base URL for image references — configurable for production
@@ -74,58 +72,76 @@ public class ForumPostOrm {
     @ConfigProperty(name = "quarkus.http.port", defaultValue = "8080")
     int serverPort;
 
-
-    public List<ForumPost>getAllPosts(){
+    public List<ForumPost> getAllPosts() {
         log.info("ForumOrm/getPosts");
-        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp", ForumPost.class);
+        TypedQuery<ForumPost> query = em.createQuery(
+                "SELECT fp FROM ForumPost fp LEFT JOIN FETCH fp.topic t LEFT JOIN FETCH t.category c", ForumPost.class);
         return query.getResultList();
     }
-    public List<ForumPost>getPostsByUser(Long userId){
+
+    public List<ForumPost> getPostsByUser(Long userId) {
         log.info("ForumOrm/getPostsByUser");
-        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE fp.creator.id = :val", ForumPost.class);
-        query.setParameter("val",userId);
+        TypedQuery<ForumPost> query = em.createQuery(
+                "SELECT fp FROM ForumPost fp LEFT JOIN FETCH fp.topic t LEFT JOIN FETCH t.category c WHERE fp.creator.id = :val",
+                ForumPost.class);
+        query.setParameter("val", userId);
         return query.getResultList();
     }
+
     @Transactional
-    public List<ForumPost>getPostsById(Long postId){
+    public List<ForumPost> getPostsById(Long postId) {
         log.info("ForumOrm/getPostsById");
         ForumPost post = em.find(ForumPost.class, postId);
         if (post != null) {
             post.setViews((post.getViews() != null ? post.getViews() : 0L) + 1);
             em.merge(post);
         }
-        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE id =: val", ForumPost.class);
-        query.setParameter("val",postId);
+        TypedQuery<ForumPost> query = em.createQuery(
+                "SELECT fp FROM ForumPost fp LEFT JOIN FETCH fp.topic t LEFT JOIN FETCH t.category c WHERE fp.id = :val",
+                ForumPost.class);
+        query.setParameter("val", postId);
         return query.getResultList();
-   }
-    public List<ForumPost>getPostsByEditor(Long userId){
+    }
+
+    public List<ForumPost> getPostsByEditor(Long userId) {
         log.info("ForumOrm/getPostsByEditor");
-        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE fp.editor.id = :val", ForumPost.class);
-        query.setParameter("val",userId);
+        TypedQuery<ForumPost> query = em.createQuery(
+                "SELECT fp FROM ForumPost fp LEFT JOIN FETCH fp.topic t LEFT JOIN FETCH t.category c WHERE fp.editor.id = :val",
+                ForumPost.class);
+        query.setParameter("val", userId);
         return query.getResultList();
-   }
-    public List<ForumPost>getPostsByTopic(Long topicId){
+    }
+
+    public List<ForumPost> getPostsByTopic(Long topicId) {
         log.info("ForumOrm/getPostsByTopic");
-        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE fp.topic.id = :val", ForumPost.class);
-        query.setParameter("val",topicId);
+        TypedQuery<ForumPost> query = em.createQuery(
+                "SELECT fp FROM ForumPost fp LEFT JOIN FETCH fp.topic t LEFT JOIN FETCH t.category c WHERE fp.topic.id = :val",
+                ForumPost.class);
+        query.setParameter("val", topicId);
         return query.getResultList();
     }
-    public List<ForumPost>getPostByTitel(String title){
+
+    public List<ForumPost> getPostByTitel(String title) {
         log.info("ForumOrm/getPostByTitel");
-        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE title =: val", ForumPost.class);
-        query.setParameter("val",title);
+        TypedQuery<ForumPost> query = em.createQuery(
+                "SELECT fp FROM ForumPost fp LEFT JOIN FETCH fp.topic t LEFT JOIN FETCH t.category c WHERE fp.title = :val",
+                ForumPost.class);
+        query.setParameter("val", title);
         return query.getResultList();
     }
-    public ForumPost getLatestPost(Long topicId){
-        log.info("ForumPostOrm/getLatestPost "+ topicId);
-        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE fp.topic.id = :val ORDER BY fp.creationDate DESC", ForumPost.class);
+
+    public ForumPost getLatestPost(Long topicId) {
+        log.info("ForumPostOrm/getLatestPost " + topicId);
+        TypedQuery<ForumPost> query = em.createQuery(
+                "SELECT fp FROM ForumPost fp LEFT JOIN FETCH fp.topic t LEFT JOIN FETCH t.category c WHERE fp.topic.id = :val ORDER BY fp.creationDate DESC",
+                ForumPost.class);
         query.setParameter("val", topicId);
         query.setMaxResults(1);
         ForumPost fp = new ForumPost();
         try {
             fp = query.getSingleResult();
         } catch (Exception e) {
-           return fp;
+            return fp;
         }
         log.info("Creator:" + fp.getCreator());
 
@@ -134,40 +150,48 @@ public class ForumPostOrm {
         return fp;
     }
 
-    //Crud operations for ForumPosts
+    // Crud operations for ForumPosts
     /**
-     *  NOTE: addPost
-        -   Checks if Post titel already exists in the same topic
-        -
+     * NOTE: addPost
+     * - Checks if Post titel already exists in the same topic
+     * -
+     * 
      * @param forumPost Conaines all Content of the Post aka text and picutres
      * @param topicId
      * @param userId
      * @return
      */
     @Transactional
-    public Response addPost(ForumPost forumPost,Long topicId,Long userId){
+    public Response addPost(ForumPost forumPost, Long topicId, Long userId) {
         log.info("ForumPostOrm/addPost");
-        if(topicId == null) return Response.status(401).entity("Es muss ein Tehma angegeben werden").build();
-        if(userId == null) return Response.status(401).entity("Es muss ein User angegebene werden").build();
+        if (topicId == null)
+            return Response.status(401).entity("Es muss ein Tehma angegeben werden").build();
+        if (userId == null)
+            return Response.status(401).entity("Es muss ein User angegebene werden").build();
 
         List<ForumTopic> forumTopics = forumTopicOrm.getTopicById(topicId);
-        if(forumTopics.isEmpty()) return Response.status(401).entity("Topic nicht gefunden").build();
+        if (forumTopics.isEmpty())
+            return Response.status(401).entity("Topic nicht gefunden").build();
         ForumTopic topic = forumTopics.get(0);
-        if(topic == null){
+        if (topic == null) {
             log.warning("TOPIC not found");
             return Response.status(401).entity("Das angegebene Tehma existiert nicht").build();
         }
-        //Check if Post title exists in current Topic
-        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE fp.topic.id = :val AND fp.title = :val2",ForumPost.class);
+        // Check if Post title exists in current Topic
+        TypedQuery<ForumPost> query = em.createQuery(
+                "SELECT fp FROM ForumPost fp WHERE fp.topic.id = :val AND fp.title = :val2", ForumPost.class);
         query.setParameter("val", topicId);
         query.setParameter("val2", forumPost.getTitle());
-        if(!query.getResultList().isEmpty()) return Response.status(401).entity("Ein Post mit diesem Titel exestiert bereit in diesem Thema").build();
+        if (!query.getResultList().isEmpty())
+            return Response.status(401).entity("Ein Post mit diesem Titel exestiert bereit in diesem Thema").build();
 
-        User user = em.find(User.class,userId);
-        if(user == null) return Response.status(401).entity("Der angegebene Nutzer wurde nicht gefunden").build();
+        User user = em.find(User.class, userId);
+        if (user == null)
+            return Response.status(401).entity("Der angegebene Nutzer wurde nicht gefunden").build();
 
         if (!model.Users.Roles.hasRequiredRole(user.getRole(), topic.getCategory().getVisibility())) {
-            return Response.status(403).entity("Du hast keine Berechtigung, in dieser Kategorie einen Beitrag zu erstellen.").build();
+            return Response.status(403)
+                    .entity("Du hast keine Berechtigung, in dieser Kategorie einen Beitrag zu erstellen.").build();
         }
 
         // Sanitize user-submitted content before persisting
@@ -189,7 +213,7 @@ public class ForumPostOrm {
             em.persist(forumPost);
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return  Response.status(401).entity("Fehler beim erstellen des Posts").build();
+            return Response.status(401).entity("Fehler beim erstellen des Posts").build();
         }
 
         // Extract base64 images after we have the postId, then update content
@@ -203,33 +227,32 @@ public class ForumPostOrm {
             // Non-fatal: post is saved, images may still be base64
         }
 
-        return  Response.status(201).entity(forumPost.getId()).build();
+        return Response.status(201).entity(forumPost.getId()).build();
     }
 
     @Transactional
-    public Response saveImages(Pictures pic, Long userId){
+    public Response saveImages(Pictures pic, Long userId) {
 
         ForumPost post = getPostsById(pic.getPostId()).get(0);
-        List <ForumPicture> pictures = new ArrayList<>();
+        List<ForumPicture> pictures = new ArrayList<>();
         ForumPicture picture;
         // post.setPictures(pictures);
 
         int start = 0;
         int end = 0;
-        String typeString; //data:image/png
-        String type; //png
-        List <String> types = new ArrayList<>();
+        String typeString; // data:image/png
+        String type; // png
+        List<String> types = new ArrayList<>();
         String base64Image;
         byte[] imageBytes;
         List<BufferedImage> imagList = new ArrayList<>();
 
-        for (String elm : pic.getFiles())
-        {
+        for (String elm : pic.getFiles()) {
             start = elm.indexOf("data:");
             end = elm.indexOf(";");
             typeString = elm.substring(start, end);
 
-            if(typeString.contains("image")){
+            if (typeString.contains("image")) {
                 type = typeString.substring(11, typeString.length());
                 types.add(type);
                 base64Image = elm.split(",")[1];
@@ -242,12 +265,12 @@ public class ForumPostOrm {
             }
         }
 
-        //Ordnerstruktur erstellen
-        File folder = new File("Forum/Posts/"+pic.getPostId()+"/images");
-        if(!folder.exists()){
-            if(!folder.mkdirs()) return Response.status(500).entity("Fehler beim erstellen der Ordnerstruktur").build();
-        }
-        else{
+        // Ordnerstruktur erstellen
+        File folder = new File("Forum/Posts/" + pic.getPostId() + "/images");
+        if (!folder.exists()) {
+            if (!folder.mkdirs())
+                return Response.status(500).entity("Fehler beim erstellen der Ordnerstruktur").build();
+        } else {
             try {
                 FileUtils.cleanDirectory(folder);
             } catch (IOException e) {
@@ -260,7 +283,7 @@ public class ForumPostOrm {
         String path;
 
         for (BufferedImage img : imagList) {
-            path = folder.getAbsolutePath()+"/img_"+i+"."+types.get(i);
+            path = folder.getAbsolutePath() + "/img_" + i + "." + types.get(i);
             picture = new ForumPicture(path);
             post.getPictures().add(picture);
             picture.setPost(post);
@@ -281,26 +304,31 @@ public class ForumPostOrm {
     /**
      *
      * NOTE: updatePost
-     * -    Check permissions. Only creator/mods
-     * -    Check if new name exists already exists in the topic
+     * - Check permissions. Only creator/mods
+     * - Check if new name exists already exists in the topic
+     * 
      * @param forumPost
      * @param userId
      * @return
      */
     @Transactional
-    public String updatePost(ForumPost forumPost, Long userId){
+    public String updatePost(ForumPost forumPost, Long userId) {
         log.info("ForumPostOrm/updatePost");
 
         User user = em.find(User.class, userId);
-        if(user == null) return "User nicht gefunden";
+        if (user == null)
+            return "User nicht gefunden";
 
         ForumPost forumPostAusDB = em.find(ForumPost.class, forumPost.getId());
-        if(forumPostAusDB == null) return "Antwort nicht in der DB gefunden";
+        if (forumPostAusDB == null)
+            return "Antwort nicht in der DB gefunden";
 
         User creator = forumPostAusDB.getCreatorObj();
-        if (creator == null) return "creator nicht gesetzt";
+        if (creator == null)
+            return "creator nicht gesetzt";
 
-        if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
+        if (!creator.getId().equals(userId) && !user.getRole().equals("Admin"))
+            return "Nur der Ersteller oder Mods dürfen das";
 
         // Sanitize updated content, then extract any new base64 images
         String sanitizedContent = htmlSanitizer.sanitize(forumPost.getContent());
@@ -310,14 +338,15 @@ public class ForumPostOrm {
         forumPostAusDB.setEditDate(Time.currentTimeInMillis());
         forumPostAusDB.setEditor(user);
 
-        try{
+        try {
             em.merge(forumPostAusDB);
-        }catch(Exception e){
+        } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return "Fehler beim updaten der Antwort";
         }
         return "Antwort erfolgreich aktualisert";
     }
+
     /**
      *
      * @param forumPost
@@ -325,19 +354,23 @@ public class ForumPostOrm {
      * @return
      */
     @Transactional
-    public String deletePost(ForumPost forumPost, Long userId){
+    public String deletePost(ForumPost forumPost, Long userId) {
         log.info("ForumPostOrm/deletePost");
 
         User user = em.find(User.class, userId);
-        if(user == null) return "User nicht gefunden";
+        if (user == null)
+            return "User nicht gefunden";
         Long postId = forumPost.getId();
         ForumPost forumPostAusDB = em.find(ForumPost.class, postId);
-        if(forumPostAusDB == null) return "Antwort nicht in der DB gefunden";
+        if (forumPostAusDB == null)
+            return "Antwort nicht in der DB gefunden";
 
         User creator = forumPostAusDB.getCreatorObj();
-        if (creator == null) return "creator nicht gesetzt";
+        if (creator == null)
+            return "creator nicht gesetzt";
 
-        if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
+        if (!creator.getId().equals(userId) && !user.getRole().equals("Admin"))
+            return "Nur der Ersteller oder Mods dürfen das";
 
         try {
             em.remove(forumPostAusDB);
@@ -352,22 +385,24 @@ public class ForumPostOrm {
 
         return "Post erfolgreich gelöscht";
     }
+
     /**
      * No checks, because this function does not have a public endpoint
      * gets Called when a Topic is deleted so no need to update answer count
      */
     @Transactional
-    public String deleteAllPostsFromUser(Long userId){
+    public String deleteAllPostsFromUser(Long userId) {
         log.info("ForumAnswerOrm/deleteAllPostsFromUser");
 
         try {
-            em.createQuery("DELETE FROM ForumPost fp WHERE fp.creator.id = :val").setParameter("val", userId).executeUpdate();
+            em.createQuery("DELETE FROM ForumPost fp WHERE fp.creator.id = :val").setParameter("val", userId)
+                    .executeUpdate();
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return "Fehler beim Löschen der Posts";
         }
 
-        //Maybe set count to 0
+        // Maybe set count to 0
         // User user = em.find(User.class, userId);
         // user.getActivityForum().setAnswerCount(0L);
         return "Posts erfolgreich gelöscht";
@@ -378,26 +413,25 @@ public class ForumPostOrm {
      * gets Called when a Topic is deleted so no need to update answer count
      */
     @Transactional
-    public String deleteAllPostsFromTopic(Long topicId){
+    public String deleteAllPostsFromTopic(Long topicId) {
         log.info("ForumPostOrm/deleteAllPostsFromTopic");
 
-        //Get all answers that will be affected to Update the affected user.
+        // Get all answers that will be affected to Update the affected user.
         List<ForumPost> allPosts = getPostsByTopic(topicId);
-        HashMap<User, Long> map = new HashMap<User,Long>();
-        //Loop all answers to count the number of deleted answers per user.
+        HashMap<User, Long> map = new HashMap<User, Long>();
+        // Loop all answers to count the number of deleted answers per user.
         for (ForumPost forumPost : allPosts) {
-           User u = forumPost.getCreatorObj();
-           if(map.containsKey(u))
-           {
+            User u = forumPost.getCreatorObj();
+            if (map.containsKey(u)) {
                 map.put(u, map.get(u) + 1);
-           }
-           else{
-               map.put(u, 1L);
-           }
-           forumAnswerOrm.deleteAllAnswersFromTopic(forumPost.getId());
+            } else {
+                map.put(u, 1L);
+            }
+            forumAnswerOrm.deleteAllAnswersFromTopic(forumPost.getId());
         }
         try {
-            em.createQuery("DELETE FROM ForumPost fp WHERE fp.topic.id = :val").setParameter("val", topicId).executeUpdate();
+            em.createQuery("DELETE FROM ForumPost fp WHERE fp.topic.id = :val").setParameter("val", topicId)
+                    .executeUpdate();
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return "Fehler beim Löschen der Antworten";
@@ -431,13 +465,14 @@ public class ForumPostOrm {
             return Response.status(400).entity("Unbekannter vote-Typ: " + type).build();
         }
 
-        if (post.getLikes() == null) post.setLikes(0L);
-        if (post.getDislikes() == null) post.setDislikes(0L);
+        if (post.getLikes() == null)
+            post.setLikes(0L);
+        if (post.getDislikes() == null)
+            post.setDislikes(0L);
 
         TypedQuery<model.Forum.ForumPostVote> query = em.createQuery(
-            "SELECT v FROM ForumPostVote v WHERE v.user.id = :userId AND v.post.id = :postId",
-            model.Forum.ForumPostVote.class
-        );
+                "SELECT v FROM ForumPostVote v WHERE v.user.id = :userId AND v.post.id = :postId",
+                model.Forum.ForumPostVote.class);
         query.setParameter("userId", userId);
         query.setParameter("postId", postId);
 
@@ -485,10 +520,9 @@ public class ForumPostOrm {
         }
 
         jakarta.json.JsonObject result = jakarta.json.Json.createObjectBuilder()
-            .add("likes", post.getLikes())
-            .add("dislikes", post.getDislikes())
-            .build();
+                .add("likes", post.getLikes())
+                .add("dislikes", post.getDislikes())
+                .build();
         return Response.ok(result).build();
     }
 }
-

@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  db:
+    image: mariadb:10.11
+    container_name: wildrovers-db
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: "${SQL_PASSOWRD}"
+      MYSQL_DATABASE: "wildrovers"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+
+  backend:
+    image: ghcr.io/voxel07/wildrovers-backend:latest
+    container_name: wildrovers-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    environment:
+      SQL_URL: "jdbc:mariadb://db:3306/wildrovers"
+      SQL_USER: "${SQL_USER}"
+      SQL_PASSOWRD: "${SQL_PASSOWRD}"
+      AUTHENTIK_AUTH_SERVER_URL: "${AUTHENTIK_AUTH_SERVER_URL}"
+      AUTHENTIK_CLIENT_ID: "${AUTHENTIK_CLIENT_ID}"
+      AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET}"
+      GOOGLE_CALENDAR_CREDENTIALS: "${GOOGLE_CALENDAR_CREDENTIALS}"
+      GOOGLE_CALENDAR_ID: "${GOOGLE_CALENDAR_ID}"
+      FORUM_IMAGES_UPLOAD_DIR: "/work/uploads"
+    volumes:
+      - backend_uploads:/work/uploads
+
+  frontend:
+    image: ghcr.io/voxel07/wildrovers-frontend:latest
+    container_name: wildrovers-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      VITE_API_URL: "${VITE_API_URL}"
+      VITE_OIDC_AUTHORITY: "${VITE_OIDC_AUTHORITY}"
+      VITE_OIDC_CLIENT_ID: "${VITE_OIDC_CLIENT_ID}"
+      VITE_OIDC_REDIRECT_URI: "${VITE_OIDC_REDIRECT_URI}"
+      VITE_IMMICH_PROXY_URL: "${VITE_IMMICH_PROXY_URL}"
+      VITE_IMMICH_DROP_URL: "${VITE_IMMICH_DROP_URL}"
+      VITE_IMMICH_KIOSK_URL: "${VITE_IMMICH_KIOSK_URL}"
+
+volumes:
+  mariadb_data:
+  backend_uploads:

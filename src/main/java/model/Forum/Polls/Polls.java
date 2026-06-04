@@ -40,28 +40,61 @@ public class Polls {
     private List<PollOptions> options = new ArrayList<>();
 
     @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-        name = "FORUM_POLL_VOTES",
-        joinColumns = @JoinColumn(name = "poll_id"),
-        inverseJoinColumns = @JoinColumn(name = "user_id")
-    )
+    @JoinTable(name = "FORUM_POLL_VOTES", joinColumns = @JoinColumn(name = "poll_id"), inverseJoinColumns = @JoinColumn(name = "user_id"))
     @JsonbTransient
     private List<User> votedUsers = new ArrayList<>();
 
-    public Polls() {}
+    @Column(name = "allow_multiple", columnDefinition = "boolean default false")
+    private Boolean allowMultiple = false;
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public Polls() {
+    }
 
-    public String getQuestion() { return question; }
-    public void setQuestion(String question) { this.question = question; }
+    public Long getId() {
+        return id;
+    }
 
-    public ForumPost getPost() { return post; }
-    public void setPost(ForumPost post) { this.post = post; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public List<PollOptions> getOptions() { return options; }
-    public void setOptions(List<PollOptions> options) { this.options = options; }
+    public String getQuestion() {
+        return question;
+    }
 
-    public List<User> getVotedUsers() { return votedUsers; }
-    public void setVotedUsers(List<User> votedUsers) { this.votedUsers = votedUsers; }
+    public Boolean getAllowMultiple() {
+        return allowMultiple;
+    }
+
+    public void setAllowMultiple(Boolean allowMultiple) {
+        this.allowMultiple = allowMultiple;
+    }
+
+    public void setQuestion(String question) {
+        this.question = question;
+    }
+
+    public ForumPost getPost() {
+        return post;
+    }
+
+    public void setPost(ForumPost post) {
+        this.post = post;
+    }
+
+    public List<PollOptions> getOptions() {
+        return options;
+    }
+
+    public void setOptions(List<PollOptions> options) {
+        this.options = options;
+    }
+
+    public List<User> getVotedUsers() {
+        return votedUsers;
+    }
+
+    public void setVotedUsers(List<User> votedUsers) {
+        this.votedUsers = votedUsers;
+    }
 }
