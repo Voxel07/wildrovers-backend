@@ -1,4 +1,4 @@
-name: Build Native Image and Publish to GHCR
+name: Build JVM Image and Publish to GHCR
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-push:
-    name: Build Native Executable & Docker Container
+    name: Build JVM Application & Docker Container
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -48,23 +48,22 @@ jobs:
         run: |
           echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: Set up GraalVM JDK
+      - name: Set up Java JDK
         if: steps.check-branch.outputs.on_master == 'true'
-        uses: graalvm/setup-graalvm@v1
+        uses: actions/setup-java@v4
         with:
-          java-version: '25'
-          distribution: 'graalvm'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          java-version: '17'
+          distribution: 'temurin'
           cache: 'maven'
 
       - name: Make Maven Wrapper Executable
         if: steps.check-branch.outputs.on_master == 'true'
         run: chmod +x mvnw
 
-      - name: Build Native Executable with Maven
+      - name: Build JVM Application with Maven
         if: steps.check-branch.outputs.on_master == 'true'
         run: |
-          ./mvnw package -Dnative -DskipTests
+          ./mvnw package -DskipTests
 
       - name: Log in to GHCR
         if: steps.check-branch.outputs.on_master == 'true'
@@ -83,7 +82,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: src/main/docker/Dockerfile.native
+          file: src/main/docker/Dockerfile.jvm
           push: true
           tags: |
             ghcr.io/${{ steps.repo_details.outputs.owner }}/${{ steps.repo_details.outputs.repo }}:${{ steps.get_tag.outputs.tag }}
