@@ -62,37 +62,82 @@ public class ForumPostResource {
                             @QueryParam("editor")Long editorId)
     {
         log.info("ForumResource/getTopics");
+        List<ForumPost> posts;
         if(postId != null){
             log.info("ForumResource/getTopics/id");
-            return forumPostOrm.getPostsById(postId);
+            posts = forumPostOrm.getPostsById(postId);
         }
         else if(topicId != null){
             log.info("ForumResource/getTopics/name");
-            return forumPostOrm.getPostsByTopic(topicId);
+            posts = forumPostOrm.getPostsByTopic(topicId);
         }
         else if(userId != null){
             log.info("ForumResource/getPosts/user");
-            return forumPostOrm.getPostsByUser(userId);
+            posts = forumPostOrm.getPostsByUser(userId);
         }
         else if(editorId != null){
             log.info("ForumResource/getPosts/editor");
-            return forumPostOrm.getPostsByEditor(editorId);
+            posts = forumPostOrm.getPostsByEditor(editorId);
         }
         else if(title != null){
             log.info("ForumResource/getPosts/category");
-            return forumPostOrm.getPostByTitel(title);
+            posts = forumPostOrm.getPostByTitel(title);
         }
         else{
-                log.info("ForumResource/getPosts/all");
-            return forumPostOrm.getAllPosts();
+            log.info("ForumResource/getPosts/all");
+            posts = forumPostOrm.getAllPosts();
         }
+
+        String userRole = Roles.VSISITOR;
+        model.User user = userPrincipalResolver.resolveUser();
+        if (user != null) {
+            userRole = user.getRole();
+        }
+        final String finalRole = userRole;
+        List<ForumPost> mutablePosts = new java.util.ArrayList<>(posts);
+        mutablePosts.removeIf(fp -> {
+            model.Forum.ForumTopic topic = fp.getTopic();
+            if (topic == null) return false;
+            model.Forum.ForumCategory cat = topic.getCategory();
+            if (cat == null) return false;
+            String vis = cat.getVisibility();
+            if (vis == null || vis.isBlank()) {
+                vis = Roles.VSISITOR;
+            }
+            return !Roles.hasRequiredRole(finalRole, vis);
+        });
+        return mutablePosts;
     }
 
     @GET
     @Path("/latest")
     @Produces(MediaType.APPLICATION_JSON)
-    public ForumPost getLatestPost(@QueryParam("topic") Long topicId){
-        return forumPostOrm.getLatestPost(topicId);
+    public Response getLatestPost(@QueryParam("topic") Long topicId){
+        ForumPost fp = forumPostOrm.getLatestPost(topicId);
+        if (fp == null || fp.getId() == null) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+
+        String userRole = Roles.VSISITOR;
+        model.User user = userPrincipalResolver.resolveUser();
+        if (user != null) {
+            userRole = user.getRole();
+        }
+
+        model.Forum.ForumTopic topic = fp.getTopic();
+        if (topic != null) {
+            model.Forum.ForumCategory cat = topic.getCategory();
+            if (cat != null) {
+                String vis = cat.getVisibility();
+                if (vis == null || vis.isBlank()) {
+                    vis = Roles.VSISITOR;
+                }
+                if (!Roles.hasRequiredRole(userRole, vis)) {
+                    return Response.status(Response.Status.FORBIDDEN).entity("Keine Berechtigung").build();
+                }
+            }
+        }
+        return Response.ok(fp).build();
     }
 
 
@@ -175,7 +220,7 @@ public class ForumPostResource {
         if (userId == null || postId == null || type == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
         }
-        return forumPostOrm.votePost(postId, type);
+        return forumPostOrm.votePost(postId, type, userId);
     }
 }
 

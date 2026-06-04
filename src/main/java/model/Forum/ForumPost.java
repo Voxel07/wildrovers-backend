@@ -18,6 +18,7 @@ import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.json.bind.annotation.JsonbTransient;
 import jakarta.persistence.CascadeType;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 
 @Entity
@@ -25,7 +26,7 @@ import jakarta.persistence.CascadeType;
 public class ForumPost {
     @Id
     @SequenceGenerator(name = "forumPostSeq", sequenceName = "ZSEQ_fPost_ID", allocationSize = 1, initialValue = 1)
-    @GeneratedValue(generator = "forumPost")
+    @GeneratedValue(generator = "forumPostSeq")
 
     @Column(name = "id", unique = true)
     private Long id;
@@ -54,21 +55,29 @@ public class ForumPost {
     @Column(name = "answerCount", columnDefinition = "bigint default '0'")
     private Long answerCount;
 
-    @ManyToOne(fetch=FetchType.LAZY)
+    @ManyToOne(fetch=FetchType.EAGER)
     @JoinColumn(name ="user_id", referencedColumnName="id")
     private User creator;
 
+    @JsonIgnore
+    @JsonbTransient
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name="topic_id", referencedColumnName="id")
     private ForumTopic topic;
 
-    @ManyToOne(cascade = CascadeType.ALL)
+    @JsonIgnore
+    @JsonbTransient
+    @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name = "editor_id",referencedColumnName = "id")
     private User editor;
 
+    @JsonIgnore
+    @JsonbTransient
     @OneToMany(mappedBy="post",cascade = {CascadeType.ALL},fetch = FetchType.LAZY )
     private List<ForumAnswer> answers = new ArrayList<>();
 
+    @JsonIgnore
+    @JsonbTransient
     @OneToMany(mappedBy ="post", cascade = {CascadeType.ALL}, fetch = FetchType.LAZY)
     private List<ForumPicture> pictures = new ArrayList<>();
 
@@ -143,6 +152,7 @@ public class ForumPost {
     public void setDislikes(Long dislikes) {
         this.dislikes = dislikes;
     }
+    @JsonIgnore
     @JsonbTransient
     public User getCreatorObj(){
         return creator;
@@ -154,14 +164,18 @@ public class ForumPost {
     public void setCreator(User creator) {
         this.creator = creator;
     }
+    @JsonIgnore
     @JsonbTransient
     public User getEditor() {
         return editor;
     }
 
+    @JsonIgnore
+    @JsonbTransient
     public void setEditor(User editor) {
         this.editor = editor;
     }
+    @JsonIgnore
     @JsonbTransient
     public List<ForumAnswer> getAnswers() {
         return answers;
@@ -174,14 +188,19 @@ public class ForumPost {
         this.answerCount --;
     }
 
+    @JsonIgnore
+    @JsonbTransient
     public void setAnswers(List<ForumAnswer> answers) {
         this.answers = answers;
     }
+    @JsonIgnore
     @JsonbTransient
     public ForumTopic getTopic() {
         return topic;
     }
 
+    @JsonIgnore
+    @JsonbTransient
     public void setTopic(ForumTopic topic) {
         this.topic = topic;
     }
@@ -193,11 +212,14 @@ public class ForumPost {
     public void setAnswerCount(Long answerCount) {
         this.answerCount = answerCount;
     }
+    @JsonIgnore
     @JsonbTransient
     public List<ForumPicture> getPictures() {
         return pictures;
     }
 
+    @JsonIgnore
+    @JsonbTransient
     public void setPictures(List<ForumPicture> pictures) {
         this.pictures = pictures;
     }

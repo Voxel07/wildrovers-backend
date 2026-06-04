@@ -19,6 +19,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.FetchType;
 import jakarta.json.bind.annotation.JsonbTransient;
 import jakarta.persistence.CascadeType;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 
@@ -63,10 +64,12 @@ public class ForumCategory {
     private String visibility;
 
     //relationships
-    @ManyToOne(fetch=FetchType.LAZY)
+    @ManyToOne(fetch=FetchType.EAGER)
     @JoinColumn(name ="user_id", referencedColumnName="id")
     private User creator;
 
+    @JsonIgnore
+    @JsonbTransient
     @OneToMany(mappedBy="category",cascade = {CascadeType.ALL},fetch=FetchType.LAZY)
     private List<ForumTopic> topics = new ArrayList<>();
 
@@ -114,6 +117,7 @@ public class ForumCategory {
         this.creationDate = creationDate;
     }
 
+    @JsonIgnore
     @JsonbTransient
     public User getCreatorObj(){
         return creator;
@@ -127,11 +131,14 @@ public class ForumCategory {
         this.creator = creator;
     }
 
+    @JsonIgnore
     @JsonbTransient
     public List<ForumTopic> getTopics() {
         return topics;
     }
 
+    @JsonIgnore
+    @JsonbTransient
     public void setTopics(List<ForumTopic> topics) {
         this.topics = topics;
     }

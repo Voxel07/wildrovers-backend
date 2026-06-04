@@ -14,7 +14,6 @@ import helper.UserPrincipalResolver;
 @Path("/forum/poll")
 @ApplicationScoped
 @Produces(MediaType.APPLICATION_JSON)
-@Consumes(MediaType.APPLICATION_JSON)
 public class ForumPollResource {
 
     @Inject
@@ -26,6 +25,7 @@ public class ForumPollResource {
     @POST
     @Path("/create")
     @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
+    @Consumes(MediaType.APPLICATION_JSON)
     public Response createPoll(@QueryParam("post") Long postId, Polls poll) {
         Long userId = userPrincipalResolver.resolveUserId();
         if (userId == null) {

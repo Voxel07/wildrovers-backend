@@ -13,6 +13,8 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Id;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.JoinColumn;
 
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
@@ -90,9 +92,36 @@ public class User {
     @OneToOne(cascade = CascadeType.ALL, mappedBy = "user")
     private ActivityForum activityForum;
 
+    @JsonIgnore
     @JsonbTransient
     @OneToOne(cascade = {CascadeType.ALL}, mappedBy = "user")
     private Secret secret;
+
+    @Column(name = "photoUrl")
+    private String photoUrl;
+
+    @Column(name = "phrase")
+    private String phrase;
+
+    @Column(name = "birthday")
+    private LocalDate birthday;
+
+    @Column(name = "visitedOps")
+    private Integer visitedOps;
+
+    @Column(name = "ribbon")
+    private String ribbon;
+
+    @JsonIgnore
+    @JsonbTransient
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "mentor_id")
+    private User mentor;
+
+    @JsonIgnore
+    @JsonbTransient
+    @OneToMany(mappedBy = "mentor", fetch = FetchType.LAZY)
+    private List<User> mentees = new ArrayList<>();
 
     @OneToMany(mappedBy="user",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
 	private List<Phone> phones = new ArrayList<>();
@@ -295,13 +324,94 @@ public class User {
         return answers;
     }
 
+    @JsonIgnore
     @JsonbTransient
     public Secret getSecret() {
         return secret;
     }
 
+    @JsonIgnore
+    @JsonbTransient
     public void setSecret(Secret secret) {
         this.secret = secret;
+    }
+
+    public String getPhotoUrl() {
+        return photoUrl;
+    }
+
+    public void setPhotoUrl(String photoUrl) {
+        this.photoUrl = photoUrl;
+    }
+
+    public String getPhrase() {
+        return phrase;
+    }
+
+    public void setPhrase(String phrase) {
+        this.phrase = phrase;
+    }
+
+    public LocalDate getBirthday() {
+        return birthday;
+    }
+
+    public void setBirthday(LocalDate birthday) {
+        this.birthday = birthday;
+    }
+
+    public Integer getVisitedOps() {
+        return visitedOps;
+    }
+
+    public void setVisitedOps(Integer visitedOps) {
+        this.visitedOps = visitedOps;
+    }
+
+    public String getRibbon() {
+        return ribbon;
+    }
+
+    public void setRibbon(String ribbon) {
+        this.ribbon = ribbon;
+    }
+
+    @JsonIgnore
+    @JsonbTransient
+    public User getMentor() {
+        return mentor;
+    }
+
+    @JsonIgnore
+    @JsonbTransient
+    public void setMentor(User mentor) {
+        this.mentor = mentor;
+    }
+
+    @JsonIgnore
+    @JsonbTransient
+    public List<User> getMentees() {
+        return mentees;
+    }
+
+    @JsonIgnore
+    @JsonbTransient
+    public void setMentees(List<User> mentees) {
+        this.mentees = mentees;
+    }
+
+    public String getMentorName() {
+        return mentor != null ? mentor.getUserName() : null;
+    }
+
+    public List<String> getMentorOf() {
+        List<String> list = new ArrayList<>();
+        if (mentees != null) {
+            for (User m : mentees) {
+                list.add(m.getUserName());
+            }
+        }
+        return list;
     }
 
     @Override

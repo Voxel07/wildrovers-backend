@@ -43,6 +43,7 @@ src/main/resources/META-INF/resources/rsaPrivateKey.pem
 src/main/resources/META-INF/resources/emailKey.pem
 src/main/resources/META-INF/resources/key.pem
 src/main/resources/META-INF/resources/certificate.pem
+service_account.json
 
 .env
 

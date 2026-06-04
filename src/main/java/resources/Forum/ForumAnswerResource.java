@@ -57,29 +57,51 @@ public class ForumAnswerResource{
                                         @QueryParam("user")Long userId,
                                         @QueryParam("post")Long postId,
                                         @QueryParam("editor")Long editorId)
-        {
+    {
         log.info("ForumAnswerResource/getAnswers");
+        List<ForumAnswer> answers;
         if(answerId != null){
             log.info("ForumAnswerResource/getAnswers/id");
-            return forumAnswerOrm.getAnswersById(answerId);
+            answers = forumAnswerOrm.getAnswersById(answerId);
         }
         else if(postId != null){
             log.info("ForumAnswerResource/getAnswers/name");
-            return forumAnswerOrm.getAnswersByPost(postId);
+            answers = forumAnswerOrm.getAnswersByPost(postId);
         }
         else if(userId != null){
             log.info("ForumAnswerResource/getAnswers/user");
-            return forumAnswerOrm.getAnswersByUser(userId);
+            answers = forumAnswerOrm.getAnswersByUser(userId);
         }
         else if(editorId != null){
             log.info("ForumAnswerResource/getAnswers/editor");
-            return forumAnswerOrm.getAnswersByEditor(editorId);
+            answers = forumAnswerOrm.getAnswersByEditor(editorId);
         }
         else{
             log.info("ForumAnswerResource/getAnswers/all");
-            return forumAnswerOrm.getAllAnswers();
+            answers = forumAnswerOrm.getAllAnswers();
         }
 
+        String userRole = Roles.VSISITOR;
+        model.User user = userPrincipalResolver.resolveUser();
+        if (user != null) {
+            userRole = user.getRole();
+        }
+        final String finalRole = userRole;
+        List<ForumAnswer> mutableAnswers = new java.util.ArrayList<>(answers);
+        mutableAnswers.removeIf(fa -> {
+            model.Forum.ForumPost post = fa.getPost();
+            if (post == null) return false;
+            model.Forum.ForumTopic topic = post.getTopic();
+            if (topic == null) return false;
+            model.Forum.ForumCategory cat = topic.getCategory();
+            if (cat == null) return false;
+            String vis = cat.getVisibility();
+            if (vis == null || vis.isBlank()) {
+                vis = Roles.VSISITOR;
+            }
+            return !Roles.hasRequiredRole(finalRole, vis);
+        });
+        return mutableAnswers;
     }
     @PUT
     @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })

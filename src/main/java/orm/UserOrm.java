@@ -333,4 +333,35 @@ public class UserOrm
         return passwordFactory.verify(userPasswordRestored, passwordToVerify.toCharArray());
     }
 
+    public List<User> getTeamMembers() {
+        log.info("UserOrm/getTeamMembers");
+        TypedQuery<User> query = em.createQuery(
+            "SELECT u FROM User u WHERE u.role IN ('Admin', 'Vorstand', 'Mitglied', 'Frischling') AND u.isActive = true",
+            User.class
+        );
+        return query.getResultList();
+    }
+
+    @Transactional
+    public User updateUserProfile(Long userId, String phrase, java.time.LocalDate birthday) {
+        log.info("UserOrm/updateUserProfile");
+        User user = em.find(User.class, userId);
+        if (user != null) {
+            user.setPhrase(phrase);
+            user.setBirthday(birthday);
+            em.merge(user);
+        }
+        return user;
+    }
+
+    @Transactional
+    public void updateUserPhotoUrl(Long userId, String photoUrl) {
+        log.info("UserOrm/updateUserPhotoUrl");
+        User user = em.find(User.class, userId);
+        if (user != null) {
+            user.setPhotoUrl(photoUrl);
+            em.merge(user);
+        }
+    }
+
 }

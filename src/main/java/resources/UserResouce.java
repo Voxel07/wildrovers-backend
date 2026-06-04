@@ -36,6 +36,16 @@ import io.vertx.core.http.HttpServerRequest;
 //Validator
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
+import jakarta.ws.rs.PathParam;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import javax.imageio.ImageIO;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.logging.Level;
 
 @Path("/user")
 @RequestScoped
@@ -47,6 +57,11 @@ public class UserResouce
     @Inject UserOrm userOrm;
 
     @Inject helper.UserPrincipalResolver userPrincipalResolver;
+
+    @Inject tools.HtmlSanitizer htmlSanitizer;
+
+    @ConfigProperty(name = "user.photos.upload-dir", defaultValue = "${user.home}/wildrovers-uploads/user-photos")
+    String uploadDir;
 
     @Context UriInfo info;
 
@@ -146,5 +161,117 @@ public class UserResouce
         log.info("UserResource/deleteUser");
         // return userOrm.addUser(usr);
         return "testingdelete";
+    }
+
+    @POST
+    @Path("/me/profile")
+    @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response updateProfile(User profileData) {
+        log.info("UserResource/updateProfile");
+        User user = userPrincipalResolver.resolveUser();
+        if (user == null) {
+            return Response.status(401).entity("Benutzer nicht eingeloggt").build();
+        }
+        String phrase = null;
+        if (profileData.getPhrase() != null) {
+            phrase = htmlSanitizer.sanitizeTitle(profileData.getPhrase());
+        }
+        userOrm.updateUserProfile(user.getId(), phrase, profileData.getBirthday());
+        return Response.ok(userOrm.getUserById(user.getId()).get(0)).build();
+    }
+
+    @POST
+    @Path("/me/photo")
+    @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response uploadPhoto(@org.jboss.resteasy.reactive.MultipartForm PhotoUploadForm form) {
+        log.info("UserResource/uploadPhoto");
+        User user = userPrincipalResolver.resolveUser();
+        if (user == null) {
+            return Response.status(401).entity("Nicht eingeloggt").build();
+        }
+        if (form == null || form.file == null) {
+            return Response.status(400).entity("Keine Datei übermittelt").build();
+        }
+        if (form.file.size() > 2 * 1024 * 1024) {
+            return Response.status(400).entity("Datei ist zu groß (max. 2MB)").build();
+        }
+
+        try {
+            File uploadedFile = form.file.uploadedFile().toFile();
+            BufferedImage original = ImageIO.read(uploadedFile);
+            if (original == null) {
+                return Response.status(400).entity("Ungültiges Bildformat").build();
+            }
+
+            BufferedImage scaled = scaleImage(original, 400);
+
+            String base = uploadDir.replace("${user.home}", System.getProperty("user.home"));
+            java.nio.file.Path dir = Paths.get(base);
+            Files.createDirectories(dir);
+            java.nio.file.Path destPath = dir.resolve(user.getId() + ".jpg");
+
+            ImageIO.write(scaled, "jpg", destPath.toFile());
+
+            String photoUrl = "/api/user/photo/" + user.getId();
+            userOrm.updateUserPhotoUrl(user.getId(), photoUrl);
+
+            jakarta.json.JsonObject result = jakarta.json.Json.createObjectBuilder()
+                    .add("photoUrl", photoUrl)
+                    .build();
+            return Response.ok(result).build();
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Failed to upload photo", e);
+            return Response.status(500).entity("Fehler beim Verarbeiten des Fotos").build();
+        }
+    }
+
+    @GET
+    @Path("/photo/{userId}")
+    @PermitAll
+    @Produces("image/jpeg")
+    public Response getPhoto(@PathParam("userId") Long userId) {
+        log.info("UserResource/getPhoto: " + userId);
+        String base = uploadDir.replace("${user.home}", System.getProperty("user.home"));
+        File file = Paths.get(base, userId + ".jpg").toFile();
+        if (!file.exists() || !file.isFile()) {
+            return Response.status(404).entity("Photo nicht gefunden").build();
+        }
+        return Response.ok(file)
+                .header("Cache-Control", "public, max-age=86400")
+                .build();
+    }
+
+    @GET
+    @Path("/members")
+    @PermitAll
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getTeamMembers() {
+        log.info("UserResource/getTeamMembers");
+        return Response.ok(userOrm.getTeamMembers()).build();
+    }
+
+    private BufferedImage scaleImage(BufferedImage src, int maxDim) {
+        int w = src.getWidth();
+        int h = src.getHeight();
+        if (w <= maxDim && h <= maxDim) return src;
+        double ratio = (double) maxDim / Math.max(w, h);
+        int newW = (int) Math.round(w * ratio);
+        int newH = (int) Math.round(h * ratio);
+        BufferedImage scaled = new BufferedImage(newW, newH, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = scaled.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g.drawImage(src, 0, 0, newW, newH, null);
+        g.dispose();
+        return scaled;
+    }
+
+    public static class PhotoUploadForm {
+        @org.jboss.resteasy.reactive.RestForm("file")
+        public org.jboss.resteasy.reactive.multipart.FileUpload file;
     }
 }

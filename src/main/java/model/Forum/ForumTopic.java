@@ -5,6 +5,7 @@ import java.util.List;
 import jakarta.persistence.FetchType;
 import jakarta.json.bind.annotation.JsonbTransient;
 import jakarta.persistence.CascadeType;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -41,14 +42,18 @@ public class ForumTopic {
     private Long views;
 
     //relationships
-    @ManyToOne(fetch=FetchType.LAZY)
+    @ManyToOne(fetch=FetchType.EAGER)
     @JoinColumn(name ="user_id", referencedColumnName="id")
     private User creator;
 
+    @JsonIgnore
+    @JsonbTransient
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name ="category_id", referencedColumnName="id")
     private ForumCategory category;
 
+    @JsonIgnore
+    @JsonbTransient
     @OneToMany(mappedBy = "topic",cascade = {CascadeType.ALL},fetch = FetchType.LAZY)
     private List<ForumPost> posts = new ArrayList<>();
 
@@ -88,6 +93,7 @@ public class ForumTopic {
     public void setCreationDate(long creationDate) {
         this.creationDate = creationDate;
     }
+    @JsonIgnore
     @JsonbTransient
     public User getCreatorObj(){
         return creator;
@@ -99,19 +105,25 @@ public class ForumTopic {
     public void setCreator(User creator) {
         this.creator = creator;
     }
+    @JsonIgnore
     @JsonbTransient
     public ForumCategory getCategory() {
         return category;
     }
 
+    @JsonIgnore
+    @JsonbTransient
     public void setCategory(ForumCategory category) {
         this.category = category;
     }
+    @JsonIgnore
     @JsonbTransient
     public List<ForumPost> getPosts() {
         return posts;
     }
 
+    @JsonIgnore
+    @JsonbTransient
     public void setPosts(List<ForumPost> posts) {
         this.posts = posts;
     }

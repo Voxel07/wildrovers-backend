@@ -86,8 +86,14 @@ public class ForumPostOrm {
         query.setParameter("val",userId);
         return query.getResultList();
     }
+    @Transactional
     public List<ForumPost>getPostsById(Long postId){
         log.info("ForumOrm/getPostsById");
+        ForumPost post = em.find(ForumPost.class, postId);
+        if (post != null) {
+            post.setViews((post.getViews() != null ? post.getViews() : 0L) + 1);
+            em.merge(post);
+        }
         TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE id =: val", ForumPost.class);
         query.setParameter("val",postId);
         return query.getResultList();
@@ -406,32 +412,78 @@ public class ForumPostOrm {
     }
 
     /**
-     * Increment like or dislike counter for a post.
-     * @param postId  the post to vote on
-     * @param type    "like" or "dislike"
-     * @return JSON with updated likes/dislikes counts
+     * Increment like or dislike counter for a post with single-vote enforcement.
      */
     @Transactional
-    public Response votePost(Long postId, String type) {
-        log.info("ForumPostOrm/votePost postId=" + postId + " type=" + type);
+    public Response votePost(Long postId, String type, Long userId) {
+        log.info("ForumPostOrm/votePost postId=" + postId + " type=" + type + " userId=" + userId);
         ForumPost post = em.find(ForumPost.class, postId);
         if (post == null) {
             return Response.status(404).entity("Post nicht gefunden").build();
         }
-        if ("like".equalsIgnoreCase(type)) {
-            post.setLikes((post.getLikes() != null ? post.getLikes() : 0L) + 1);
-        } else if ("dislike".equalsIgnoreCase(type)) {
-            post.setDislikes((post.getDislikes() != null ? post.getDislikes() : 0L) + 1);
-        } else {
+        User user = em.find(User.class, userId);
+        if (user == null) {
+            return Response.status(401).entity("Nutzer nicht gefunden").build();
+        }
+
+        String targetType = type.toUpperCase(); // "LIKE" or "DISLIKE"
+        if (!"LIKE".equals(targetType) && !"DISLIKE".equals(targetType)) {
             return Response.status(400).entity("Unbekannter vote-Typ: " + type).build();
         }
+
+        if (post.getLikes() == null) post.setLikes(0L);
+        if (post.getDislikes() == null) post.setDislikes(0L);
+
+        TypedQuery<model.Forum.ForumPostVote> query = em.createQuery(
+            "SELECT v FROM ForumPostVote v WHERE v.user.id = :userId AND v.post.id = :postId",
+            model.Forum.ForumPostVote.class
+        );
+        query.setParameter("userId", userId);
+        query.setParameter("postId", postId);
+
+        List<model.Forum.ForumPostVote> votes = query.getResultList();
+        if (votes.isEmpty()) {
+            model.Forum.ForumPostVote newVote = new model.Forum.ForumPostVote();
+            newVote.setUser(user);
+            newVote.setPost(post);
+            newVote.setVoteType(targetType);
+            em.persist(newVote);
+
+            if ("LIKE".equals(targetType)) {
+                post.setLikes(post.getLikes() + 1);
+            } else {
+                post.setDislikes(post.getDislikes() + 1);
+            }
+        } else {
+            model.Forum.ForumPostVote existingVote = votes.get(0);
+            if (existingVote.getVoteType().equals(targetType)) {
+                em.remove(existingVote);
+                if ("LIKE".equals(targetType)) {
+                    post.setLikes(Math.max(0, post.getLikes() - 1));
+                } else {
+                    post.setDislikes(Math.max(0, post.getDislikes() - 1));
+                }
+            } else {
+                existingVote.setVoteType(targetType);
+                em.merge(existingVote);
+
+                if ("LIKE".equals(targetType)) {
+                    post.setLikes(post.getLikes() + 1);
+                    post.setDislikes(Math.max(0, post.getDislikes() - 1));
+                } else {
+                    post.setDislikes(post.getDislikes() + 1);
+                    post.setLikes(Math.max(0, post.getLikes() - 1));
+                }
+            }
+        }
+
         try {
             em.merge(post);
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            log.log(Level.SEVERE, "Failed to save vote", e);
             return Response.status(500).entity("Fehler beim Speichern der Stimme").build();
         }
-        // Return updated counts
+
         jakarta.json.JsonObject result = jakarta.json.Json.createObjectBuilder()
             .add("likes", post.getLikes())
             .add("dislikes", post.getDislikes())

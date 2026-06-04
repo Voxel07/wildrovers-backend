@@ -12,6 +12,7 @@ import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.GeneratedValue;
 import jakarta.json.bind.annotation.JsonbTransient;
 import jakarta.persistence.CascadeType;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.FetchType;
 
@@ -46,18 +47,24 @@ public class ForumAnswer {
     @Column(name = "dislikes", columnDefinition = "bigint default '0'")
     private Long dislikes;
 
+    @JsonIgnore
+    @JsonbTransient
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name="post_id", referencedColumnName="id")
     private ForumPost post;
 
-    @ManyToOne(fetch=FetchType.LAZY)
+    @ManyToOne(fetch=FetchType.EAGER)
     @JoinColumn(name ="user_id", referencedColumnName="id")
     private User creator;
 
+    @JsonIgnore
+    @JsonbTransient
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name = "editor_id",referencedColumnName = "id")
     private User editor;
 
+    @JsonIgnore
+    @JsonbTransient
     @OneToMany(mappedBy ="answer", cascade = {CascadeType.ALL}, fetch = FetchType.LAZY)
     private List<ForumPicture> pictures = new ArrayList<>();
 
@@ -118,15 +125,19 @@ public class ForumAnswer {
     public void setDislikes(Long dislikes) {
         this.dislikes = dislikes;
     }
+    @JsonIgnore
     @JsonbTransient
     public ForumPost getPost() {
         return post;
     }
 
+    @JsonIgnore
+    @JsonbTransient
     public void setPost(ForumPost post) {
         this.post = post;
     }
 
+    @JsonIgnore
     @JsonbTransient
     public User getCreatorObj(){
         return creator;
@@ -138,19 +149,25 @@ public class ForumAnswer {
     public void setCreator(User creator) {
         this.creator = creator;
     }
+    @JsonIgnore
     @JsonbTransient
     public User getEditor() {
         return editor;
     }
 
+    @JsonIgnore
+    @JsonbTransient
     public void setEditor(User editor) {
         this.editor = editor;
     }
+    @JsonIgnore
     @JsonbTransient
     public List<ForumPicture> getPictures() {
         return pictures;
     }
 
+    @JsonIgnore
+    @JsonbTransient
     public void setPictures(List<ForumPicture> pictures) {
         this.pictures = pictures;
     }
