@@ -1,9 +1,9 @@
 package orm;
 
-import javax.inject.Inject;
-import javax.enterprise.context.ApplicationScoped;
-import javax.persistence.TypedQuery;
-import javax.persistence.EntityManager;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.TypedQuery;
+import jakarta.persistence.EntityManager;
 //Logging zeug
 import org.jboss.logging.Logger;
 

@@ -5,12 +5,12 @@ import java.util.List;
 import java.util.HashMap;
 import java.util.Map.Entry;
 //
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
-import javax.persistence.EntityManager;
-import javax.persistence.TypedQuery;
-import javax.transaction.Transactional;
-import javax.ws.rs.core.Response;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.TypedQuery;
+import jakarta.transaction.Transactional;
+import jakarta.ws.rs.core.Response;
 
 //Logging
 import java.util.logging.Logger;
@@ -24,12 +24,16 @@ import model.Forum.ForumAnswer;
 import model.Forum.ForumPost;
 import model.User;
 import tools.Time;
+import tools.HtmlSanitizer;
 
 @ApplicationScoped
 public class ForumAnswerOrm {
     private static final Logger log = Logger.getLogger(ForumAnswerOrm.class.getName());
     @Inject
     EntityManager em;
+
+    @Inject
+    HtmlSanitizer htmlSanitizer;
 
 
     public List<ForumAnswer>getAllAnswers(){
@@ -39,7 +43,7 @@ public class ForumAnswerOrm {
     }
     public List<ForumAnswer>getAnswersByUser(Long userId){
         log.info("ForumOrm/getAnswersByUser");
-        TypedQuery<ForumAnswer> query = em.createQuery("SELECT fa FROM ForumAnswer fa WHERE user_id =: val", ForumAnswer.class);
+        TypedQuery<ForumAnswer> query = em.createQuery("SELECT fa FROM ForumAnswer fa WHERE fa.creator.id = :val", ForumAnswer.class);
         query.setParameter("val",userId);
         return query.getResultList();
     }
@@ -51,13 +55,13 @@ public class ForumAnswerOrm {
    }
     public List<ForumAnswer>getAnswersByEditor(Long userId){
         log.info("ForumOrm/getAnswersByEditor");
-        TypedQuery<ForumAnswer> query = em.createQuery("SELECT fa FROM ForumAnswer fa WHERE  editor_id =: val", ForumAnswer.class);
+        TypedQuery<ForumAnswer> query = em.createQuery("SELECT fa FROM ForumAnswer fa WHERE fa.editor.id = :val", ForumAnswer.class);
         query.setParameter("val",userId);
         return query.getResultList();
    }
     public List<ForumAnswer>getAnswersByPost(Long postId){
         log.info("ForumOrm/getAnswersByPost");
-        TypedQuery<ForumAnswer> query = em.createQuery("SELECT fa FROM ForumAnswer fa WHERE post_id =: val", ForumAnswer.class);
+        TypedQuery<ForumAnswer> query = em.createQuery("SELECT fa FROM ForumAnswer fa WHERE fa.post.id = :val", ForumAnswer.class);
         query.setParameter("val",postId);
         return query.getResultList();
     }
@@ -69,6 +73,13 @@ public class ForumAnswerOrm {
         if(forumPost == null) return Response.status(401).entity("Post nicht gefunden").build();
         User user = em.find(User.class, userId);
         if(user == null) return Response.status(401).entity("User nicht gefunden").build();
+
+        if (!model.Users.Roles.hasRequiredRole(user.getRole(), forumPost.getTopic().getCategory().getVisibility())) {
+            return Response.status(403).entity("Du hast keine Berechtigung, in dieser Kategorie eine Antwort zu erstellen.").build();
+        }
+
+        // Sanitize content before persisting
+        forumAnswer.setContent(htmlSanitizer.sanitize(forumAnswer.getContent()));
 
         forumAnswer.setCreationDate(Time.currentTimeInMillis());
         forumAnswer.setPost(forumPost);
@@ -102,7 +113,8 @@ public class ForumAnswerOrm {
 
         if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
 
-        forumAnswerAusDB.setContent(forumAnswer.getContent());
+        // Sanitize content before merging
+        forumAnswerAusDB.setContent(htmlSanitizer.sanitize(forumAnswer.getContent()));
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");
         LocalDateTime now = LocalDateTime.now();
         forumAnswerAusDB.setEditDate(dtf.format(now));
@@ -154,7 +166,7 @@ public class ForumAnswerOrm {
         log.info("ForumAnswerOrm/deleteAllAnswersFromUser");
 
         try {
-            em.createQuery("DELETE fa FROM ForumAnswer fa WHERE user_id =: val").setParameter("val", userId).executeUpdate();
+            em.createQuery("DELETE FROM ForumAnswer fa WHERE fa.creator.id = :val").setParameter("val", userId).executeUpdate();
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return "Fehler beim Löschen der Antworten";
@@ -189,7 +201,7 @@ public class ForumAnswerOrm {
            }
         }
         try {
-            em.createQuery("DELETE FROM ForumAnswer WHERE post_id =: val").setParameter("val", postId).executeUpdate();
+            em.createQuery("DELETE FROM ForumAnswer fa WHERE fa.post.id = :val").setParameter("val", postId).executeUpdate();
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return "Fehler beim Löschen der Antworten";

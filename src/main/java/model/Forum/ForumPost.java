@@ -5,19 +5,19 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.ArrayList;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.OneToOne;
-import javax.persistence.OneToMany;
-import javax.persistence.ManyToOne;
-import javax.persistence.SequenceGenerator;
-import javax.persistence.Table;
-import javax.json.bind.annotation.JsonbTransient;
-import javax.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
+import jakarta.json.bind.annotation.JsonbTransient;
+import jakarta.persistence.CascadeType;
 
 
 @Entity
@@ -71,6 +71,10 @@ public class ForumPost {
 
     @OneToMany(mappedBy ="post", cascade = {CascadeType.ALL}, fetch = FetchType.LAZY)
     private List<ForumPicture> pictures = new ArrayList<>();
+
+    @OneToOne(mappedBy = "post", cascade = {CascadeType.ALL}, fetch = FetchType.EAGER)
+    private model.Forum.Polls.Polls poll;
+
 
     public ForumPost(){}
 
@@ -209,5 +213,13 @@ public class ForumPost {
 
     public void setViews(Long views) {
         this.views = views;
+    }
+
+    public model.Forum.Polls.Polls getPoll() {
+        return poll;
+    }
+
+    public void setPoll(model.Forum.Polls.Polls poll) {
+        this.poll = poll;
     }
 }

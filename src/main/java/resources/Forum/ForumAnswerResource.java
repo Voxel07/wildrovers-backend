@@ -3,32 +3,31 @@ package resources.Forum;
 //Datentypen
 import java.util.List;
 
-import javax.annotation.security.RolesAllowed;
 //Quarkus zeug
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.UriInfo;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.UriInfo;
 
 import io.vertx.core.http.HttpServerRequest;
+import jakarta.annotation.security.RolesAllowed;
 
-//HTTP Requests
-import javax.ws.rs.GET;
-import javax.ws.rs.PUT;
-import javax.ws.rs.POST;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.Path;
-import javax.ws.rs.QueryParam;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.QueryParam;
 
 
 import model.Forum.ForumAnswer;
 import orm.Forum.ForumAnswerOrm;
 
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.SecurityContext;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.SecurityContext;
 import model.Users.Roles;
 
 //Logging
@@ -47,7 +46,9 @@ public class ForumAnswerResource{
 
     @Context
     HttpServerRequest request;
-    @Context SecurityContext ctx;
+    
+    @Inject
+    helper.UserPrincipalResolver userPrincipalResolver;
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -81,16 +82,16 @@ public class ForumAnswerResource{
 
     }
     @PUT
-    @RolesAllowed({Roles.FRESHMAN, Roles.MEMBER, Roles.ADMIN})
+    @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response addAnswer(ForumAnswer forumAnswer, @QueryParam("post") Long postId){
         log.info("ForumAnswerResource/addAnswer");
-        Long userId = Long.parseLong(ctx.getUserPrincipal().getName());
+        Long userId = userPrincipalResolver.resolveUserId();
 
         if(userId == null || forumAnswer == null)
         {
-            return Response.status(401).entity("Fehleder oder falscher Parameter").build();
+            return Response.status(401).entity("Fehlender oder falscher Parameter").build();
         }
         else
         {
@@ -99,22 +100,32 @@ public class ForumAnswerResource{
     }
 
     @POST
+    @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String updateAnswer(ForumAnswer forumAnswer, @QueryParam("user") Long userId){
+    public Response updateAnswer(ForumAnswer forumAnswer){
         log.info("ForumAnswerResource/updateAnswer");
-        if(userId == null) return "Es muss ein User angegebene werden";
-        return forumAnswerOrm.updateAnswer(forumAnswer,userId);
+        Long userId = userPrincipalResolver.resolveUserId();
+        if(userId == null || forumAnswer == null) {
+            return Response.status(401).entity("Fehlender oder falscher Parameter").build();
+        }
+        String result = forumAnswerOrm.updateAnswer(forumAnswer,userId);
+        return Response.ok(result).build();
     }
 
     @DELETE
+    @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String deleteAnswer(ForumAnswer forumAnswer, @QueryParam("user") Long userId){
+    public Response deleteAnswer(ForumAnswer forumAnswer){
         log.info("ForumAnswerResource/deleteAnswer");
         log.info("Info: " + info.getQueryParameters() + "|" + info.getBaseUri() + "|" + info.getPath() + "|" + info.getAbsolutePath());
         log.info("Request: " + request.response() + "|" + request.host()+ "|" + request.cookieCount()+ "|" + request.remoteAddress()+ "|" + request.localAddress());
-        if(userId == null) return "Es muss ein User angegebene werden";
-        return forumAnswerOrm.deleteAnswer(forumAnswer,userId);
+        Long userId = userPrincipalResolver.resolveUserId();
+        if(userId == null || forumAnswer == null) {
+            return Response.status(401).entity("Fehlender oder falscher Parameter").build();
+        }
+        String result = forumAnswerOrm.deleteAnswer(forumAnswer,userId);
+        return Response.ok(result).build();
     }
 }

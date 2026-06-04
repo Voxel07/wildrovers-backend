@@ -4,22 +4,22 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.json.bind.annotation.JsonbTransient;
-import javax.persistence.CascadeType;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
+import jakarta.json.bind.annotation.JsonbTransient;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 
-import javax.persistence.OneToMany;
-import javax.persistence.OneToOne;
-import javax.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Id;
 
-import javax.persistence.SequenceGenerator;
-import javax.persistence.Table;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
-import javax.persistence.GeneratedValue;
+import jakarta.persistence.GeneratedValue;
 
 import io.quarkus.security.jpa.Password;
 import io.quarkus.security.jpa.Roles;
@@ -34,7 +34,7 @@ import model.Users.ActivityForum;
 import model.Users.Secret;
 
 //Validator
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 import org.hibernate.validator.constraints.Length;
 
 @Entity
@@ -90,6 +90,7 @@ public class User {
     @OneToOne(cascade = CascadeType.ALL, mappedBy = "user")
     private ActivityForum activityForum;
 
+    @JsonbTransient
     @OneToOne(cascade = {CascadeType.ALL}, mappedBy = "user")
     private Secret secret;
 
@@ -294,6 +295,7 @@ public class User {
         return answers;
     }
 
+    @JsonbTransient
     public Secret getSecret() {
         return secret;
     }

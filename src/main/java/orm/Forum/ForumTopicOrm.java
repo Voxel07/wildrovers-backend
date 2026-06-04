@@ -7,12 +7,12 @@ import java.util.HashMap;
 import java.util.Map.Entry;
 
 //
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
-import javax.persistence.EntityManager;
-import javax.persistence.TypedQuery;
-import javax.transaction.Transactional;
-import javax.ws.rs.core.Response;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.TypedQuery;
+import jakarta.transaction.Transactional;
+import jakarta.ws.rs.core.Response;
 
 import java.util.logging.Level;
 //Logging
@@ -20,6 +20,7 @@ import java.util.logging.Logger;
 
 //Time
 import tools.Time;
+import tools.HtmlSanitizer;
 
 import orm.UserOrm;
 import model.User;
@@ -38,6 +39,9 @@ public class ForumTopicOrm {
 
     @Inject
     ForumPostOrm forumPostOrm;
+
+    @Inject
+    HtmlSanitizer htmlSanitizer;
 
     // @Inject
     // UserOrm userOrm;
@@ -61,7 +65,7 @@ public class ForumTopicOrm {
     public List<ForumTopic>getTopicsByUser(Long userId)
     {
         log.info("ForumTopicOrm/getTopicByUser");
-        TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft WHERE user_id =: val", ForumTopic.class);
+        TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft WHERE ft.creator.id = :val", ForumTopic.class);
         query.setParameter("val", userId);
         return query.getResultList();
     }
@@ -69,7 +73,7 @@ public class ForumTopicOrm {
     public List<ForumTopic>getTopicsByCategory(Long categoryId)
     {
         log.info("ForumTopicOrm/getTopicByCategory");
-        TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft WHERE category_id =: val", ForumTopic.class);
+        TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft WHERE ft.category.id = :val", ForumTopic.class);
         query.setParameter("val", categoryId);
         return query.getResultList();
     }
@@ -93,6 +97,8 @@ public class ForumTopicOrm {
     @Transactional
     public Response addTopic(ForumTopic topic, Long categoryId, Long userId){
         log.info("ForumTopicOrm/addTopic");
+        // Sanitize topic name (plain text — no HTML allowed in topic titles)
+        topic.setTopic(htmlSanitizer.sanitizeTitle(topic.getTopic()));
         //Check if Topic exists
         if(!getTopicsByTopic(topic.getTopic()).isEmpty()){
             log.warning("duplicate topic");
@@ -115,6 +121,10 @@ public class ForumTopicOrm {
         if(u == null){
             log.warning("User nicht in der DB gefunden");
             return Response.status(401).entity("User nicht gefunden").build();
+        }
+
+        if (!model.Users.Roles.hasRequiredRole(u.getRole(), forumCategory.getVisibility())) {
+            return Response.status(403).entity("Du hast keine Berechtigung, in dieser Kategorie ein Thema zu erstellen.").build();
         }
 
         u.getActivityForum().incTopicCount();
@@ -149,7 +159,8 @@ public class ForumTopicOrm {
 
         if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
 
-        forumTopicAusDB.setTopic(forumTopic.getTopic());
+        // Sanitize topic name before merging
+        forumTopicAusDB.setTopic(htmlSanitizer.sanitizeTitle(forumTopic.getTopic()));
 
         try{
             em.merge(forumTopicAusDB);
@@ -200,7 +211,7 @@ public class ForumTopicOrm {
         log.info("ForumAnswerOrm/deleteAllTopicsFromUser");
 
         try {
-            em.createQuery("DELETE ft FROM ForumTopic ft WHERE user_id =: val").setParameter("val", userId).executeUpdate();
+            em.createQuery("DELETE FROM ForumTopic ft WHERE ft.creator.id = :val").setParameter("val", userId).executeUpdate();
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return "Fehler beim Löschen der Themen";
@@ -236,7 +247,7 @@ public class ForumTopicOrm {
            forumPostOrm.deleteAllPostsFromTopic(forumTopic.getId());
         }
         try {
-            em.createQuery("DELETE FROM ForumTopic WHERE category_id =: val").setParameter("val", categoryId).executeUpdate();
+            em.createQuery("DELETE FROM ForumTopic ft WHERE ft.category.id = :val").setParameter("val", categoryId).executeUpdate();
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return "Fehler beim Löschen der Antworten";

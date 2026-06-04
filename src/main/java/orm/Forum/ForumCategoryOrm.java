@@ -4,13 +4,13 @@ package orm.Forum;
 import java.util.List;
 
 //
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
-import javax.persistence.EntityManager;
-import javax.persistence.TypedQuery;
-import javax.transaction.Transactional;
-import javax.ws.rs.core.Response;
-import javax.persistence.Query;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.TypedQuery;
+import jakarta.transaction.Transactional;
+import jakarta.ws.rs.core.Response;
+import jakarta.persistence.Query;
 
 
 import java.util.logging.Level;
@@ -77,22 +77,14 @@ public class ForumCategoryOrm {
         }
 
         if(category.getVisibility() !=null){
-
             List<String> allowedVis = Roles.getRoles();
 
-            if(!allowedVis.contains(category.getVisibility())) return Response.status(406).entity("Die angeebene Nutzergrupper existiert nicht").build();
+            if(!allowedVis.contains(category.getVisibility())) return Response.status(406).entity("Die angegebene Nutzergruppe existiert nicht").build();
 
-            //Should never be triggered. Role is saved in the jwt
-            int index = allowedVis.indexOf(user.getRole());
-            if (index == -1) return Response.status(406).entity("Pfusch nicht an deinem Nutzer rum").build();
-
-
-            //Ensure that the user has the same rights as the visibilty groub
-            for(int vis = index ; vis < allowedVis.size(); vis++){
-                allowedVis.remove(index+1);
+            // Ensure that the user's role rank is greater than or equal to the category's target visibility role
+            if(!Roles.hasRequiredRole(user.getRole(), category.getVisibility())) {
+                return Response.status(406).entity("Die angegebene Nutzergruppe hat mehr Rechte als deine eigene").build();
             }
-
-            if(!allowedVis.contains(category.getVisibility())) return Response.status(406).entity("Die angegebene Nutzergruppe hat mehr Rechte als deine eigen").build();
         }
         else{
             category.setVisibility("Besucher");

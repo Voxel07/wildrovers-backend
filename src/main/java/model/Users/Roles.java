@@ -21,5 +21,13 @@ public final class Roles {
         list.add(ADMIN);
         return list;
     }
+    public static boolean hasRequiredRole(String userRole, String requiredRole) {
+        List<String> roles = getRoles();
+        int userIndex = roles.indexOf(userRole);
+        int requiredIndex = roles.indexOf(requiredRole);
+        if (userIndex == -1) return false;
+        if (requiredIndex == -1) return false;
+        return userIndex >= requiredIndex;
+    }
 }
 

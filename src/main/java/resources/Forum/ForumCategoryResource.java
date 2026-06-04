@@ -4,38 +4,36 @@ package resources.Forum;
 import java.util.List;
 
 //Quarkus zeug
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
-import javax.validation.Valid;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.validation.Valid;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
 
 //HTTP Requests
-import javax.ws.rs.GET;
-import javax.ws.rs.PUT;
-import javax.ws.rs.POST;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.Path;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.Response.ResponseBuilder;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.Response.ResponseBuilder;
 
 import io.quarkus.arc.All;
 
 //Logging
 import java.util.logging.Logger;
 
-//Eigene Imports
+import jakarta.annotation.security.RolesAllowed;
 import model.Forum.ForumCategory;
 import orm.Forum.ForumCategoryOrm;
 import model.Users.Roles;
 
 //Sicherheits Zeug
-import javax.ws.rs.core.Context;
-import javax.annotation.security.PermitAll;
-import javax.annotation.security.RolesAllowed;
-import javax.ws.rs.core.SecurityContext;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.SecurityContext;
 
 @Path("/forum/category")
 // @RequestScoped
@@ -46,81 +44,87 @@ public class ForumCategoryResource {
     @Inject
     ForumCategoryOrm forumCategoryOrm;
 
+    @Inject
+    helper.UserPrincipalResolver userPrincipalResolver;
+
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public List<ForumCategory> getCategorys(@QueryParam("categoryId") Long categoryId,@QueryParam("category") String category){
+    public List<ForumCategory> getCategorys(@QueryParam("categoryId") Long categoryId,
+            @QueryParam("category") String category) {
         log.info("ForumResource/getCategorys");
-        // try {
-        //     log.info("Waiting 10 sec");
+        List<ForumCategory> categories;
+        if (categoryId != null) {
+            log.info("ForumResource/getCategorys/id");
+            categories = forumCategoryOrm.getCategoriesById(categoryId);
+        } else if (category != null) {
+            log.info("ForumResource/getCategorys/name");
+            categories = forumCategoryOrm.getCategoriesByName(category);
+        } else {
+            log.info("ForumResource/getCategorys/all");
+            categories = forumCategoryOrm.getAllCategories();
+        }
 
-        //     Thread.sleep(3000);
-        // } catch (InterruptedException e1) {
-        //     e1.printStackTrace();
-        // }
-        if(categoryId != null){
-             log.info("ForumResource/getCategorys/id");
-            return forumCategoryOrm.getCategoriesById(categoryId);
+        String userRole = Roles.VSISITOR;
+        model.User user = userPrincipalResolver.resolveUser();
+        if (user != null) {
+            userRole = user.getRole();
         }
-        else if(category != null){
-             log.info("ForumResource/getCategorys/name");
-            return forumCategoryOrm.getCategoriesByName(category);
-        }
-        else{
-             log.info("ForumResource/getCategorys/all");
-            return forumCategoryOrm.getAllCategories();
-        }
+        final String finalRole = userRole;
+        List<ForumCategory> mutableCategories = new java.util.ArrayList<>(categories);
+        mutableCategories.removeIf(cat -> {
+            String vis = cat.getVisibility();
+            if (vis == null || vis.isBlank()) {
+                vis = Roles.VSISITOR;
+            }
+            return !Roles.hasRequiredRole(finalRole, vis);
+        });
+        return mutableCategories;
     }
 
     @PUT
-    @RolesAllowed({Roles.FRESHMAN, Roles.MEMBER, Roles.ADMIN})
+    @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response addCategory(@Valid ForumCategory forumCategory, @Context SecurityContext ctx){
+    public Response addCategory(@Valid ForumCategory forumCategory) {
         log.info("ForumResource/addCategory");
-        Long userId = Long.parseLong(ctx.getUserPrincipal().getName());
-        log.info(ctx.getUserPrincipal().getName());
+        Long userId = userPrincipalResolver.resolveUserId();
 
-        if(userId == null || forumCategory == null)
-        {
-            return Response.status(401).entity("Fehleder oder falscher Parameter").build();
+        if (userId == null || forumCategory == null) {
+            return Response.status(401).entity("Fehlender oder falscher Parameter").build();
+        } else {
+            return forumCategoryOrm.addCategory(forumCategory, userId);
         }
-        else
-        {
-            return forumCategoryOrm.addCategory(forumCategory,userId);
-        }
-     }
+    }
 
     @POST
+    @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String updateCategory(ForumCategory forumCategory,@QueryParam("user")Long userId){
+    public Response updateCategory(ForumCategory forumCategory) {
         log.info("ForumResource/updateCategory");
-        /*
-        @ToDo
-        -   Check permissions
-        */
-        return forumCategoryOrm.updateCategory(forumCategory,userId);
+        Long userId = userPrincipalResolver.resolveUserId();
+
+        if (userId == null || forumCategory == null) {
+            return Response.status(401).entity("Fehlender oder falscher Parameter").build();
+        } else {
+            String result = forumCategoryOrm.updateCategory(forumCategory, userId);
+            return Response.ok(result).build();
+        }
     }
 
     @DELETE
-    @RolesAllowed({Roles.FRESHMAN, Roles.MEMBER, Roles.ADMIN})
+    @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response deleteCategory(ForumCategory forumCategory,  @Context SecurityContext ctx){
-        Long userId = Long.parseLong(ctx.getUserPrincipal().getName());
+    public Response deleteCategory(ForumCategory forumCategory) {
         log.info("ForumResource/deleteCategory");
-        /*
-        @ToDo
-        -   Check permissions
-        */
-        if(userId == null || forumCategory == null)
-        {
-            return Response.status(401).entity("Fehleder oder falscher Parameter").build();
-        }
-        else
-        {
-            return forumCategoryOrm.deleteCategory(forumCategory,userId);
+        Long userId = userPrincipalResolver.resolveUserId();
+
+        if (userId == null || forumCategory == null) {
+            return Response.status(401).entity("Fehlender oder falscher Parameter").build();
+        } else {
+            return forumCategoryOrm.deleteCategory(forumCategory, userId);
         }
     }
 }

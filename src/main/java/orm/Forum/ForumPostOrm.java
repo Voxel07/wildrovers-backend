@@ -5,11 +5,11 @@ import java.util.List;
 import java.util.HashMap;
 import java.util.Map.Entry;
 //
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
-import javax.persistence.EntityManager;
-import javax.persistence.TypedQuery;
-import javax.transaction.Transactional;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.TypedQuery;
+import jakarta.transaction.Transactional;
 
 
 //Logging
@@ -25,10 +25,14 @@ import model.Forum.ForumPost;
 import model.Forum.ForumTopic;
 import model.Forum.Pictures;
 import orm.UserOrm;
-import javax.ws.rs.core.Response;
+import jakarta.ws.rs.core.Response;
 
 //Time
 import tools.Time;
+import tools.HtmlSanitizer;
+import tools.ImageExtractor;
+
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 //img
 import java.awt.image.BufferedImage;
@@ -53,6 +57,23 @@ public class ForumPostOrm {
     @Inject
     UserOrm userOrm;
 
+    @Inject
+    HtmlSanitizer htmlSanitizer;
+
+    @Inject
+    ImageExtractor imageExtractor;
+
+    @ConfigProperty(name = "forum.images.upload-dir",
+                    defaultValue = "${user.home}/wildrovers-uploads/forum")
+    String uploadDir;
+
+    // Base URL for image references — configurable for production
+    @ConfigProperty(name = "quarkus.http.host", defaultValue = "localhost")
+    String serverHost;
+
+    @ConfigProperty(name = "quarkus.http.port", defaultValue = "8080")
+    int serverPort;
+
 
     public List<ForumPost>getAllPosts(){
         log.info("ForumOrm/getPosts");
@@ -61,7 +82,7 @@ public class ForumPostOrm {
     }
     public List<ForumPost>getPostsByUser(Long userId){
         log.info("ForumOrm/getPostsByUser");
-        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE user_id =: val", ForumPost.class);
+        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE fp.creator.id = :val", ForumPost.class);
         query.setParameter("val",userId);
         return query.getResultList();
     }
@@ -73,13 +94,13 @@ public class ForumPostOrm {
    }
     public List<ForumPost>getPostsByEditor(Long userId){
         log.info("ForumOrm/getPostsByEditor");
-        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE  editor_id =: val", ForumPost.class);
+        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE fp.editor.id = :val", ForumPost.class);
         query.setParameter("val",userId);
         return query.getResultList();
    }
     public List<ForumPost>getPostsByTopic(Long topicId){
         log.info("ForumOrm/getPostsByTopic");
-        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE topic_id =: val", ForumPost.class);
+        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE fp.topic.id = :val", ForumPost.class);
         query.setParameter("val",topicId);
         return query.getResultList();
     }
@@ -91,7 +112,7 @@ public class ForumPostOrm {
     }
     public ForumPost getLatestPost(Long topicId){
         log.info("ForumPostOrm/getLatestPost "+ topicId);
-        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE topic_id =: val ORDER BY creationDate DESC", ForumPost.class);
+        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE fp.topic.id = :val ORDER BY fp.creationDate DESC", ForumPost.class);
         query.setParameter("val", topicId);
         query.setMaxResults(1);
         ForumPost fp = new ForumPost();
@@ -131,13 +152,21 @@ public class ForumPostOrm {
             return Response.status(401).entity("Das angegebene Tehma existiert nicht").build();
         }
         //Check if Post title exists in current Topic
-        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE topic_id =: val AND title =: val2",ForumPost.class);
+        TypedQuery<ForumPost> query = em.createQuery("SELECT fp FROM ForumPost fp WHERE fp.topic.id = :val AND fp.title = :val2",ForumPost.class);
         query.setParameter("val", topicId);
         query.setParameter("val2", forumPost.getTitle());
         if(!query.getResultList().isEmpty()) return Response.status(401).entity("Ein Post mit diesem Titel exestiert bereit in diesem Thema").build();
 
         User user = em.find(User.class,userId);
         if(user == null) return Response.status(401).entity("Der angegebene Nutzer wurde nicht gefunden").build();
+
+        if (!model.Users.Roles.hasRequiredRole(user.getRole(), topic.getCategory().getVisibility())) {
+            return Response.status(403).entity("Du hast keine Berechtigung, in dieser Kategorie einen Beitrag zu erstellen.").build();
+        }
+
+        // Sanitize user-submitted content before persisting
+        forumPost.setTitle(htmlSanitizer.sanitizeTitle(forumPost.getTitle()));
+        String sanitizedContent = htmlSanitizer.sanitize(forumPost.getContent());
 
         forumPost.setCreationDate(Time.currentTimeInMillis());
 
@@ -156,6 +185,18 @@ public class ForumPostOrm {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return  Response.status(401).entity("Fehler beim erstellen des Posts").build();
         }
+
+        // Extract base64 images after we have the postId, then update content
+        String baseUrl = "http://" + serverHost + ":" + serverPort;
+        String processedContent = imageExtractor.extractAndSaveImages(sanitizedContent, forumPost.getId(), baseUrl);
+        forumPost.setContent(processedContent);
+        try {
+            em.merge(forumPost);
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Image content update failed", e);
+            // Non-fatal: post is saved, images may still be base64
+        }
+
         return  Response.status(201).entity(forumPost.getId()).build();
     }
 
@@ -186,7 +227,7 @@ public class ForumPostOrm {
                 type = typeString.substring(11, typeString.length());
                 types.add(type);
                 base64Image = elm.split(",")[1];
-                imageBytes = javax.xml.bind.DatatypeConverter.parseBase64Binary(base64Image);
+                imageBytes = jakarta.xml.bind.DatatypeConverter.parseBase64Binary(base64Image);
                 try {
                     imagList.add(ImageIO.read(new ByteArrayInputStream(imageBytes)));
                 } catch (IOException e) {
@@ -255,7 +296,10 @@ public class ForumPostOrm {
 
         if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
 
-        forumPostAusDB.setContent(forumPost.getContent());
+        // Sanitize updated content, then extract any new base64 images
+        String sanitizedContent = htmlSanitizer.sanitize(forumPost.getContent());
+        String baseUrl = "http://" + serverHost + ":" + serverPort;
+        forumPostAusDB.setContent(imageExtractor.extractAndSaveImages(sanitizedContent, forumPost.getId(), baseUrl));
 
         forumPostAusDB.setEditDate(Time.currentTimeInMillis());
         forumPostAusDB.setEditor(user);
@@ -311,7 +355,7 @@ public class ForumPostOrm {
         log.info("ForumAnswerOrm/deleteAllPostsFromUser");
 
         try {
-            em.createQuery("DELETE fa FROM ForumPosts fa WHERE user_id =: val").setParameter("val", userId).executeUpdate();
+            em.createQuery("DELETE FROM ForumPost fp WHERE fp.creator.id = :val").setParameter("val", userId).executeUpdate();
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return "Fehler beim Löschen der Posts";
@@ -347,7 +391,7 @@ public class ForumPostOrm {
            forumAnswerOrm.deleteAllAnswersFromTopic(forumPost.getId());
         }
         try {
-            em.createQuery("DELETE fp FROM ForumPost fp WHERE topic_id =: val").setParameter("val", topicId).executeUpdate();
+            em.createQuery("DELETE FROM ForumPost fp WHERE fp.topic.id = :val").setParameter("val", topicId).executeUpdate();
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return "Fehler beim Löschen der Antworten";
@@ -360,4 +404,39 @@ public class ForumPostOrm {
         }
         return "Posts erfolgreich gelöscht:";
     }
+
+    /**
+     * Increment like or dislike counter for a post.
+     * @param postId  the post to vote on
+     * @param type    "like" or "dislike"
+     * @return JSON with updated likes/dislikes counts
+     */
+    @Transactional
+    public Response votePost(Long postId, String type) {
+        log.info("ForumPostOrm/votePost postId=" + postId + " type=" + type);
+        ForumPost post = em.find(ForumPost.class, postId);
+        if (post == null) {
+            return Response.status(404).entity("Post nicht gefunden").build();
+        }
+        if ("like".equalsIgnoreCase(type)) {
+            post.setLikes((post.getLikes() != null ? post.getLikes() : 0L) + 1);
+        } else if ("dislike".equalsIgnoreCase(type)) {
+            post.setDislikes((post.getDislikes() != null ? post.getDislikes() : 0L) + 1);
+        } else {
+            return Response.status(400).entity("Unbekannter vote-Typ: " + type).build();
+        }
+        try {
+            em.merge(post);
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            return Response.status(500).entity("Fehler beim Speichern der Stimme").build();
+        }
+        // Return updated counts
+        jakarta.json.JsonObject result = jakarta.json.Json.createObjectBuilder()
+            .add("likes", post.getLikes())
+            .add("dislikes", post.getDislikes())
+            .build();
+        return Response.ok(result).build();
+    }
 }
+

@@ -11,9 +11,9 @@ import io.smallrye.jwt.build.Jwt;
 import io.vertx.core.http.Cookie;
 import model.User;
 
-import javax.json.JsonObject;
-import javax.ws.rs.core.NewCookie;
-import javax.json.Json;
+import jakarta.json.JsonObject;
+import jakarta.ws.rs.core.NewCookie;
+import jakarta.json.Json;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import io.smallrye.jwt.auth.principal.JWTParser;
 import io.smallrye.jwt.auth.principal.ParseException;

@@ -7,38 +7,37 @@ import java.util.ArrayList;
 import java.util.List;
 
 //Quarkus zeug
-import javax.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.ApplicationScoped;
 import javax.imageio.ImageIO;
-import javax.inject.Inject;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 
 import org.json.JSONException;
 //HTTP Requests
-import javax.ws.rs.GET;
-import javax.ws.rs.PUT;
-import javax.ws.rs.POST;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.FormParam;
-import javax.ws.rs.Path;
-import javax.ws.rs.QueryParam;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.FormParam;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.QueryParam;
 
 
 //Logging
 import java.util.logging.Logger;
 import java.util.logging.Level;
 
-//Eigene Imports
+import jakarta.annotation.security.RolesAllowed;
 import model.Forum.ForumPost;
 import orm.Forum.ForumPostOrm;
 import model.Forum.Pictures;
 
 //Security
-import javax.ws.rs.core.SecurityContext;
-import javax.ws.rs.core.Context;
-import javax.annotation.security.RolesAllowed;
+import jakarta.ws.rs.core.SecurityContext;
+import jakarta.ws.rs.core.Context;
 import model.Users.Roles;
 
 @Path("/forum/post")
@@ -50,8 +49,8 @@ public class ForumPostResource {
     @Inject
     ForumPostOrm forumPostOrm;
 
-    @Context
-    SecurityContext ctx;
+    @Inject
+    helper.UserPrincipalResolver userPrincipalResolver;
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -98,16 +97,16 @@ public class ForumPostResource {
 
 
     @PUT
-    @RolesAllowed({Roles.FRESHMAN, Roles.MEMBER, Roles.ADMIN})
+    @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response addPost(ForumPost forumPost,@QueryParam("topic")Long topicId){
         log.info("ForumPostResource/addPost");
-        Long userId = Long.parseLong(ctx.getUserPrincipal().getName());
+        Long userId = userPrincipalResolver.resolveUserId();
 
         if(userId == null || forumPost == null)
         {
-            return Response.status(401).entity("Fehleder oder falscher Parameter").build();
+            return Response.status(401).entity("Fehlender oder falscher Parameter").build();
         }
         else
         {
@@ -116,16 +115,16 @@ public class ForumPostResource {
     }
     @POST
     @Path("/img")
-    @RolesAllowed({Roles.FRESHMAN, Roles.MEMBER, Roles.ADMIN})
+    @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     // @Consumes(MediaType.MULTIPART_FORM_DATA)
     public Response saveImages(Pictures pic){
-        Long userId = Long.parseLong(ctx.getUserPrincipal().getName());
-            log.info("ID:"+ pic.getPostId());
+        Long userId = userPrincipalResolver.resolveUserId();
+        log.info("ID:"+ pic.getPostId());
         if(userId == null || pic.getFiles().isEmpty())
         {
-            return Response.status(401).entity("Fehleder oder falscher Parameter").build();
+            return Response.status(401).entity("Fehlender oder falscher Parameter").build();
         }
         else
         {
@@ -134,25 +133,49 @@ public class ForumPostResource {
     }
 
     @POST
+    @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String updatePost(ForumPost forumPost, @QueryParam("user") Long userId){
+    public Response updatePost(ForumPost forumPost){
         log.info("ForumPostResource/updatePost");
-        /**
-         * TODO:
-         * -    Check permissions
-         */
-        return forumPostOrm.updatePost(forumPost, userId);
+        Long userId = userPrincipalResolver.resolveUserId();
+
+        if (userId == null || forumPost == null) {
+            return Response.status(401).entity("Fehlender oder falscher Parameter").build();
+        } else {
+            String result = forumPostOrm.updatePost(forumPost, userId);
+            return Response.ok(result).build();
+        }
     }
     @DELETE
+    @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String deletePost(ForumPost forumPost, @QueryParam("user") Long userId){
+    public Response deletePost(ForumPost forumPost){
         log.info("ForumPostResource/deletePost");
-        /**
-         * TODO:
-         * -    Check permissions
-         */
-        return forumPostOrm.deletePost(forumPost, userId);
+        Long userId = userPrincipalResolver.resolveUserId();
+
+        if (userId == null || forumPost == null) {
+            return Response.status(401).entity("Fehlender oder falscher Parameter").build();
+        } else {
+            String result = forumPostOrm.deletePost(forumPost, userId);
+            return Response.ok(result).build();
+        }
+    }
+
+    @POST
+    @Path("/vote")
+    @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response votePost(@QueryParam("post") Long postId, @QueryParam("type") String type) {
+        log.info("ForumPostResource/votePost");
+        Long userId = userPrincipalResolver.resolveUserId();
+
+        if (userId == null || postId == null || type == null) {
+            return Response.status(401).entity("Fehlender oder falscher Parameter").build();
+        }
+        return forumPostOrm.votePost(postId, type);
     }
 }
+

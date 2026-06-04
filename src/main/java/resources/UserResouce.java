@@ -4,40 +4,38 @@ package resources;
 import java.util.List;
 
 //Quarkus zeug
-import javax.enterprise.context.RequestScoped;
-import javax.inject.Inject;
+import jakarta.enterprise.context.RequestScoped;
+import jakarta.inject.Inject;
 
 //Logging zeug
 import java.util.logging.Logger;
 
 //HTTP Requests
-import javax.ws.rs.Consumes;
-import javax.ws.rs.GET;
-import javax.ws.rs.PUT;
-import javax.ws.rs.POST;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-
-//Eigene Imports
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import jakarta.annotation.security.PermitAll;
+import jakarta.annotation.security.RolesAllowed;
 import model.User;
 import orm.UserOrm;
-import javax.ws.rs.QueryParam;
+import jakarta.ws.rs.QueryParam;
 
 //Sicherheits Zeug
-import javax.ws.rs.core.Context;
-import javax.annotation.security.PermitAll;
-import javax.annotation.security.RolesAllowed;
+import jakarta.ws.rs.core.Context;
 
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.UriInfo;
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.UriInfo;
 import io.vertx.core.http.HttpServerRequest;
 
 //Validator
-import javax.validation.Valid;
-import javax.validation.Validator;
+import jakarta.validation.Valid;
+import jakarta.validation.Validator;
 
 @Path("/user")
 @RequestScoped
@@ -48,6 +46,8 @@ public class UserResouce
 
     @Inject UserOrm userOrm;
 
+    @Inject helper.UserPrincipalResolver userPrincipalResolver;
+
     @Context UriInfo info;
 
     @Context HttpServerRequest request;
@@ -55,6 +55,21 @@ public class UserResouce
     @Context HttpHeaders header;
 
     @Inject Validator validator;
+
+    @GET
+    @Path("/me")
+    @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getMe()
+    {
+        log.info("UserResource/getMe");
+        User user = userPrincipalResolver.resolveUser();
+        if (user == null)
+        {
+            return Response.status(401).entity("Benutzer nicht eingeloggt oder unbekannt").build();
+        }
+        return Response.ok(user).build();
+    }
 
     @GET
     @RolesAllowed("user")

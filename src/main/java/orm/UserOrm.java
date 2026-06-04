@@ -1,11 +1,11 @@
 package orm;
 
 import java.util.List;
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
-import javax.persistence.EntityManager;
-import javax.persistence.TypedQuery;
-import javax.transaction.Transactional;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.TypedQuery;
+import jakarta.transaction.Transactional;
 
 import io.quarkus.elytron.security.common.BcryptUtil;
 import org.wildfly.security.password.Password;
@@ -14,7 +14,7 @@ import org.wildfly.security.password.WildFlyElytronPasswordProvider;
 import org.wildfly.security.password.interfaces.BCryptPassword;
 import org.wildfly.security.password.util.ModularCrypt;
 
-import javax.json.JsonObject;
+import jakarta.json.JsonObject;
 
 //Eigene
 import model.User;
@@ -31,8 +31,8 @@ import java.util.logging.Logger;
 import java.util.logging.Level;
 
 //Coockie
-import javax.ws.rs.core.NewCookie;
-import javax.ws.rs.core.Response;
+import jakarta.ws.rs.core.NewCookie;
+import jakarta.ws.rs.core.Response;
 @ApplicationScoped
 public class UserOrm
 {
@@ -78,6 +78,54 @@ public class UserOrm
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE userName =: val", User.class);
         query.setParameter("val", userName);
         return query.getResultList();
+    }
+
+    public User findByUsername(String username) {
+        try {
+            return em.createQuery("SELECT u FROM User u WHERE u.userName = :val", User.class)
+                    .setParameter("val", username)
+                    .getSingleResult();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public User findByEmail(String email) {
+        try {
+            return em.createQuery("SELECT u FROM User u WHERE u.email = :val", User.class)
+                    .setParameter("val", email)
+                    .getSingleResult();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    @Transactional
+    public User createOidcUser(String username, String email, String firstName, String lastName, String role) {
+        log.info("UserOrm/createOidcUser: " + username + " (" + email + ")");
+        User usr = new User();
+        usr.setUserName(username);
+        usr.setEmail(email);
+        usr.setFirstName((firstName != null && !firstName.isBlank()) ? firstName : "OIDC");
+        usr.setLastName((lastName != null && !lastName.isBlank()) ? lastName : "User");
+        usr.setRole(role != null ? role : "Besucher");
+        usr.setActive(true);
+        usr.setPassword(BcryptUtil.bcryptHash(java.util.UUID.randomUUID().toString())); // Hashed random UUID to satisfy @NotBlank and @Length constraints
+        usr.setRegDate(Time.currentTimeInMillis());
+
+        try {
+            em.persist(usr);
+            activityForumOrm.addActivityForum(usr.getId());
+            
+            // Register secret for user, marked verified since they authenticated via OIDC
+            String verificationId = secretOrm.generateVerificationId();
+            secretOrm.addSecret(usr.getId(), true, verificationId);
+            
+            return usr;
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Failed to create JIT user from OIDC", e);
+            return null;
+        }
     }
 
     @Transactional

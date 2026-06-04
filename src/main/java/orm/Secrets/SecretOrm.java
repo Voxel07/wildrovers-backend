@@ -2,10 +2,10 @@ package orm.Secrets;
 
 import java.util.UUID;
 import model.Users.Secret;
-import javax.enterprise.context.ApplicationScoped;
-import javax.persistence.EntityManager;
-import javax.transaction.Transactional;
-import javax.inject.Inject;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.EntityManager;
+import jakarta.transaction.Transactional;
+import jakarta.inject.Inject;
 
 import model.User;
 import orm.UserOrm;
