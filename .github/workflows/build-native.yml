@@ -50,7 +50,7 @@ jobs:
 
       - name: Set up GraalVM JDK
         if: steps.check-branch.outputs.on_master == 'true'
-        uses: graalvm-actions/setup-graalvm@v1
+        uses: graalvm/setup-graalvm@v1
         with:
           java-version: '17'
           distribution: 'graalvm'
