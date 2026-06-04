@@ -19,9 +19,6 @@ import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.Response.ResponseBuilder;
-
-import io.quarkus.arc.All;
 
 //Logging
 import java.util.logging.Logger;
@@ -31,12 +28,9 @@ import model.Forum.ForumCategory;
 import orm.Forum.ForumCategoryOrm;
 import model.Users.Roles;
 
-//Sicherheits Zeug
-import jakarta.ws.rs.core.Context;
-import jakarta.ws.rs.core.SecurityContext;
+
 
 @Path("/forum/category")
-// @RequestScoped
 @ApplicationScoped
 public class ForumCategoryResource {
     private static final Logger log = Logger.getLogger(ForumCategoryResource.class.getName());

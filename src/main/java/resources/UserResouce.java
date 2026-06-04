@@ -27,13 +27,7 @@ import orm.UserOrm;
 import jakarta.ws.rs.QueryParam;
 
 //Sicherheits Zeug
-import jakarta.ws.rs.core.Context;
-
-import jakarta.ws.rs.core.HttpHeaders;
-import jakarta.ws.rs.core.UriInfo;
-import io.vertx.core.http.HttpServerRequest;
-
-//Validator
+// Validator
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
 import jakarta.ws.rs.PathParam;
@@ -49,7 +43,6 @@ import java.util.logging.Level;
 
 @Path("/user")
 @RequestScoped
-// @ApplicationScoped
 public class UserResouce {
     private static final Logger log = Logger.getLogger(UserResouce.class.getName());
 
@@ -65,14 +58,7 @@ public class UserResouce {
     @ConfigProperty(name = "user.photos.upload-dir", defaultValue = "${user.home}/wildrovers-uploads/user-photos")
     String uploadDir;
 
-    @Context
-    UriInfo info;
 
-    @Context
-    HttpServerRequest request;
-
-    @Context
-    HttpHeaders header;
 
     @Inject
     Validator validator;

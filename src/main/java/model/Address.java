@@ -8,7 +8,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.persistence.OneToOne;
-import jakarta.persistence.JoinColumn;
 @Entity
 @Table(name = "Address")
 public class Address {
@@ -35,7 +34,6 @@ public class Address {
     private String addressSupplements;
 
     @OneToOne(cascade = CascadeType.ALL)
-    // @JoinColumn(name = "user_id", referencedColumnName = "id")
     private User userAddress;
 
     public Long getId() {

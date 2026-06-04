@@ -25,8 +25,7 @@ public class Secret {
     @Column(name = "id", unique = true)
     private Long id;
 
-    // @Column(name = "password")
-    // String password;
+
 
     @Column(name = "isVerifyed")
     Boolean isVerifyed;
@@ -45,8 +44,7 @@ public class Secret {
 
     
 
-    public Secret(/*String password,*/ Boolean isVerifyed, String verificationId) {
-        // this.password = password;
+    public Secret(Boolean isVerifyed, String verificationId) {
         this.isVerifyed = isVerifyed;
         this.verificationId = verificationId;
     }
@@ -59,13 +57,7 @@ public class Secret {
         this.id = id;
     }
 
-    // public String getPassword() {
-    //     return password;
-    // }
 
-    // public void setPassword(String password) {
-    //     this.password = password;
-    // }
 
     public Boolean getIsVerifyed() {
         return isVerifyed;

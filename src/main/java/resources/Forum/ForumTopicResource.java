@@ -18,8 +18,6 @@ import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.QueryParam;
 import model.Users.Roles;
-import jakarta.ws.rs.core.SecurityContext;
-import jakarta.ws.rs.core.Context;
 
 
 //Logging
@@ -30,7 +28,6 @@ import model.Forum.ForumTopic;
 import orm.Forum.ForumTopicOrm;
 
 @Path("/forum/topic")
-// @RequestScoped
 @ApplicationScoped
 public class ForumTopicResource {
     private static final Logger log = Logger.getLogger(ForumTopicResource.class.getName());

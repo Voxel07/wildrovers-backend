@@ -1,7 +1,5 @@
 package orm.Forum;
 
-//Additional Data Types
-import java.util.ArrayList;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map.Entry;
@@ -22,7 +20,6 @@ import java.util.logging.Logger;
 import tools.Time;
 import tools.HtmlSanitizer;
 
-import orm.UserOrm;
 import model.User;
 import model.Forum.ForumCategory;
 import model.Forum.ForumTopic;
@@ -43,8 +40,7 @@ public class ForumTopicOrm {
     @Inject
     HtmlSanitizer htmlSanitizer;
 
-    // @Inject
-    // UserOrm userOrm;
+
 
     //Basic GET methods
     public List<ForumTopic>getAllTopics()
@@ -108,10 +104,7 @@ public class ForumTopicOrm {
         List<ForumCategory> forumCategorys = forumCategoryOrm.getCategoriesById(categoryId);
         if(forumCategorys.isEmpty()) return Response.status(401).entity("Kategorie nicht gefunden").build();
         ForumCategory forumCategory = forumCategorys.get(0);
-        // if(forumCategory == null){
-        //     log.warning("CATEGORY not found");
-        //     return "Angegbene Kategorie nicht gefunden";
-        // }
+
         forumCategory.incTopicCount();
         topic.setCategory(forumCategory);
         //setCreationDate
@@ -217,9 +210,7 @@ public class ForumTopicOrm {
             return "Fehler beim Löschen der Themen";
         }
 
-        //Maybe set count to 0
-        // User user = em.find(User.class, userId);
-        // user.getActivityForum().setAnswerCount(0L);
+
         return "Themen erfolgreich gelöscht";
     }
 

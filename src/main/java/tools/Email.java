@@ -18,10 +18,8 @@ import io.quarkus.mailer.reactive.ReactiveMailer;
 
 
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.context.RequestScoped;
 
 @Path("/email")
-// @RequestScoped
 @ApplicationScoped
 public class Email {
 
