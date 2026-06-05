@@ -1,28 +1,18 @@
-version: '3.8'
-
 services:
-  db:
-    image: mariadb:10.11
-    container_name: wildrovers-db
-    restart: unless-stopped
-    ports:
-      - "3306:3306"
-    environment:
-      MYSQL_ROOT_PASSWORD: "${SQL_PASSOWRD}"
-      MYSQL_DATABASE: "wildrovers"
-    volumes:
-      - mariadb_data:/var/lib/mysql
-
   backend:
     image: ghcr.io/voxel07/wildrovers-backend:latest
     container_name: wildrovers-backend
     restart: unless-stopped
+    # Ports can be omitted if you only expose them via the Nginx proxy network,
+    # but kept here if you need direct access for testing.
     ports:
       - "8080:8080"
-    depends_on:
-      - db
+    networks:
+      - mariadb_network
+      - proxy_network
     environment:
-      SQL_URL: "jdbc:mariadb://db:3306/wildrovers"
+      # Use the hostname of your external MariaDB container here (e.g. wildrovers-db-external)
+      SQL_URL: "jdbc:mariadb://<YOUR_EXTERNAL_DB_CONTAINER_NAME>:3306/wildrovers"
       SQL_USER: "${SQL_USER}"
       SQL_PASSOWRD: "${SQL_PASSOWRD}"
       AUTHENTIK_AUTH_SERVER_URL: "${AUTHENTIK_AUTH_SERVER_URL}"
@@ -31,6 +21,8 @@ services:
       GOOGLE_CALENDAR_CREDENTIALS: "${GOOGLE_CALENDAR_CREDENTIALS}"
       GOOGLE_CALENDAR_ID: "${GOOGLE_CALENDAR_ID}"
       FORUM_IMAGES_UPLOAD_DIR: "/work/uploads"
+      # The public URL of the frontend browser client (CORS configuration)
+      CORS_ORIGINS: "https://wildrovers.wtf" # Replace with your production domain
     volumes:
       - backend_uploads:/work/uploads
 
@@ -40,8 +32,11 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+    networks:
+      - proxy_network
     environment:
-      VITE_API_URL: "${VITE_API_URL}"
+      # The public URL of the backend API as seen by the user's browser
+      VITE_API_URL: "https://api.wildrovers.wtf" # Or "https://wildrovers.wtf/api" depending on Nginx routing
       VITE_OIDC_AUTHORITY: "${VITE_OIDC_AUTHORITY}"
       VITE_OIDC_CLIENT_ID: "${VITE_OIDC_CLIENT_ID}"
       VITE_OIDC_REDIRECT_URI: "${VITE_OIDC_REDIRECT_URI}"
@@ -50,5 +45,12 @@ services:
       VITE_IMMICH_KIOSK_URL: "${VITE_IMMICH_KIOSK_URL}"
 
 volumes:
-  mariadb_data:
   backend_uploads:
+
+networks:
+  mariadb_network:
+    external: true
+    name: my_mariadb_network
+  proxy_network:
+    external: true
+    name: my_proxy_network
