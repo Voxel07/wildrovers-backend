@@ -5,6 +5,11 @@ ENV LANGUAGE='en_US:en'
 # Configure the JAVA_OPTIONS
 ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
 
+# Create work directory and set permissions for the non-root user (185)
+USER root
+RUN mkdir -p /work/uploads && chown -R 185:0 /work && chmod -R g+rwX /work
+USER 185
+
 # We make four distinct layers so if there are application changes the library layers can be re-used
 COPY --chown=185 target/quarkus-app/lib/ /deployments/lib/
 COPY --chown=185 target/quarkus-app/*.jar /deployments/
