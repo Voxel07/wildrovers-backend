@@ -201,6 +201,7 @@ public class ForumAnswerOrm {
            }
         }
         try {
+            em.createQuery("DELETE FROM ForumPicture fp WHERE fp.answer.id IN (SELECT fa.id FROM ForumAnswer fa WHERE fa.post.id = :postId)").setParameter("postId", postId).executeUpdate();
             em.createQuery("DELETE FROM ForumAnswer fa WHERE fa.post.id = :val").setParameter("val", postId).executeUpdate();
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());

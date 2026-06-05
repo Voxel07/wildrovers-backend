@@ -189,15 +189,18 @@ public class ForumTopicOrm {
         if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
 
         try {
+            forumPostOrm.deleteAllPostsFromTopic(topicId);
+
+            creator.getActivityForum().decTopicCount();
+            if (forumTopicAusDB.getCategory() != null) {
+                forumTopicAusDB.getCategory().decTopicCount();
+            }
+
             em.remove(forumTopicAusDB);
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return "Fehler beim Löschen des Topics";
         }
-
-        creator.getActivityForum().decTopicCount();
-        forumTopicAusDB.getCategory().decTopicCount();
-        forumPostOrm.deleteAllPostsFromTopic(topicId);
 
         return "Thema erfolgreich gelöscht";
     }

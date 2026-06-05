@@ -374,15 +374,24 @@ public class ForumPostOrm {
             return "Nur der Ersteller oder Mods dürfen das";
 
         try {
+            // Delete answers first
+            forumAnswerOrm.deleteAllAnswersFromTopic(postId);
+
+            // Delete votes and views
+            em.createQuery("DELETE FROM ForumPostVote v WHERE v.post.id = :postId").setParameter("postId", postId).executeUpdate();
+            em.createQuery("DELETE FROM ForumPostView v WHERE v.post.id = :postId").setParameter("postId", postId).executeUpdate();
+
+            // Decrement counts
+            creator.getActivityForum().decPostCount();
+            if (forumPostAusDB.getTopic() != null) {
+                forumPostAusDB.getTopic().decPostCount();
+            }
+
             em.remove(forumPostAusDB);
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return "Fehler beim Löschen des Posts";
         }
-
-        creator.getActivityForum().decPostCount();
-        forumPostAusDB.getTopic().decPostCount();
-        forumAnswerOrm.deleteAllAnswersFromTopic(postId);
 
         return "Post erfolgreich gelöscht";
     }
@@ -429,6 +438,22 @@ public class ForumPostOrm {
                 map.put(u, 1L);
             }
             forumAnswerOrm.deleteAllAnswersFromTopic(forumPost.getId());
+
+            // Delete votes and views
+            em.createQuery("DELETE FROM ForumPostVote v WHERE v.post.id = :postId").setParameter("postId", forumPost.getId()).executeUpdate();
+            em.createQuery("DELETE FROM ForumPostView v WHERE v.post.id = :postId").setParameter("postId", forumPost.getId()).executeUpdate();
+
+            // Delete pictures
+            em.createQuery("DELETE FROM ForumPicture p WHERE p.post.id = :postId").setParameter("postId", forumPost.getId()).executeUpdate();
+
+            // Delete polls
+            List<model.Forum.Polls.Polls> polls = em.createQuery("SELECT p FROM Polls p WHERE p.post.id = :postId", model.Forum.Polls.Polls.class)
+                    .setParameter("postId", forumPost.getId()).getResultList();
+            for (model.Forum.Polls.Polls poll : polls) {
+                em.createNativeQuery("DELETE FROM FORUM_POLL_VOTES WHERE poll_id = :pollId").setParameter("pollId", poll.getId()).executeUpdate();
+                em.createQuery("DELETE FROM PollOptions o WHERE o.poll.id = :pollId").setParameter("pollId", poll.getId()).executeUpdate();
+                em.remove(poll);
+            }
         }
         try {
             em.createQuery("DELETE FROM ForumPost fp WHERE fp.topic.id = :val").setParameter("val", topicId)

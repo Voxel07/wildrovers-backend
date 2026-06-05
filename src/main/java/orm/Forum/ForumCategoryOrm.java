@@ -192,15 +192,13 @@ public class ForumCategoryOrm {
         if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return Response.status(406).entity("Nur der Ersteller oder Mods dürfen das").build();
 
         try {
+            forumTopicOrm.deleteAllTopicsFromCategory(categoryId);
+            creator.getActivityForum().decCategoryCount();
             em.remove(forumCategoryAusDB);
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return Response.status(406).entity("Fehler beim Löschen der Kategorie").build();
         }
-
-        creator.getActivityForum().decCategoryCount();
-        forumTopicOrm.deleteAllTopicsFromCategory(categoryId);
-        user.getActivityForum().decCategoryCount();
 
         return Response.status(200).entity("Kategorie erfolgreich gelöscht").build();
     }
