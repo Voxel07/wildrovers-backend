@@ -52,7 +52,7 @@ public class ForumImageUploadResource {
     @Path("/upload")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response uploadImage(@org.jboss.resteasy.reactive.MultipartForm UploadForm form) {
+    public Response uploadImage(@jakarta.ws.rs.BeanParam UploadForm form) {
         log.info("ForumImageUploadResource/uploadImage");
 
         Long userId = userPrincipalResolver.resolveUserId();

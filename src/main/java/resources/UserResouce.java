@@ -172,7 +172,7 @@ public class UserResouce {
     @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response uploadPhoto(@org.jboss.resteasy.reactive.MultipartForm PhotoUploadForm form) {
+    public Response uploadPhoto(@jakarta.ws.rs.BeanParam PhotoUploadForm form) {
         log.info("UserResource/uploadPhoto");
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {

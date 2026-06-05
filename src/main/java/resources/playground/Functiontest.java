@@ -369,7 +369,15 @@ public class Functiontest {
             .add("Auth", "ja")
             .build();
 
-            NewCookie klaus = new NewCookie("rolf", "4567", "/","localhost","test",3600,true,true);
+            NewCookie klaus = new NewCookie.Builder("rolf")
+                    .value("4567")
+                    .path("/")
+                    .domain("localhost")
+                    .comment("test")
+                    .maxAge(3600)
+                    .secure(true)
+                    .httpOnly(true)
+                    .build();
 
             return Response.status(200).entity(object)
             .cookie(klaus)
@@ -381,7 +389,15 @@ public class Functiontest {
         @Produces(MediaType.APPLICATION_JSON)
         public Response removeCookie()
         {
-            NewCookie klaus = new NewCookie("rolf", "deleted", "/","localhost","test",0,true,true);
+            NewCookie klaus = new NewCookie.Builder("rolf")
+                    .value("deleted")
+                    .path("/")
+                    .domain("localhost")
+                    .comment("test")
+                    .maxAge(0)
+                    .secure(true)
+                    .httpOnly(true)
+                    .build();
 
             return Response.status(200).entity("object").header("Set-Cookie", klaus).build();
         }
