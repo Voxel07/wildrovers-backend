@@ -54,6 +54,14 @@ public class ForumPostResource {
         if(postId != null){
             log.info("ForumResource/getTopics/id");
             posts = forumPostOrm.getPostsById(postId);
+            Long loggedInUserId = userPrincipalResolver.resolveUserId();
+            if (loggedInUserId != null) {
+                try {
+                    forumPostOrm.recordPostView(postId, loggedInUserId);
+                } catch (Exception e) {
+                    log.log(Level.WARNING, "Failed to record post view", e);
+                }
+            }
         }
         else if(topicId != null){
             log.info("ForumResource/getTopics/name");
@@ -94,6 +102,24 @@ public class ForumPostResource {
             }
             return !Roles.hasRequiredRole(finalRole, vis);
         });
+
+        Long loggedInUserId = userPrincipalResolver.resolveUserId();
+        if (loggedInUserId != null && !mutablePosts.isEmpty()) {
+            try {
+                java.util.List<Long> postIds = new java.util.ArrayList<>();
+                for (ForumPost fp : mutablePosts) {
+                    if (fp.getId() != null) postIds.add(fp.getId());
+                }
+                java.util.Set<Long> viewedIds = forumPostOrm.getViewedPostIds(postIds, loggedInUserId);
+                for (ForumPost fp : mutablePosts) {
+                    if (viewedIds.contains(fp.getId())) {
+                        fp.setViewed(true);
+                    }
+                }
+            } catch (Exception e) {
+                log.log(Level.WARNING, "Failed to set viewed state on posts", e);
+            }
+        }
         return mutablePosts;
     }
 

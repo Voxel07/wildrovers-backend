@@ -47,8 +47,21 @@ public class GoogleCalendarService {
             log.warning("Google Calendar credentials are not configured.");
             return null;
         }
-        if (jsonStr == null || jsonStr.isBlank()) {
-            return null;
+        String trimmed = jsonStr.trim();
+        if (trimmed.startsWith("@") || !trimmed.startsWith("{")) {
+            String filePath = trimmed.startsWith("@") ? trimmed.substring(1) : trimmed;
+            try {
+                java.nio.file.Path path = java.nio.file.Paths.get(filePath);
+                if (java.nio.file.Files.exists(path)) {
+                    jsonStr = java.nio.file.Files.readString(path, java.nio.charset.StandardCharsets.UTF_8);
+                } else {
+                    log.warning("Google Calendar credentials file does not exist: " + filePath);
+                    return null;
+                }
+            } catch (Exception e) {
+                log.log(Level.WARNING, "Failed to read Google credentials from file: " + filePath, e);
+                return null;
+            }
         }
         try {
             return new JSONObject(jsonStr);

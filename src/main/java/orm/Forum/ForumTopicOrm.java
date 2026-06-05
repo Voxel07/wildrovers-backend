@@ -46,14 +46,20 @@ public class ForumTopicOrm {
     public List<ForumTopic>getAllTopics()
     {
         log.info("ForumTopicOrm/getTopics");
-        TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft", ForumTopic.class);
+        TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft LEFT JOIN FETCH ft.category", ForumTopic.class);
         return query.getResultList();
     }
 
+    @Transactional
     public List<ForumTopic>getTopicById(Long topicId)
     {
         log.info("ForumTopicOrm/getTopicById");
-        TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft WHERE id =: val", ForumTopic.class);
+        ForumTopic topic = em.find(ForumTopic.class, topicId);
+        if (topic != null) {
+            topic.setViews((topic.getViews() != null ? topic.getViews() : 0L) + 1);
+            em.merge(topic);
+        }
+        TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft LEFT JOIN FETCH ft.category WHERE ft.id =: val", ForumTopic.class);
         query.setParameter("val", topicId);
         return query.getResultList();
     }
@@ -61,7 +67,7 @@ public class ForumTopicOrm {
     public List<ForumTopic>getTopicsByUser(Long userId)
     {
         log.info("ForumTopicOrm/getTopicByUser");
-        TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft WHERE ft.creator.id = :val", ForumTopic.class);
+        TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft LEFT JOIN FETCH ft.category WHERE ft.creator.id = :val", ForumTopic.class);
         query.setParameter("val", userId);
         return query.getResultList();
     }
@@ -69,7 +75,7 @@ public class ForumTopicOrm {
     public List<ForumTopic>getTopicsByCategory(Long categoryId)
     {
         log.info("ForumTopicOrm/getTopicByCategory");
-        TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft WHERE ft.category.id = :val", ForumTopic.class);
+        TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft LEFT JOIN FETCH ft.category WHERE ft.category.id = :val", ForumTopic.class);
         query.setParameter("val", categoryId);
         return query.getResultList();
     }
@@ -131,7 +137,7 @@ public class ForumTopicOrm {
              log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return Response.status(500).entity("Fehler beim erstellen des neuen Tehmas").build();
         }
-        return Response.status(201).entity("Thema erfolgreich erstellt").build();
+        return Response.status(201).entity(topic).build();
     }
     /*
         Brief updateTopic

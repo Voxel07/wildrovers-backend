@@ -21,14 +21,14 @@ public class EventOrm {
 
     public List<Event> getAllEvents() {
         log.info("EventOrm/getAllEvents");
-        TypedQuery<Event> query = em.createQuery("SELECT e FROM Event e ORDER BY e.eventDate ASC", Event.class);
+        TypedQuery<Event> query = em.createQuery("SELECT e FROM Event e LEFT JOIN FETCH e.creator ORDER BY e.eventDate ASC", Event.class);
         return query.getResultList();
     }
 
     public List<Event> getUpcomingEvents(int limit) {
         log.info("EventOrm/getUpcomingEvents limit=" + limit);
         LocalDateTime now = LocalDateTime.now();
-        TypedQuery<Event> query = em.createQuery("SELECT e FROM Event e WHERE e.eventDate >= :now ORDER BY e.eventDate ASC", Event.class);
+        TypedQuery<Event> query = em.createQuery("SELECT e FROM Event e LEFT JOIN FETCH e.creator WHERE e.eventDate >= :now ORDER BY e.eventDate ASC", Event.class);
         query.setParameter("now", now);
         query.setMaxResults(limit);
         return query.getResultList();
@@ -36,7 +36,10 @@ public class EventOrm {
 
     public Event getEventById(Long id) {
         log.info("EventOrm/getEventById: " + id);
-        return em.find(Event.class, id);
+        TypedQuery<Event> query = em.createQuery("SELECT e FROM Event e LEFT JOIN FETCH e.creator WHERE e.id = :id", Event.class);
+        query.setParameter("id", id);
+        List<Event> results = query.getResultList();
+        return results.isEmpty() ? null : results.get(0);
     }
 
     @Transactional
@@ -55,7 +58,9 @@ public class EventOrm {
     @Transactional
     public Event updateEvent(Event event) {
         log.info("EventOrm/updateEvent: " + event.getId());
-        return em.merge(event);
+        Event merged = em.merge(event);
+        em.flush();
+        return getEventById(merged.getId());
     }
 
     @Transactional

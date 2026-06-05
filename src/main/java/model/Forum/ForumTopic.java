@@ -116,6 +116,14 @@ public class ForumTopic {
     public void setCategory(ForumCategory category) {
         this.category = category;
     }
+
+    public Long getCategoryId() {
+        return category != null ? category.getId() : null;
+    }
+
+    public String getCategoryName() {
+        return category != null ? category.getCategory() : null;
+    }
     @JsonIgnore
     @JsonbTransient
     public List<ForumPost> getPosts() {

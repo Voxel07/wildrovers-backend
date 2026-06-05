@@ -84,6 +84,9 @@ public class ForumPost {
     @OneToOne(mappedBy = "post", cascade = {CascadeType.ALL}, fetch = FetchType.EAGER)
     private model.Forum.Polls.Polls poll;
 
+    @jakarta.persistence.Transient
+    private boolean viewed;
+
 
     public ForumPost(){}
 
@@ -203,6 +206,30 @@ public class ForumPost {
     @JsonbTransient
     public void setTopic(ForumTopic topic) {
         this.topic = topic;
+    }
+
+    public boolean isViewed() {
+        return viewed;
+    }
+
+    public void setViewed(boolean viewed) {
+        this.viewed = viewed;
+    }
+
+    public Long getTopicId() {
+        return topic != null ? topic.getId() : null;
+    }
+
+    public String getTopicName() {
+        return topic != null ? topic.getTopic() : null;
+    }
+
+    public Long getCategoryId() {
+        return (topic != null && topic.getCategory() != null) ? topic.getCategory().getId() : null;
+    }
+
+    public String getCategoryName() {
+        return (topic != null && topic.getCategory() != null) ? topic.getCategory().getCategory() : null;
     }
 
     public Long getAnswerCount() {

@@ -22,6 +22,7 @@ import model.User;
 import model.Forum.ForumPicture;
 import model.Forum.ForumPost;
 import model.Forum.ForumTopic;
+import model.Forum.ForumPostView;
 import model.Forum.Pictures;
 import orm.UserOrm;
 import jakarta.ws.rs.core.Response;
@@ -524,5 +525,41 @@ public class ForumPostOrm {
                 .add("dislikes", post.getDislikes())
                 .build();
         return Response.ok(result).build();
+    }
+
+    @Transactional
+    public void recordPostView(Long postId, Long userId) {
+        log.info("ForumPostOrm/recordPostView postId=" + postId + " userId=" + userId);
+        TypedQuery<Long> query = em.createQuery(
+            "SELECT COUNT(pv) FROM ForumPostView pv WHERE pv.user.id = :userId AND pv.post.id = :postId",
+            Long.class
+        );
+        query.setParameter("userId", userId);
+        query.setParameter("postId", postId);
+        Long count = query.getSingleResult();
+        if (count == 0) {
+            User user = em.find(User.class, userId);
+            ForumPost post = em.find(ForumPost.class, postId);
+            if (user != null && post != null) {
+                ForumPostView view = new ForumPostView();
+                view.setUser(user);
+                view.setPost(post);
+                view.setViewedAt(Time.currentTimeInMillis());
+                em.persist(view);
+            }
+        }
+    }
+
+    public java.util.Set<Long> getViewedPostIds(List<Long> postIds, Long userId) {
+        if (postIds == null || postIds.isEmpty() || userId == null) {
+            return java.util.Collections.emptySet();
+        }
+        TypedQuery<Long> query = em.createQuery(
+            "SELECT pv.post.id FROM ForumPostView pv WHERE pv.user.id = :userId AND pv.post.id IN :postIds",
+            Long.class
+        );
+        query.setParameter("userId", userId);
+        query.setParameter("postIds", postIds);
+        return new java.util.HashSet<>(query.getResultList());
     }
 }
