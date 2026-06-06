@@ -23,9 +23,9 @@ services:
       FORUM_IMAGES_UPLOAD_DIR: "/work/uploads/forum"
       USER_PHOTOS_UPLOAD_DIR: "/work/uploads/user-photos"
       # The public URL of the frontend browser client (CORS configuration)
-      CORS_ORIGINS: "https://wildrovers.wtf" # Replace with your production domain
-      QUARKUS_OTEL_EXPORTER_OTLP_ENDPOINT: "http://openobserve:5080/api/default"
-      QUARKUS_OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Basic ${OPENOBSERVE_TOKEN}"
+      CORS_ORIGINS: "https://your-domain.de" # Replace with your production domain
+      OPENOBSERVE_ENDPOINT: "${OPENOBSERVE_ENDPOINT:-http://openobserve:5080/api/default}"
+      OPENOBSERVE_TOKEN: "${OPENOBSERVE_TOKEN}"
     volumes:
       - backend_uploads:/work/uploads
       - ./service_account.json:/work/service_account.json:ro
