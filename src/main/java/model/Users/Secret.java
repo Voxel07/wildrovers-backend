@@ -27,6 +27,9 @@ public class Secret {
 
 
 
+    @Column(name = "password")
+    private String password;
+
     @Column(name = "isVerifyed")
     Boolean isVerifyed;
 
@@ -40,6 +43,14 @@ public class Secret {
 
     public Secret(){
 
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
     }
 
     

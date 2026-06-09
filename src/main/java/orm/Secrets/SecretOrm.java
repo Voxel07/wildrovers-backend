@@ -23,7 +23,7 @@ public class SecretOrm {
     @Inject
     EntityManager em;
 
-    public String addSecret(Long userId, Boolean isVerifyed, String verificationId){
+    public String addSecret(Long userId, Boolean isVerifyed, String verificationId, String password){
         log.info("SecretOrm/addSecret");
 
         User user = em.find(User.class, userId);
@@ -34,6 +34,7 @@ public class SecretOrm {
         }
 
         Secret secret = new Secret(isVerifyed,verificationId);
+        secret.setPassword(password);
         secret.setUser(user);
 
         try {

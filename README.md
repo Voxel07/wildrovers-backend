@@ -46,7 +46,7 @@ You can then execute your native executable with: `./target/getting-started-1.0.
 If you want to learn more about building native executables, please consult https://quarkus.io/guides/maven-tooling.html.
 
 # About this Project
-This is the backend for the www.wildrovers.wtf homepage. It provides bunch of Rest endpoinst witch are secured by a role based system.
+This is the backend for the www.wild-rovers.de homepage. It provides bunch of Rest endpoinst witch are secured by a role based system.
 
 ## Functinality
 ### User Management

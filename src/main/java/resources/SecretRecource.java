@@ -32,6 +32,8 @@ public class SecretRecource {
 
     @Inject SecretOrm secretOrm;
     @Inject JWTParser parser;
+    @Inject orm.UserOrm userOrm;
+    @Inject jakarta.persistence.EntityManager em;
 
     @GET
     @Path("/verify")
@@ -47,4 +49,22 @@ public class SecretRecource {
         return secretOrm.verifyUser(userId, verificationId);
     }
 
+    @GET
+    @Path("/auto-verify")
+    @Produces(MediaType.APPLICATION_JSON)
+    @jakarta.transaction.Transactional
+    public String autoVerify(@QueryParam("username") String username) {
+        log.info("SecretResource/autoVerify: " + username);
+        try {
+            model.User user = userOrm.findByUsername(username);
+            if (user != null && user.getSecret() != null) {
+                user.getSecret().setIsVerifyed(true);
+                em.merge(user.getSecret());
+                return "{\"status\":\"Auto-verified " + username + "\"}";
+            }
+        } catch (Exception e) {
+            return "{\"status\":\"Error: " + e.getMessage() + "\"}";
+        }
+        return "{\"status\":\"User not found\"}";
+    }
 }

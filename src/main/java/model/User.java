@@ -74,14 +74,14 @@ public class User {
     private String lastName;
 
     @Roles
-    @Column(name ="role")
+    @Column(name = "role")
     private String role;
 
     @Column(name = "isActive")
     private boolean isActive;
 
     @Column(name = "lastLogin")
-    private LocalDate lastLogin;
+    private Long lastLogin;
 
     @Column(name = "regestrationDate")
     private Long regDate;
@@ -94,7 +94,7 @@ public class User {
 
     @JsonIgnore
     @JsonbTransient
-    @OneToOne(cascade = {CascadeType.ALL}, mappedBy = "user")
+    @OneToOne(cascade = { CascadeType.ALL }, mappedBy = "user")
     private Secret secret;
 
     @Column(name = "photoUrl")
@@ -129,30 +129,28 @@ public class User {
     @OneToMany(mappedBy = "mentor", fetch = FetchType.LAZY)
     private List<User> mentees = new ArrayList<>();
 
-    @OneToMany(mappedBy="user",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
-	private List<Phone> phones = new ArrayList<>();
+    @OneToMany(mappedBy = "user", cascade = { CascadeType.ALL }, fetch = FetchType.LAZY)
+    private List<Phone> phones = new ArrayList<>();
 
-    @OneToMany(mappedBy = "creator",cascade = {CascadeType.ALL},fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "creator", cascade = { CascadeType.ALL }, fetch = FetchType.LAZY)
     private List<ForumCategory> categories = new ArrayList<>();
 
-    @OneToMany(mappedBy = "creator",cascade = {CascadeType.ALL},fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "creator", cascade = { CascadeType.ALL }, fetch = FetchType.LAZY)
     private List<ForumTopic> topics = new ArrayList<>();
 
-    @OneToMany(mappedBy="creator",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
+    @OneToMany(mappedBy = "creator", cascade = { CascadeType.ALL }, fetch = FetchType.LAZY)
     private List<ForumPost> posts = new ArrayList<>();
 
-    @OneToMany(mappedBy="editor",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
+    @OneToMany(mappedBy = "editor", cascade = { CascadeType.ALL }, fetch = FetchType.LAZY)
     private List<ForumPost> editedPosts = new ArrayList<>();
 
-    @OneToMany(mappedBy="creator",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
+    @OneToMany(mappedBy = "creator", cascade = { CascadeType.ALL }, fetch = FetchType.LAZY)
     private List<ForumAnswer> answers = new ArrayList<>();
 
-    @OneToMany(mappedBy="editor",cascade = {CascadeType.ALL},fetch=FetchType.LAZY )
+    @OneToMany(mappedBy = "editor", cascade = { CascadeType.ALL }, fetch = FetchType.LAZY)
     private List<ForumPost> editedAnswers = new ArrayList<>();
 
-
-
-    public User(){
+    public User() {
 
     }
 
@@ -160,7 +158,8 @@ public class User {
         this.answers = answers;
     }
 
-    public User(String email, String userName, String password, String firstName, String lastName, String role, Boolean isActive) {
+    public User(String email, String userName, String password, String firstName, String lastName, String role,
+            Boolean isActive) {
         this.email = email;
         this.userName = userName;
         this.password = BcryptUtil.bcryptHash(password);
@@ -193,6 +192,7 @@ public class User {
     public void setUserName(String username) {
         this.userName = username;
     }
+
     @JsonIgnore
     public String getPassword() {
         return password;
@@ -236,26 +236,28 @@ public class User {
     }
 
     @JsonbTransient
-    public List<Phone> getPhones(){
-    	return this.phones;
+    public List<Phone> getPhones() {
+        return this.phones;
     }
+
     public void setPhones(List<Phone> phones) {
-    	this.phones = phones;
+        this.phones = phones;
 
     }
+
     public void removePhone(Phone phone) {
-    	getPhones().remove(phone);
+        getPhones().remove(phone);
     }
 
     public void setActive(boolean isActive) {
         this.isActive = isActive;
     }
 
-    public LocalDate getLastLogin() {
+    public Long getLastLogin() {
         return lastLogin;
     }
 
-    public void setLastLogin(LocalDate lastLogin) {
+    public void setLastLogin(Long lastLogin) {
         this.lastLogin = lastLogin;
     }
 

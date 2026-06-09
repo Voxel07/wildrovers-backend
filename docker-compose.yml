@@ -26,6 +26,7 @@ services:
       CORS_ORIGINS: "https://your-domain.de" # Replace with your production domain
       OPENOBSERVE_ENDPOINT: "${OPENOBSERVE_ENDPOINT:-http://openobserve:5080/api/default}"
       OPENOBSERVE_TOKEN: "${OPENOBSERVE_TOKEN}"
+      MAILER_MOCK: "${MAILER_MOCK:-true}"
     volumes:
       - backend_uploads:/work/uploads
       - ./service_account.json:/work/service_account.json:ro

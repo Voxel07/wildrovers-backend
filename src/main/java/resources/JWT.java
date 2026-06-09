@@ -24,12 +24,12 @@ public class JWT {
     /**
      * Generate JWT token
      */
-    public static String generator(String role , Long userId) {
-
+    public static String generator(User user) {
       return Jwt
             .issuer("wildrovers") //needs to match application properties
-            .upn(Long.toString(userId))
-            .groups(new HashSet<>(Arrays.asList(role)))
+            .upn(user.getUserName())
+            .claim("email", user.getEmail())
+            .groups(new HashSet<>(Arrays.asList(user.getRole())))
             .expiresAt(Instant.now().plus(Duration.ofDays(30)))
             .jws()
             .algorithm(SignatureAlgorithm.RS256)

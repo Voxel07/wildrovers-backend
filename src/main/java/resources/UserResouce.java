@@ -134,13 +134,12 @@ public class UserResouce {
     }
 
     @DELETE
-    @RolesAllowed({ "user", "admin" })
+    @Path("/{userId}")
+    @RolesAllowed({ "Admin", "Vorstand" })
     @Produces(MediaType.APPLICATION_JSON)
-    @Consumes(MediaType.APPLICATION_JSON)
-    public String deleteUser(User usr) {
-        log.info("UserResource/deleteUser");
-        // return userOrm.addUser(usr);
-        return "testingdelete";
+    public Response deleteUser(@jakarta.ws.rs.PathParam("userId") Long userId) {
+        log.info("UserResource/deleteUser: " + userId);
+        return userOrm.deleteUser(userId);
     }
 
     @POST

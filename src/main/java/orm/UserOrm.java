@@ -127,9 +127,7 @@ public class UserOrm {
         usr.setLastName((lastName != null && !lastName.isBlank()) ? lastName : "User");
         usr.setRole(role != null ? role : "Besucher");
         usr.setActive(true);
-        usr.setPassword(BcryptUtil.bcryptHash(java.util.UUID.randomUUID().toString())); // Hashed random UUID to satisfy
-                                                                                        // @NotBlank and @Length
-                                                                                        // constraints
+        usr.setPassword("OIDC_DUMMY"); // Set dummy value for transient validation
         usr.setRegDate(Time.currentTimeInMillis());
 
         try {
@@ -138,7 +136,8 @@ public class UserOrm {
 
             // Register secret for user, marked verified since they authenticated via OIDC
             String verificationId = secretOrm.generateVerificationId();
-            secretOrm.addSecret(usr.getId(), true, verificationId);
+            String dummyHash = BcryptUtil.bcryptHash(java.util.UUID.randomUUID().toString());
+            secretOrm.addSecret(usr.getId(), true, verificationId, dummyHash);
 
             return usr;
         } catch (Exception e) {
@@ -160,7 +159,9 @@ public class UserOrm {
             return Response.status(406).entity("Nutzer bereits bekannt").build();
         }
 
-        usr.setPassword(BcryptUtil.bcryptHash(usr.getPassword()));
+        String plainPassword = usr.getPassword();
+        String passwordHash = BcryptUtil.bcryptHash(plainPassword);
+        usr.setPassword(passwordHash); // Set dummy value for transient validation
         usr.setRegDate(Time.currentTimeInMillis());
         usr.setActive(true);
         usr.setRole("Besucher"); // Default role is Guest for now
@@ -186,7 +187,7 @@ public class UserOrm {
          * Generate secrets
          */
         String verificationId = secretOrm.generateVerificationId();
-        secretOrm.addSecret(userId, false, verificationId);
+        secretOrm.addSecret(userId, false, verificationId, passwordHash);
         // Id zurückgeben
 
         /**
@@ -277,7 +278,9 @@ public class UserOrm {
             dbUser.setYearlyFeePaid(u.getYearlyFeePaid());
         }
         if (u.getPassword() != null && !u.getPassword().isBlank()) {
-            dbUser.setPassword(BcryptUtil.bcryptHash(u.getPassword()));
+            if (dbUser.getSecret() != null) {
+                dbUser.getSecret().setPassword(BcryptUtil.bcryptHash(u.getPassword()));
+            }
         }
         try {
             em.merge(dbUser);
@@ -289,6 +292,7 @@ public class UserOrm {
         return errorMSG;
     }
 
+    @Transactional
     public Response loginUser(User usr) {
         log.info("UserOrm/loginUser");
         if (usr.getUserName() == null && usr.getEmail() == null)
@@ -324,7 +328,8 @@ public class UserOrm {
 
         // Verify Password
         try {
-            if (!verifyBCryptPassword(user.getPassword(), usr.getPassword())) {
+            String storedPasswordHash = user.getSecret() != null ? user.getSecret().getPassword() : null;
+            if (storedPasswordHash == null || !verifyBCryptPassword(storedPasswordHash, usr.getPassword())) {
                 log.info("Falsches PW");
                 // TODO: Change text to: "Benutzername oder Password flasch"
                 return Response.status(401).entity("Falsches Password").build();
@@ -335,9 +340,12 @@ public class UserOrm {
             return Response.status(401).entity("Fehler bei der Passwortprüfung").build();
         }
 
+        user.setLastLogin(Time.currentTimeInMillis());
+        em.merge(user);
+
         // Return cookie and Auth Object
         /* For now there is no refresh token */
-        String token = JWT.generator(user.getRole(), user.getId());
+        String token = JWT.generator(user);
         JsonObject reactAuthObject = JWT.createReactAuthObject(token, user);
         NewCookie cookie = JWT.generateCookie(token);
 
@@ -409,6 +417,39 @@ public class UserOrm {
         if (user != null) {
             user.setPhotoUrl(photoUrl);
             em.merge(user);
+        }
+    }
+
+    @Transactional
+    public Response deleteUser(Long userId) {
+        log.info("UserOrm/deleteUser: " + userId);
+        User user = em.find(User.class, userId);
+        if (user == null) {
+            return Response.status(404).entity("Benutzer nicht gefunden").build();
+        }
+        try {
+            // Break the in-memory association BEFORE any JPQL delete.
+            // User.secret has CascadeType.ALL, so if we leave the reference intact,
+            // Hibernate will try to cascade-remove or reload the Secret we are about
+            // to delete, causing EntityNotFoundException / ObjectDeletedException.
+            model.Users.Secret secret = user.getSecret();
+            user.setSecret(null);
+
+            if (secret != null) {
+                // Delete by the Secret's own PK, not by user_id
+                em.createQuery("DELETE FROM Secret s WHERE s.id = :sid")
+                        .setParameter("sid", secret.getId())
+                        .executeUpdate();
+            }
+
+            // Remove the user directly — no refresh needed, em.find() already gave us
+            // a managed entity, and the cascade target is already gone + nulled out.
+            log.info("Lösche Benutzer: " + user.getUserName());
+            em.remove(user);
+            return Response.ok("Benutzer erfolgreich gelöscht").build();
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Error deleting user " + userId, e);
+            return Response.status(500).entity("Fehler beim Löschen des Benutzers: " + e.getMessage()).build();
         }
     }
 
