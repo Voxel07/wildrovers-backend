@@ -1,0 +1,12 @@
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "n": "pSuDTevlKXmXPVXkDW1U90s8HtFQVoaczg6W9flCMPSj2elR0xLAe8rxzgyYNZHhqioAIlNbW2iA5p0hN8gw9nzh-46FWpDhYj6of_j3-BAtbt_0yZJedRdUSNwj3EiVF7h8GOPrBqDd9BGgJOArXJcXPl4upyRdHiKbji-btP-jitMThP80HdB25VrVztDpnGoX0PyYYstSCS-cJfh3sn4a6OEfzOaGn6p6dNndwH0r2GtWS-Szf1tgp7MUz8dhUhSXx1RmJ-sEHR6MUjW5TTQ5VlzhJAyA8yYET-L_Obkbx1O-OjnmKZ1nadekrO0vaCcAJzjSS5QooEO2UFZViQ",
+      "e": "AQAB",
+      "alg": "RS256",
+      "use": "sig",
+      "kid": "wildrovers-local"
+    }
+  ]
+}

@@ -30,7 +30,17 @@ public class UserPrincipalResolver {
 
         // Get OIDC identity info
         String username = identity.getPrincipal().getName();
-        String email = jwt.getClaim("email");
+
+        // For locally-signed JWTs (username/password login), LocalJwtAuthMechanism stores
+        // the email as a SecurityIdentity attribute. Accessing @Inject JsonWebToken jwt for
+        // these requests would trigger Quarkus OIDC's OidcJsonWebTokenProducer, which logs
+        // a spurious WARNING because there is no OIDC access token on the request.
+        String email;
+        if (Boolean.TRUE.equals(identity.getAttribute("local-jwt"))) {
+            email = identity.getAttribute("email"); // set by LocalJwtAuthMechanism
+        } else {
+            email = jwt.getClaim("email"); // OIDC access token — safe to access here
+        }
         
         log.info("Resolving user for principal: " + username + " (email: " + email + ")");
 
@@ -61,7 +71,7 @@ public class UserPrincipalResolver {
             if (!currentMappedRole.equals(user.getRole())) {
                 log.info("User role changed in identity provider. Syncing role: " + user.getRole() + " -> " + currentMappedRole);
                 user.setRole(currentMappedRole);
-                userOrm.updateUser(user);
+                userOrm.updateUserRole(user.getId(), currentMappedRole);
             }
         }
 

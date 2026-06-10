@@ -27,9 +27,15 @@ services:
       OPENOBSERVE_ENDPOINT: "${OPENOBSERVE_ENDPOINT:-http://openobserve:5080/api/default}"
       OPENOBSERVE_TOKEN: "${OPENOBSERVE_TOKEN}"
       MAILER_MOCK: "${MAILER_MOCK:-true}"
+      # JWT key paths (override in .env for custom locations)
+      JWT_PRIVATE_KEY_PATH: "/work/keys/privateKey.pem"
+      JWT_PUBLIC_KEY_PATH: "/work/keys/publicKey.pem"
     volumes:
       - backend_uploads:/work/uploads
       - ./service_account.json:/work/service_account.json:ro
+      # Mount JWT key files
+      - ./src/main/resources/privateKey.pem:/work/keys/privateKey.pem:ro
+      - ./src/main/resources/publicKey.pem:/work/keys/publicKey.pem:ro
 
   frontend:
     image: ghcr.io/voxel07/wildrovers-frontend:latest

@@ -278,8 +278,13 @@ public class UserOrm {
             dbUser.setYearlyFeePaid(u.getYearlyFeePaid());
         }
         if (u.getPassword() != null && !u.getPassword().isBlank()) {
-            if (dbUser.getSecret() != null) {
-                dbUser.getSecret().setPassword(BcryptUtil.bcryptHash(u.getPassword()));
+            // Only re-hash if the value is a plain-text password, not already a BCrypt hash.
+            // BCrypt hashes always start with '$2' — re-hashing them would corrupt the stored password.
+            String incoming = u.getPassword();
+            if (!incoming.startsWith("$2")) {
+                if (dbUser.getSecret() != null) {
+                    dbUser.getSecret().setPassword(BcryptUtil.bcryptHash(incoming));
+                }
             }
         }
         try {
@@ -428,22 +433,38 @@ public class UserOrm {
             return Response.status(404).entity("Benutzer nicht gefunden").build();
         }
         try {
-            // Break the in-memory association BEFORE any JPQL delete.
-            // User.secret has CascadeType.ALL, so if we leave the reference intact,
-            // Hibernate will try to cascade-remove or reload the Secret we are about
-            // to delete, causing EntityNotFoundException / ObjectDeletedException.
-            model.Users.Secret secret = user.getSecret();
-            user.setSecret(null);
+            // 1. Delete EventAttendance records first.
+            //    EventAttendance has a user_id FK with no CascadeType set on the User side,
+            //    so Hibernate will NOT delete them automatically. Leaving them causes a
+            //    FK constraint violation when the User row is deleted, which is why the
+            //    first delete attempt only removes the Secret (the JPQL delete commits to DB)
+            //    while the User removal fails during flush.
+            em.createQuery("DELETE FROM EventAttendance ea WHERE ea.user.id = :uid")
+                    .setParameter("uid", userId)
+                    .executeUpdate();
 
-            if (secret != null) {
-                // Delete by the Secret's own PK, not by user_id
-                em.createQuery("DELETE FROM Secret s WHERE s.id = :sid")
-                        .setParameter("sid", secret.getId())
-                        .executeUpdate();
+            // 2. Delete Secret via JPQL (owns the user_id FK, must go before User).
+            em.createQuery("DELETE FROM Secret s WHERE s.user.id = :uid")
+                    .setParameter("uid", userId)
+                    .executeUpdate();
+
+            // 3. Flush and clear the persistence context.
+            //    JPQL bulk deletes bypass Hibernate's PC (first-level cache), leaving it
+            //    out of sync with the DB. Without this, em.remove(user) can fail because
+            //    Hibernate still sees the old Secret entity as "managed" and tries to
+            //    interact with it during the cascade analysis at flush time.
+            em.flush();
+            em.clear();
+
+            // 4. Re-fetch the user on the now-clean PC and remove it.
+            //    Hibernate will cascade to Address, ActivityForum, Phones, and Forum
+            //    entities as configured via CascadeType.ALL on those relationships.
+            user = em.find(User.class, userId);
+            if (user == null) {
+                // Secret was already deleted above; user was somehow gone — treat as success.
+                return Response.ok("Benutzer erfolgreich gelöscht").build();
             }
 
-            // Remove the user directly — no refresh needed, em.find() already gave us
-            // a managed entity, and the cascade target is already gone + nulled out.
             log.info("Lösche Benutzer: " + user.getUserName());
             em.remove(user);
             return Response.ok("Benutzer erfolgreich gelöscht").build();
@@ -453,4 +474,20 @@ public class UserOrm {
         }
     }
 
+
+    /**
+     * Targeted role-only update — avoids going through the full updateUser() path
+     * which could inadvertently trigger password re-hashing.
+     */
+    @Transactional
+    public void updateUserRole(Long userId, String role) {
+        log.info("UserOrm/updateUserRole: userId=" + userId + " role=" + role);
+        User user = em.find(User.class, userId);
+        if (user != null) {
+            user.setRole(role);
+            em.merge(user);
+        }
+    }
+
 }
+
