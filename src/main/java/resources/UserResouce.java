@@ -58,6 +58,9 @@ public class UserResouce {
     @ConfigProperty(name = "user.photos.upload-dir", defaultValue = "${user.home}/wildrovers-uploads/user-photos")
     String uploadDir;
 
+    @ConfigProperty(name = "user.backgrounds.upload-dir", defaultValue = "${user.home}/wildrovers-uploads/profile-backgrounds")
+    String backgroundUploadDir;
+
 
 
     @Inject
@@ -213,6 +216,82 @@ public class UserResouce {
         }
     }
 
+    @POST
+    @Path("/me/background")
+    @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response uploadBackground(@jakarta.ws.rs.BeanParam PhotoUploadForm form) {
+        log.info("UserResource/uploadBackground");
+        User user = userPrincipalResolver.resolveUser();
+        if (user == null) {
+            return Response.status(401).entity("Nicht eingeloggt").build();
+        }
+        if (form == null || form.file == null) {
+            return Response.status(400).entity("Keine Datei übermittelt").build();
+        }
+        if (form.file.size() > 5 * 1024 * 1024) {
+            return Response.status(400).entity("Datei ist zu groß (max. 5MB)").build();
+        }
+
+        try {
+            File uploadedFile = form.file.uploadedFile().toFile();
+            BufferedImage original = ImageIO.read(uploadedFile);
+            if (original == null) {
+                return Response.status(400).entity("Ungültiges Bildformat").build();
+            }
+
+            BufferedImage scaled = scaleImage(original, 1200);
+
+            String base = backgroundUploadDir.replace("${user.home}", System.getProperty("user.home"));
+            java.nio.file.Path dir = Paths.get(base);
+            Files.createDirectories(dir);
+            java.nio.file.Path destPath = dir.resolve(user.getId() + "_background.jpg");
+
+            ImageIO.write(scaled, "jpg", destPath.toFile());
+
+            String backgroundUrl = "/user/background/" + user.getId() + "?v=" + System.currentTimeMillis();
+            userOrm.updateUserBackgroundUrl(user.getId(), backgroundUrl);
+
+            jakarta.json.JsonObject result = jakarta.json.Json.createObjectBuilder()
+                    .add("backgroundUrl", backgroundUrl)
+                    .build();
+            return Response.ok(result).build();
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Failed to upload background", e);
+            return Response.status(500).entity("Fehler beim Verarbeiten des Hintergrundbildes").build();
+        }
+    }
+
+    @DELETE
+    @Path("/me/background")
+    @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response deleteBackground() {
+        log.info("UserResource/deleteBackground");
+        User user = userPrincipalResolver.resolveUser();
+        if (user == null) {
+            return Response.status(401).entity("Nicht eingeloggt").build();
+        }
+
+        try {
+            String base = backgroundUploadDir.replace("${user.home}", System.getProperty("user.home"));
+            java.nio.file.Path filePath = Paths.get(base, user.getId() + "_background.jpg");
+            File file = filePath.toFile();
+            if (file.exists() && file.isFile()) {
+                Files.deleteIfExists(filePath);
+            }
+            userOrm.updateUserBackgroundUrl(user.getId(), null);
+
+            return Response.ok(jakarta.json.Json.createObjectBuilder()
+                    .add("message", "Hintergrundbild gelöscht")
+                    .build()).build();
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Failed to delete background", e);
+            return Response.status(500).entity("Fehler beim Löschen des Hintergrundbildes").build();
+        }
+    }
+
     @GET
     @Path("/photo/{userId}")
     @PermitAll
@@ -223,6 +302,22 @@ public class UserResouce {
         File file = Paths.get(base, userId + ".jpg").toFile();
         if (!file.exists() || !file.isFile()) {
             return Response.status(404).entity("Photo nicht gefunden").build();
+        }
+        return Response.ok(file)
+                .header("Cache-Control", "public, max-age=86400")
+                .build();
+    }
+
+    @GET
+    @Path("/background/{userId}")
+    @PermitAll
+    @Produces("image/jpeg")
+    public Response getBackground(@PathParam("userId") Long userId) {
+        log.info("UserResource/getBackground: " + userId);
+        String base = backgroundUploadDir.replace("${user.home}", System.getProperty("user.home"));
+        File file = Paths.get(base, userId + "_background.jpg").toFile();
+        if (!file.exists() || !file.isFile()) {
+            return Response.status(404).entity("Hintergrund nicht gefunden").build();
         }
         return Response.ok(file)
                 .header("Cache-Control", "public, max-age=86400")

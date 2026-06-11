@@ -426,6 +426,16 @@ public class UserOrm {
     }
 
     @Transactional
+    public void updateUserBackgroundUrl(Long userId, String backgroundUrl) {
+        log.info("UserOrm/updateUserBackgroundUrl");
+        User user = em.find(User.class, userId);
+        if (user != null) {
+            user.setBackgroundUrl(backgroundUrl);
+            em.merge(user);
+        }
+    }
+
+    @Transactional
     public Response deleteUser(Long userId) {
         log.info("UserOrm/deleteUser: " + userId);
         User user = em.find(User.class, userId);

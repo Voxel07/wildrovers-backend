@@ -100,6 +100,9 @@ public class User {
     @Column(name = "photoUrl")
     private String photoUrl;
 
+    @Column(name = "backgroundUrl")
+    private String backgroundUrl;
+
     @Column(name = "phrase")
     private String phrase;
 
@@ -350,6 +353,14 @@ public class User {
 
     public void setPhotoUrl(String photoUrl) {
         this.photoUrl = photoUrl;
+    }
+
+    public String getBackgroundUrl() {
+        return backgroundUrl;
+    }
+
+    public void setBackgroundUrl(String backgroundUrl) {
+        this.backgroundUrl = backgroundUrl;
     }
 
     public String getPhrase() {

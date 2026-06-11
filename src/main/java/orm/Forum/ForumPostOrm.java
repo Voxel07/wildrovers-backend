@@ -197,7 +197,6 @@ public class ForumPostOrm {
 
         // Sanitize user-submitted content before persisting
         forumPost.setTitle(htmlSanitizer.sanitizeTitle(forumPost.getTitle()));
-        String sanitizedContent = htmlSanitizer.sanitize(forumPost.getContent());
 
         forumPost.setCreationDate(Time.currentTimeInMillis());
 
@@ -217,10 +216,12 @@ public class ForumPostOrm {
             return Response.status(401).entity("Fehler beim erstellen des Posts").build();
         }
 
-        // Extract base64 images after we have the postId, then update content
+        // Extract base64 images from ORIGINAL content first (before sanitization
+        // strips data: URIs), THEN sanitize the result (now with safe HTTP URLs).
         String baseUrl = "http://" + serverHost + ":" + serverPort;
-        String processedContent = imageExtractor.extractAndSaveImages(sanitizedContent, forumPost.getId(), baseUrl);
-        forumPost.setContent(processedContent);
+        String contentWithImages = imageExtractor.extractAndSaveImages(
+                forumPost.getContent(), forumPost.getId(), baseUrl);
+        forumPost.setContent(htmlSanitizer.sanitize(contentWithImages));
         try {
             em.merge(forumPost);
         } catch (Exception e) {
@@ -331,10 +332,11 @@ public class ForumPostOrm {
         if (!creator.getId().equals(userId) && !user.getRole().equals("Admin"))
             return "Nur der Ersteller oder Mods dürfen das";
 
-        // Sanitize updated content, then extract any new base64 images
-        String sanitizedContent = htmlSanitizer.sanitize(forumPost.getContent());
+        // Extract base64 images from ORIGINAL content first, then sanitize
         String baseUrl = "http://" + serverHost + ":" + serverPort;
-        forumPostAusDB.setContent(imageExtractor.extractAndSaveImages(sanitizedContent, forumPost.getId(), baseUrl));
+        String contentWithImages = imageExtractor.extractAndSaveImages(
+                forumPost.getContent(), forumPost.getId(), baseUrl);
+        forumPostAusDB.setContent(htmlSanitizer.sanitize(contentWithImages));
 
         forumPostAusDB.setEditDate(Time.currentTimeInMillis());
         forumPostAusDB.setEditor(user);
