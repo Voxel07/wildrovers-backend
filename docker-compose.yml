@@ -33,9 +33,8 @@ services:
     volumes:
       - backend_uploads:/work/uploads
       - ./service_account.json:/work/service_account.json:ro
-      # Mount JWT key files
-      - ./src/main/resources/privateKey.pem:/work/keys/privateKey.pem:ro
-      - ./src/main/resources/publicKey.pem:/work/keys/publicKey.pem:ro
+      # Mount JWT key files directory (read-write to allow generation/rotation)
+      - ${JWT_KEYS_DIR:-./src/main/resources}:/work/keys
 
   frontend:
     image: ghcr.io/voxel07/wildrovers-frontend:latest

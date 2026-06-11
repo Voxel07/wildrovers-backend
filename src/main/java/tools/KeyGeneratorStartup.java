@@ -12,10 +12,17 @@ import java.util.Base64;
 @ApplicationScoped
 public class KeyGeneratorStartup {
     void onStart(@Observes StartupEvent ev) {
-        File privFile = new File("src/main/resources/privateKey.pem");
-        File pubFile = new File("src/main/resources/publicKey.pem");
+        String privateKeyPath = System.getenv().getOrDefault("JWT_PRIVATE_KEY_PATH", "src/main/resources/privateKey.pem");
+        String publicKeyPath = System.getenv().getOrDefault("JWT_PUBLIC_KEY_PATH", "src/main/resources/publicKey.pem");
         
-        // Force regeneration to replace any invalid Web Crypto formatting
+        File privFile = new File(privateKeyPath);
+        File pubFile = new File(publicKeyPath);
+        
+        if (privFile.exists() && pubFile.exists()) {
+            System.out.println(">>> RSA JWT Keys already exist. Skipping generation. <<<");
+            return;
+        }
+        
         try {
             KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
             kpg.initialize(2048);
