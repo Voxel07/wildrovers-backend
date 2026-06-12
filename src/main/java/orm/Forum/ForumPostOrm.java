@@ -14,9 +14,6 @@ import jakarta.transaction.Transactional;
 //Logging
 import java.util.logging.Logger;
 import java.util.logging.Level;
-//Zeit
-import java.time.format.DateTimeFormatter;
-import java.time.LocalDateTime;
 
 import model.User;
 import model.Forum.ForumPicture;
@@ -42,8 +39,6 @@ import javax.imageio.ImageIO;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
-
-import org.apache.commons.io.FileUtils;
 
 @ApplicationScoped
 public class ForumPostOrm {
@@ -236,7 +231,6 @@ public class ForumPostOrm {
     public Response saveImages(Pictures pic, Long userId) {
 
         ForumPost post = getPostsById(pic.getPostId()).get(0);
-        List<ForumPicture> pictures = new ArrayList<>();
         ForumPicture picture;
         // post.setPictures(pictures);
 

@@ -139,10 +139,9 @@ public class ForumTopicOrm {
         }
         return Response.status(201).entity(topic).build();
     }
-    /*
-        Brief updateTopic
-        - ToDo
-    */
+    /**
+     * Updates the topic name. Only the creator or an Admin may update a topic.
+     */
     @Transactional
     public String updateTopic(ForumTopic forumTopic, Long userId){
         log.info("ForumTopicOrm/updateTopic");
@@ -169,10 +168,9 @@ public class ForumTopicOrm {
         }
         return "Thema erfolgreich aktualisert";
     }
-    /*
-        Brief updateTopic
-        - ToDo
-    */
+    /**
+     * Deletes a topic and all its nested posts/answers. Only the creator or an Admin may delete a topic.
+     */
     @Transactional
     public String deleteTopic(ForumTopic forumTopic, Long userId){
         log.info("ForumTopicOrm/deleteTopic");

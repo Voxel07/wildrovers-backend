@@ -161,7 +161,7 @@ public class UserResouce {
     @Path("/{userId}/posts")
     @RolesAllowed({ "Admin", "Vorstand" })
     @Produces(MediaType.APPLICATION_JSON)
-    public Response deleteAllUserPosts(@jakarta.ws.rs.PathParam("userId") Long userId) {
+    public Response deleteAllUserPosts(@PathParam("userId") Long userId) {
         log.info("UserResource/deleteAllUserPosts: " + userId);
         try {
             String result = forumPostOrm.deleteAllPostsFromUser(userId);
@@ -208,7 +208,7 @@ public class UserResouce {
     @Path("/{userId}")
     @RolesAllowed({ "Admin", "Vorstand" })
     @Produces(MediaType.APPLICATION_JSON)
-    public Response deleteUser(@jakarta.ws.rs.PathParam("userId") Long userId) {
+    public Response deleteUser(@PathParam("userId") Long userId) {
         log.info("UserResource/deleteUser: " + userId);
         return userOrm.deleteUser(userId);
     }

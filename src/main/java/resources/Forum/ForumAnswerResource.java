@@ -8,11 +8,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.UriInfo;
 
-import io.vertx.core.http.HttpServerRequest;
 import jakarta.annotation.security.RolesAllowed;
 
 import jakarta.ws.rs.GET;
@@ -27,7 +24,6 @@ import model.Forum.ForumAnswer;
 import orm.Forum.ForumAnswerOrm;
 
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.SecurityContext;
 import model.Users.Roles;
 
 //Logging
@@ -41,12 +37,6 @@ public class ForumAnswerResource{
     @Inject
     ForumAnswerOrm forumAnswerOrm;
 
-    @Context
-    UriInfo info;
-
-    @Context
-    HttpServerRequest request;
-    
     @Inject
     helper.UserPrincipalResolver userPrincipalResolver;
 
@@ -141,8 +131,6 @@ public class ForumAnswerResource{
     @Consumes(MediaType.APPLICATION_JSON)
     public Response deleteAnswer(ForumAnswer forumAnswer){
         log.info("ForumAnswerResource/deleteAnswer");
-        log.info("Info: " + info.getQueryParameters() + "|" + info.getBaseUri() + "|" + info.getPath() + "|" + info.getAbsolutePath());
-        log.info("Request: " + request.response() + "|" + request.host()+ "|" + request.cookieCount()+ "|" + request.remoteAddress()+ "|" + request.localAddress());
         Long userId = userPrincipalResolver.resolveUserId();
         if(userId == null || forumAnswer == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();

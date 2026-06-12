@@ -173,10 +173,10 @@ public class ForumCategoryOrm {
         }
         return "Kategorie erfolgreich aktualisert";
     }
-    /*
-        @Brief removeCategory
-        - TODO: everything
-    */
+    /**
+     * Deletes a category and all its nested topics/posts/answers.
+     * Only the category creator or an Admin may delete a category.
+     */
     @Transactional
     public Response deleteCategory(ForumCategory forumCategory, Long userId){
         log.info("ForumCategoryOrm/removeCategory");

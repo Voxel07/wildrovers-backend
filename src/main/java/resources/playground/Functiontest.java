@@ -5,8 +5,6 @@ import jakarta.ws.rs.Path;
 import jakarta.inject.Inject;
 import jakarta.json.Json;
 import jakarta.json.JsonObject;
-import jakarta.json.JsonValue;
-import javax.print.attribute.standard.Media;
 
 //Logging
 import java.util.logging.Logger;
@@ -16,10 +14,8 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.SecurityContext;
 
 import orm.Secrets.SecretOrm;
-import resources.JWT;
 
 import jakarta.ws.rs.core.NewCookie;
 
@@ -76,10 +72,6 @@ public class Functiontest {
         }
         private static void incCount(){
             count += 1;
-        }
-
-        private static Long getCount(){
-            return count;
         }
 
         @Inject

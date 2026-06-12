@@ -9,7 +9,6 @@ import java.util.logging.Logger;
 
 //HTTP Requests
 import jakarta.ws.rs.Consumes;
-import jakarta.ws.rs.CookieParam;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -19,10 +18,6 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
-import io.smallrye.jwt.build.Jwt;
-import org.eclipse.microprofile.jwt.JsonWebToken;
-import io.smallrye.jwt.auth.principal.JWTParser;
-import io.smallrye.jwt.auth.principal.ParseException;
 //Eigene Imports
 import orm.Secrets.SecretOrm;
 
@@ -32,7 +27,6 @@ public class SecretRecource {
     private static final Logger log = Logger.getLogger(SecretRecource.class.getName());
 
     @Inject SecretOrm secretOrm;
-    @Inject JWTParser parser;
     @Inject orm.UserOrm userOrm;
     @Inject jakarta.persistence.EntityManager em;
     @Inject tools.Email email;

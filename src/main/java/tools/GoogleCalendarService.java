@@ -5,13 +5,13 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.json.JSONObject;
 import io.smallrye.jwt.build.Jwt;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
@@ -51,9 +51,9 @@ public class GoogleCalendarService {
         if (trimmed.startsWith("@") || !trimmed.startsWith("{")) {
             String filePath = trimmed.startsWith("@") ? trimmed.substring(1) : trimmed;
             try {
-                java.nio.file.Path path = java.nio.file.Paths.get(filePath);
-                if (java.nio.file.Files.exists(path)) {
-                    jsonStr = java.nio.file.Files.readString(path, java.nio.charset.StandardCharsets.UTF_8);
+                Path path = Paths.get(filePath);
+                if (Files.exists(path)) {
+                    jsonStr = Files.readString(path, StandardCharsets.UTF_8);
                 } else {
                     log.warning("Google Calendar credentials file does not exist: " + filePath);
                     return null;

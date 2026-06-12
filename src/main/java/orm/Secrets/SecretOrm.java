@@ -1,6 +1,5 @@
 package orm.Secrets;
 
-import java.util.UUID;
 import model.Users.Secret;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;

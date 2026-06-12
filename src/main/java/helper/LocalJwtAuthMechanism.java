@@ -13,7 +13,6 @@ import io.smallrye.jwt.algorithm.SignatureAlgorithm;
 import io.smallrye.jwt.auth.principal.DefaultJWTParser;
 import io.smallrye.jwt.auth.principal.JWTAuthContextInfo;
 import io.smallrye.jwt.auth.principal.JWTParser;
-import io.smallrye.jwt.auth.principal.ParseException;
 import io.smallrye.mutiny.Uni;
 import io.vertx.ext.web.RoutingContext;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -21,7 +20,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyFactory;
-import java.security.Principal;
 import java.security.PublicKey;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
@@ -77,7 +75,7 @@ public class LocalJwtAuthMechanism implements HttpAuthenticationMechanism {
             String email = jwt.getClaim("email"); // embedded at login time by JWT.generator()
 
             var identityBuilder = QuarkusSecurityIdentity.builder()
-                .setPrincipal((Principal) () -> username)
+                .setPrincipal(jwt)
                 .addRoles(groups)
                 .addCredential(new TokenCredential(token, "Bearer"))
                 // Mark this identity as locally-signed so UserPrincipalResolver can

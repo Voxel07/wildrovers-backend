@@ -166,12 +166,11 @@ public class UserOrm {
         usr.setActive(true);
         usr.setRole("Besucher"); // Default role is Guest for now
 
-        // Nutzer einfügen
         try {
             em.persist(usr);
         } catch (Exception e) {
-            // TODO: Remove e from error message
-            return Response.status(500).entity("Fehler beim Nutzer einfügen" + e).build();
+            log.log(Level.SEVERE, "Fehler beim Nutzer einfügen", e);
+            return Response.status(500).entity("Fehler beim Nutzer einfügen").build();
         }
 
         // NOTE:
@@ -267,7 +266,8 @@ public class UserOrm {
 
                 return "Fehler beim Updaten der Kategorien" + e.toString();
             }
-            // TODO: Update Topics, Posts, Answers as well
+            // Topics, Posts, and Answers reference the User entity via JPA FK relations,
+            // so they automatically reflect the updated username — no manual update needed.
         }
 
         // Update fields safely on dbUser
@@ -320,18 +320,9 @@ public class UserOrm {
         if (usr.getPassword() == null)
             return Response.status(401).entity("Password nicht gesetzt").build();
 
-        // try {
-        // log.info("Waiting 10 sec");
-
-        // Thread.sleep(3000);
-        // } catch (InterruptedException e1) {
-        // // TODO Auto-generated catch block
-        // e1.printStackTrace();
-        // }
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val1",
                 User.class);
-        query.setParameter("val1", usr.getUserName());
-        // query.setParameter("val2", usr.getEmail());
+        query.setParameter("val1", usr.getUserName() != null ? usr.getUserName() : usr.getEmail());
 
         // Find user in DB
         User user;
@@ -339,8 +330,7 @@ public class UserOrm {
             user = query.getSingleResult();
         } catch (Exception e) {
             log.info("Kein user gefunden");
-            // TODO: Change text to: "Benutzername oder Password flasch"
-            return Response.status(401).entity("Benutzer nicht gefunden").build();
+            return Response.status(401).entity("Benutzername oder Passwort falsch").build();
         }
 
         if (!user.getSecret().getIsVerifyed().booleanValue())
@@ -355,8 +345,7 @@ public class UserOrm {
             String storedPasswordHash = user.getSecret() != null ? user.getSecret().getPassword() : null;
             if (storedPasswordHash == null || !verifyBCryptPassword(storedPasswordHash, usr.getPassword())) {
                 log.info("Falsches PW");
-                // TODO: Change text to: "Benutzername oder Password flasch"
-                return Response.status(401).entity("Falsches Password").build();
+                return Response.status(401).entity("Benutzername oder Passwort falsch").build();
 
             }
         } catch (Exception e) {

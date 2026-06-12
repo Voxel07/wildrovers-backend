@@ -67,7 +67,6 @@ public class ImageExtractor {
         int imgIndex = 0;
 
         while (matcher.find()) {
-            String dataUri  = matcher.group(1);
             String mimeType = matcher.group(2).toLowerCase(Locale.ROOT); // e.g. "png"
             String b64data  = matcher.group(3);
 

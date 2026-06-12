@@ -3,20 +3,13 @@ package resources;
 import java.util.Arrays;
 import java.util.HashSet;
 
-import org.eclipse.microprofile.jwt.Claims;
-
-import io.smallrye.jwt.algorithm.KeyEncryptionAlgorithm;
 import io.smallrye.jwt.algorithm.SignatureAlgorithm;
 import io.smallrye.jwt.build.Jwt;
-import io.vertx.core.http.Cookie;
 import model.User;
 
 import jakarta.json.JsonObject;
 import jakarta.ws.rs.core.NewCookie;
 import jakarta.json.Json;
-import org.eclipse.microprofile.jwt.JsonWebToken;
-import io.smallrye.jwt.auth.principal.JWTParser;
-import io.smallrye.jwt.auth.principal.ParseException;
 import java.time.Duration;
 import java.time.Instant;
 
@@ -36,34 +29,6 @@ public class JWT {
             .sign();
     }
 
-    /**
-     * Verify JWT token
-     */
-    public static boolean validator(String jwt){
-      return true;
-      // String key = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAseIvpZEu6aqyaQz8JbnHsOuHMUH7jOcZ0DiJiVAD2vLdwJhet0RZoAKHCDqRd+1g+U0LIVMnLW2K04cmeOkkILAo+7uoj9v+rVvLoD9w91bNplZPG7wW9kbjliQaXJKkEhHMqwxdmRYLfcC6SdjkT3PrGisOIEPgP+24iZzoaDz+5i2JGYQyBmmcTZRBAiUNAKHRAT0cCW3dmCvYUde1/GoP4Oo7GPl0gGSQ60VhsTWB20dr4lXyMPNnU0K/3iBASuTlPdvWLjtflZQPA22Z7YFw3a4gHzrKZ/ZNBbfSwwwVSlqhxK8KwR1F2H0uOifZWCF5TURyME0cDYKG3G1BGwIDAQAB";
-      // JsonWebToken jwt;
-
-      // try {
-      //     jwt = parser.parse(token);
-      // } catch (ParseException e) {
-      //     // TODO Auto-generated catch block
-      //     e.printStackTrace();
-      //     return Response.status(500).build();
-      // }
-
-      // JsonWebToken isValid;
-      // try {
-      //     isValid = parser.verify(token, key);
-      // } catch (ParseException e) {
-      //     // TODO Auto-generated catch block
-      //     // e.printStackTrace();
-      //     return Response.status(200).entity(e).build();
-      // }
-
-      // return Response.ok("isValid").build();
-
-    }
 
     public static JsonObject createReactAuthObject(String token, User user){
       return Json.createObjectBuilder()
@@ -77,11 +42,27 @@ public class JWT {
     }
 
     public static NewCookie generateCookie(String token){
-      return new NewCookie("__refresh_Token__", token, "/","localhost","test",3600*24*30,true,true);
+      return new NewCookie.Builder("__refresh_Token__")
+          .value(token)
+          .path("/")
+          .domain("localhost")
+          .comment("test")
+          .maxAge(3600 * 24 * 30)
+          .secure(true)
+          .httpOnly(true)
+          .build();
     }
 
     public static NewCookie removeCookie(){
-      return new NewCookie("__refresh_Token__", "deleted", "/","localhost:3000","test",0,true,true);
+      return new NewCookie.Builder("__refresh_Token__")
+          .value("deleted")
+          .path("/")
+          .domain("localhost:3000")
+          .comment("test")
+          .maxAge(0)
+          .secure(true)
+          .httpOnly(true)
+          .build();
     }
 
 }
