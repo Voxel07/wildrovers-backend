@@ -8,10 +8,23 @@ import model.User;
 import orm.UserOrm;
 import java.util.Set;
 import java.util.logging.Logger;
+import java.util.concurrent.ConcurrentHashMap;
+import java.time.Instant;
 
 @ApplicationScoped
 public class UserPrincipalResolver {
     private static final Logger log = Logger.getLogger(UserPrincipalResolver.class.getName());
+
+    private static class CacheEntry {
+        final User user;
+        final Instant expiry;
+        CacheEntry(User user, Instant expiry) {
+            this.user = user;
+            this.expiry = expiry;
+        }
+    }
+
+    private final ConcurrentHashMap<String, CacheEntry> globalCache = new ConcurrentHashMap<>();
 
     @Inject
     SecurityIdentity identity;
@@ -28,8 +41,21 @@ public class UserPrincipalResolver {
             return null;
         }
 
-        // Get OIDC identity info
         String username = identity.getPrincipal().getName();
+        Instant now = Instant.now();
+        CacheEntry entry = globalCache.get(username);
+        if (entry != null && entry.expiry.isAfter(now)) {
+            // Re-verify blocked status
+            if (entry.user.getIsBlocked()) {
+                log.warning("User " + entry.user.getUserName() + " is blocked. Denying access.");
+                throw new jakarta.ws.rs.WebApplicationException(
+                    jakarta.ws.rs.core.Response.status(jakarta.ws.rs.core.Response.Status.FORBIDDEN)
+                            .entity("Dein Account wurde gesperrt.")
+                            .build()
+                );
+            }
+            return entry.user;
+        }
 
         // For locally-signed JWTs (username/password login), LocalJwtAuthMechanism stores
         // the email as a SecurityIdentity attribute. Accessing @Inject JsonWebToken jwt for
@@ -82,6 +108,11 @@ public class UserPrincipalResolver {
                         .entity("Dein Account wurde gesperrt.")
                         .build()
             );
+        }
+
+        // Cache the resolved user globally for a short duration (5 seconds) to handle concurrent frontend requests
+        if (user != null) {
+            globalCache.put(username, new CacheEntry(user, Instant.now().plusMillis(5000)));
         }
 
         return user;
