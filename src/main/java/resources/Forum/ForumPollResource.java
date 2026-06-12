@@ -57,4 +57,15 @@ public class ForumPollResource {
         boolean voted = forumPollOrm.hasVoted(pollId, userId);
         return Response.ok(voted).build();
     }
+
+    @GET
+    @Path("/myVotes")
+    @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
+    public List<Long> getMyVotes(@QueryParam("poll") Long pollId) {
+        Long userId = userPrincipalResolver.resolveUserId();
+        if (userId == null) {
+            return java.util.Collections.emptyList();
+        }
+        return forumPollOrm.getVotedOptionIds(pollId, userId);
+    }
 }

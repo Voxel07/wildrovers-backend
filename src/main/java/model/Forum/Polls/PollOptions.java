@@ -1,6 +1,11 @@
 package model.Forum.Polls;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.JoinTable;
+import model.User;
+import java.util.List;
+import java.util.ArrayList;
 import jakarta.persistence.Table;
 import jakarta.persistence.Id;
 import jakarta.persistence.GeneratedValue;
@@ -31,6 +36,11 @@ public class PollOptions {
     @JsonbTransient
     private Polls poll;
 
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "FORUM_POLL_OPTION_VOTES", joinColumns = @JoinColumn(name = "option_id"), inverseJoinColumns = @JoinColumn(name = "user_id"))
+    @JsonbTransient
+    private List<User> votedUsers = new ArrayList<>();
+
     public PollOptions() {}
 
     public PollOptions(String optionText) {
@@ -48,4 +58,15 @@ public class PollOptions {
 
     public Polls getPoll() { return poll; }
     public void setPoll(Polls poll) { this.poll = poll; }
+
+    public List<User> getVotedUsers() {
+        if (votedUsers == null) {
+            votedUsers = new ArrayList<>();
+        }
+        return votedUsers;
+    }
+
+    public void setVotedUsers(List<User> votedUsers) {
+        this.votedUsers = votedUsers;
+    }
 }

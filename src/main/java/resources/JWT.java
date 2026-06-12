@@ -70,7 +70,8 @@ public class JWT {
       .add("JWT", token)
       .add("USER", Json.createObjectBuilder()
               .add("Name", user.getUserName())
-              .add("Role", user.getRole()).build()
+              .add("Role", user.getRole())
+              .add("canCreateCategory", user.getCanCreateCategory()).build()
               )
       .build();
     }

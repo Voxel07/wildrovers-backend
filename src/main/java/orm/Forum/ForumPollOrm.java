@@ -79,11 +79,6 @@ public class ForumPollOrm {
                     .build();
         }
 
-        // Check if user has already voted
-        if (poll.getVotedUsers().contains(user)) {
-            return Response.status(Response.Status.BAD_REQUEST).entity("Du hast bereits abgestimmt").build();
-        }
-
         if (optionIds == null || optionIds.isEmpty()) {
             return Response.status(Response.Status.BAD_REQUEST).entity("Keine Optionen ausgewählt").build();
         }
@@ -93,18 +88,42 @@ public class ForumPollOrm {
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity("Mehrfachauswahl ist für diese Umfrage nicht erlaubt").build();
         }
+
+        // Remove previous votes in this poll by this user
+        List<PollOptions> allOptions = em.createQuery("SELECT o FROM PollOptions o WHERE o.poll.id = :pollId", PollOptions.class)
+                                         .setParameter("pollId", pollId)
+                                         .getResultList();
+        for (PollOptions option : allOptions) {
+            if (option.getVotedUsers().contains(user)) {
+                option.getVotedUsers().remove(user);
+                option.setVotes(Math.max(0L, (option.getVotes() != null ? option.getVotes() : 0L) - 1));
+                em.merge(option);
+            }
+        }
+
+        // Add user to new selected options
         for (Long optionId : optionIds) {
             PollOptions option = em.find(PollOptions.class, optionId);
             if (option == null || !option.getPoll().getId().equals(pollId)) {
                 return Response.status(Response.Status.BAD_REQUEST).entity("Ungültige Option").build();
             }
-            option.setVotes((option.getVotes() != null ? option.getVotes() : 0L) + 1);
-            em.merge(option);
+            if (!option.getVotedUsers().contains(user)) {
+                option.getVotedUsers().add(user);
+                option.setVotes((option.getVotes() != null ? option.getVotes() : 0L) + 1);
+                em.merge(option);
+            }
         }
-        poll.getVotedUsers().add(user);
-        em.merge(poll);
 
-        return Response.ok("Stimme erfolgreich gezählt").build();
+        // Ensure user is in votedUsers list of the poll
+        if (!poll.getVotedUsers().contains(user)) {
+            poll.getVotedUsers().add(user);
+            em.merge(poll);
+        }
+
+        em.flush();
+        // Return fresh poll details with updated vote counts
+        Polls updatedPoll = em.find(Polls.class, pollId);
+        return Response.ok(updatedPoll).build();
     }
 
     public boolean hasVoted(Long pollId, Long userId) {
@@ -115,5 +134,15 @@ public class ForumPollOrm {
         if (user == null)
             return false;
         return poll.getVotedUsers().contains(user);
+    }
+
+    public List<Long> getVotedOptionIds(Long pollId, Long userId) {
+        return em.createQuery(
+            "SELECT o.id FROM PollOptions o JOIN o.votedUsers u WHERE o.poll.id = :pollId AND u.id = :userId",
+            Long.class
+        )
+        .setParameter("pollId", pollId)
+        .setParameter("userId", userId)
+        .getResultList();
     }
 }

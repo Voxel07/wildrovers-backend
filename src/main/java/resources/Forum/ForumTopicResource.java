@@ -94,16 +94,15 @@ public class ForumTopicResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public Response addTopic(ForumTopic forumTopic, @QueryParam("category") Long categoryId){
         log.info("ForumResource/addTopic");
-        Long userId = userPrincipalResolver.resolveUserId();
+        model.User user = userPrincipalResolver.resolveUser();
 
-        if(userId == null || forumTopic.getTopic() == null)
-        {
+        if (user == null || forumTopic == null || forumTopic.getTopic() == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
         }
-        else
-        {
-            return forumTopicOrm.addTopic(forumTopic, categoryId, userId);
+        if (Roles.VSISITOR.equals(user.getRole())) {
+            return Response.status(403).entity("Besucher dürfen keine Themen erstellen/verwalten.").build();
         }
+        return forumTopicOrm.addTopic(forumTopic, categoryId, user.getId());
     }
 
     @POST
@@ -112,14 +111,16 @@ public class ForumTopicResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public Response updateTopic(ForumTopic ft){
         log.info("ForumResource/updateTopic");
-        Long userId = userPrincipalResolver.resolveUserId();
+        model.User user = userPrincipalResolver.resolveUser();
 
-        if (userId == null || ft == null) {
+        if (user == null || ft == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
-        } else {
-            String result = forumTopicOrm.updateTopic(ft, userId);
-            return Response.ok(result).build();
         }
+        if (Roles.VSISITOR.equals(user.getRole())) {
+            return Response.status(403).entity("Besucher dürfen keine Themen erstellen/verwalten.").build();
+        }
+        String result = forumTopicOrm.updateTopic(ft, user.getId());
+        return Response.ok(result).build();
     }
 
     @DELETE
@@ -128,13 +129,15 @@ public class ForumTopicResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public Response deleteTopic(ForumTopic ft){
         log.info("ForumResource/deleteTopic");
-        Long userId = userPrincipalResolver.resolveUserId();
+        model.User user = userPrincipalResolver.resolveUser();
 
-        if (userId == null || ft == null) {
+        if (user == null || ft == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
-        } else {
-            String result = forumTopicOrm.deleteTopic(ft, userId);
-            return Response.ok(result).build();
         }
+        if (Roles.VSISITOR.equals(user.getRole())) {
+            return Response.status(403).entity("Besucher dürfen keine Themen erstellen/verwalten.").build();
+        }
+        String result = forumTopicOrm.deleteTopic(ft, user.getId());
+        return Response.ok(result).build();
     }
 }

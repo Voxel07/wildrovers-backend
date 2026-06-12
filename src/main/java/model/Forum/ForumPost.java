@@ -161,7 +161,7 @@ public class ForumPost {
         return creator;
     }
     public String getCreator() {
-        return creator.getUserName();
+        return creator != null ? creator.getUserName() : "deleted";
     }
 
     public void setCreator(User creator) {

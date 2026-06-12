@@ -286,6 +286,9 @@ public class UserOrm {
         if (u.getYearlyFeePaid() != null) {
             dbUser.setYearlyFeePaid(u.getYearlyFeePaid());
         }
+        if (u.getCanCreateCategory() != null) {
+            dbUser.setCanCreateCategory(u.getCanCreateCategory());
+        }
         if (u.getPassword() != null && !u.getPassword().isBlank()) {
             // Only re-hash if the value is a plain-text password, not already a BCrypt hash.
             // BCrypt hashes always start with '$2' — re-hashing them would corrupt the stored password.
@@ -456,18 +459,67 @@ public class UserOrm {
             return Response.status(404).entity("Benutzer nicht gefunden").build();
         }
         try {
-            // 1. Delete EventAttendance records first.
-            //    EventAttendance has a user_id FK with no CascadeType set on the User side,
-            //    so Hibernate will NOT delete them automatically. Leaving them causes a
-            //    FK constraint violation when the User row is deleted, which is why the
-            //    first delete attempt only removes the Secret (the JPQL delete commits to DB)
-            //    while the User removal fails during flush.
+            // Nullify mentor relationship
+            em.createQuery("UPDATE User u SET u.mentor = null WHERE u.mentor.id = :uid")
+                    .setParameter("uid", userId)
+                    .executeUpdate();
+
+            // Delete EventAttendance records first.
             em.createQuery("DELETE FROM EventAttendance ea WHERE ea.user.id = :uid")
                     .setParameter("uid", userId)
                     .executeUpdate();
 
-            // 2. Delete Secret via JPQL (owns the user_id FK, must go before User).
+            // Delete Secret via JPQL (owns the user_id FK, must go before User).
             em.createQuery("DELETE FROM Secret s WHERE s.user.id = :uid")
+                    .setParameter("uid", userId)
+                    .executeUpdate();
+
+            // Decrement votes in PollOptions for options the user voted for
+            try {
+                @SuppressWarnings("unchecked")
+                List<Object> optionIds = em.createNativeQuery("SELECT option_id FROM FORUM_POLL_OPTION_VOTES WHERE user_id = :uid")
+                        .setParameter("uid", userId)
+                        .getResultList();
+                for (Object optionIdObj : optionIds) {
+                    Long optionId = ((Number) optionIdObj).longValue();
+                    em.createQuery("UPDATE PollOptions o SET o.votes = o.votes - 1 WHERE o.id = :oid AND o.votes > 0")
+                            .setParameter("oid", optionId)
+                            .executeUpdate();
+                }
+            } catch (Exception e) {
+                log.warning("Failed to decrement user poll votes: " + e.getMessage());
+            }
+
+            // Delete votes from option votes table
+            em.createNativeQuery("DELETE FROM FORUM_POLL_OPTION_VOTES WHERE user_id = :uid")
+                    .setParameter("uid", userId)
+                    .executeUpdate();
+
+            // Delete votes and views
+            em.createQuery("DELETE FROM ForumPostVote v WHERE v.user.id = :uid")
+                    .setParameter("uid", userId)
+                    .executeUpdate();
+            em.createQuery("DELETE FROM ForumPostView v WHERE v.user.id = :uid")
+                    .setParameter("uid", userId)
+                    .executeUpdate();
+
+            // Nullify creator/editor referencing this user on forum entities
+            em.createQuery("UPDATE ForumCategory c SET c.creator = null WHERE c.creator.id = :uid")
+                    .setParameter("uid", userId)
+                    .executeUpdate();
+            em.createQuery("UPDATE ForumTopic t SET t.creator = null WHERE t.creator.id = :uid")
+                    .setParameter("uid", userId)
+                    .executeUpdate();
+            em.createQuery("UPDATE ForumPost p SET p.creator = null WHERE p.creator.id = :uid")
+                    .setParameter("uid", userId)
+                    .executeUpdate();
+            em.createQuery("UPDATE ForumPost p SET p.editor = null WHERE p.editor.id = :uid")
+                    .setParameter("uid", userId)
+                    .executeUpdate();
+            em.createQuery("UPDATE ForumAnswer a SET a.creator = null WHERE a.creator.id = :uid")
+                    .setParameter("uid", userId)
+                    .executeUpdate();
+            em.createQuery("UPDATE ForumAnswer a SET a.editor = null WHERE a.editor.id = :uid")
                     .setParameter("uid", userId)
                     .executeUpdate();
 

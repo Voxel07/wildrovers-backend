@@ -383,6 +383,17 @@ public class ForumPostOrm {
             em.createQuery("DELETE FROM ForumPostVote v WHERE v.post.id = :postId").setParameter("postId", postId).executeUpdate();
             em.createQuery("DELETE FROM ForumPostView v WHERE v.post.id = :postId").setParameter("postId", postId).executeUpdate();
 
+            // Delete poll option votes and native poll tables
+            if (forumPostAusDB.getPoll() != null) {
+                model.Forum.Polls.Polls poll = forumPostAusDB.getPoll();
+                em.createNativeQuery("DELETE FROM FORUM_POLL_OPTION_VOTES WHERE option_id IN (SELECT id FROM FORUM_POLL_OPTIONS WHERE poll_id = :pollId)")
+                        .setParameter("pollId", poll.getId()).executeUpdate();
+                em.createNativeQuery("DELETE FROM FORUM_POLL_VOTES WHERE poll_id = :pollId").setParameter("pollId", poll.getId()).executeUpdate();
+                em.createQuery("DELETE FROM PollOptions o WHERE o.poll.id = :pollId").setParameter("pollId", poll.getId()).executeUpdate();
+                em.remove(poll);
+                forumPostAusDB.setPoll(null);
+            }
+
             // Decrement counts
             creator.getActivityForum().decPostCount();
             if (forumPostAusDB.getTopic() != null) {
@@ -452,6 +463,8 @@ public class ForumPostOrm {
             List<model.Forum.Polls.Polls> polls = em.createQuery("SELECT p FROM Polls p WHERE p.post.id = :postId", model.Forum.Polls.Polls.class)
                     .setParameter("postId", forumPost.getId()).getResultList();
             for (model.Forum.Polls.Polls poll : polls) {
+                em.createNativeQuery("DELETE FROM FORUM_POLL_OPTION_VOTES WHERE option_id IN (SELECT id FROM FORUM_POLL_OPTIONS WHERE poll_id = :pollId)")
+                        .setParameter("pollId", poll.getId()).executeUpdate();
                 em.createNativeQuery("DELETE FROM FORUM_POLL_VOTES WHERE poll_id = :pollId").setParameter("pollId", poll.getId()).executeUpdate();
                 em.createQuery("DELETE FROM PollOptions o WHERE o.poll.id = :pollId").setParameter("pollId", poll.getId()).executeUpdate();
                 em.remove(poll);

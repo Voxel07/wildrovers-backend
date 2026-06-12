@@ -82,13 +82,15 @@ public class ForumCategoryResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public Response addCategory(@Valid ForumCategory forumCategory) {
         log.info("ForumResource/addCategory");
-        Long userId = userPrincipalResolver.resolveUserId();
+        model.User user = userPrincipalResolver.resolveUser();
 
-        if (userId == null || forumCategory == null) {
+        if (user == null || forumCategory == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
-        } else {
-            return forumCategoryOrm.addCategory(forumCategory, userId);
         }
+        if (Roles.VSISITOR.equals(user.getRole()) && !user.getCanCreateCategory()) {
+            return Response.status(403).entity("Du hast keine Berechtigung, Kategorien zu verwalten.").build();
+        }
+        return forumCategoryOrm.addCategory(forumCategory, user.getId());
     }
 
     @POST
@@ -97,14 +99,16 @@ public class ForumCategoryResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public Response updateCategory(ForumCategory forumCategory) {
         log.info("ForumResource/updateCategory");
-        Long userId = userPrincipalResolver.resolveUserId();
+        model.User user = userPrincipalResolver.resolveUser();
 
-        if (userId == null || forumCategory == null) {
+        if (user == null || forumCategory == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
-        } else {
-            String result = forumCategoryOrm.updateCategory(forumCategory, userId);
-            return Response.ok(result).build();
         }
+        if (Roles.VSISITOR.equals(user.getRole()) && !user.getCanCreateCategory()) {
+            return Response.status(403).entity("Du hast keine Berechtigung, Kategorien zu verwalten.").build();
+        }
+        String result = forumCategoryOrm.updateCategory(forumCategory, user.getId());
+        return Response.ok(result).build();
     }
 
     @DELETE
@@ -113,12 +117,14 @@ public class ForumCategoryResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public Response deleteCategory(ForumCategory forumCategory) {
         log.info("ForumResource/deleteCategory");
-        Long userId = userPrincipalResolver.resolveUserId();
+        model.User user = userPrincipalResolver.resolveUser();
 
-        if (userId == null || forumCategory == null) {
+        if (user == null || forumCategory == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
-        } else {
-            return forumCategoryOrm.deleteCategory(forumCategory, userId);
         }
+        if (Roles.VSISITOR.equals(user.getRole()) && !user.getCanCreateCategory()) {
+            return Response.status(403).entity("Du hast keine Berechtigung, Kategorien zu verwalten.").build();
+        }
+        return forumCategoryOrm.deleteCategory(forumCategory, user.getId());
     }
 }

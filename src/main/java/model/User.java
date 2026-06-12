@@ -118,6 +118,9 @@ public class User {
     @Column(name = "yearlyFeePaid", columnDefinition = "boolean default false")
     private Boolean yearlyFeePaid = false;
 
+    @Column(name = "canCreateCategory", columnDefinition = "boolean default false")
+    private Boolean canCreateCategory = false;
+
     @jakarta.persistence.Transient
     private Long eventsAttended = 0L;
 
@@ -135,22 +138,22 @@ public class User {
     @OneToMany(mappedBy = "user", cascade = { CascadeType.ALL }, fetch = FetchType.LAZY)
     private List<Phone> phones = new ArrayList<>();
 
-    @OneToMany(mappedBy = "creator", cascade = { CascadeType.ALL }, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "creator", cascade = { CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REFRESH, CascadeType.DETACH }, fetch = FetchType.LAZY)
     private List<ForumCategory> categories = new ArrayList<>();
 
-    @OneToMany(mappedBy = "creator", cascade = { CascadeType.ALL }, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "creator", cascade = { CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REFRESH, CascadeType.DETACH }, fetch = FetchType.LAZY)
     private List<ForumTopic> topics = new ArrayList<>();
 
-    @OneToMany(mappedBy = "creator", cascade = { CascadeType.ALL }, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "creator", cascade = { CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REFRESH, CascadeType.DETACH }, fetch = FetchType.LAZY)
     private List<ForumPost> posts = new ArrayList<>();
 
-    @OneToMany(mappedBy = "editor", cascade = { CascadeType.ALL }, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "editor", cascade = { CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REFRESH, CascadeType.DETACH }, fetch = FetchType.LAZY)
     private List<ForumPost> editedPosts = new ArrayList<>();
 
-    @OneToMany(mappedBy = "creator", cascade = { CascadeType.ALL }, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "creator", cascade = { CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REFRESH, CascadeType.DETACH }, fetch = FetchType.LAZY)
     private List<ForumAnswer> answers = new ArrayList<>();
 
-    @OneToMany(mappedBy = "editor", cascade = { CascadeType.ALL }, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "editor", cascade = { CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REFRESH, CascadeType.DETACH }, fetch = FetchType.LAZY)
     private List<ForumPost> editedAnswers = new ArrayList<>();
 
     public User() {
@@ -401,6 +404,14 @@ public class User {
 
     public void setYearlyFeePaid(Boolean yearlyFeePaid) {
         this.yearlyFeePaid = yearlyFeePaid;
+    }
+
+    public Boolean getCanCreateCategory() {
+        return canCreateCategory != null ? canCreateCategory : false;
+    }
+
+    public void setCanCreateCategory(Boolean canCreateCategory) {
+        this.canCreateCategory = canCreateCategory;
     }
 
     public Long getEventsAttended() {
