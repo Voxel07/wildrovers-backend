@@ -76,6 +76,9 @@ public class UserResouce {
         if (user == null) {
             return Response.status(401).entity("Benutzer nicht eingeloggt oder unbekannt").build();
         }
+        if (!user.isActive()) {
+            return Response.status(403).entity("Dein Account wurde deaktiviert.").build();
+        }
         user.setEventsAttended(userOrm.getEventsAttendedCount(user.getId()));
         return Response.ok(user).build();
     }

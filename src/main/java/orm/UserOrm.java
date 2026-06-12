@@ -340,6 +340,10 @@ public class UserOrm {
         if (!user.getSecret().getIsVerifyed().booleanValue())
             return Response.status(401).entity("Bitte verifiziere dein Konto").build();
 
+        if (!user.isActive()) {
+            return Response.status(403).entity("Dein Account wurde deaktiviert.").build();
+        }
+
         // Verify Password
         try {
             String storedPasswordHash = user.getSecret() != null ? user.getSecret().getPassword() : null;

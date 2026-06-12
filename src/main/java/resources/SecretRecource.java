@@ -35,6 +35,7 @@ public class SecretRecource {
     @Inject JWTParser parser;
     @Inject orm.UserOrm userOrm;
     @Inject jakarta.persistence.EntityManager em;
+    @Inject tools.Email email;
 
     public static class VerificationRequest {
         public String email;
@@ -81,5 +82,91 @@ public class SecretRecource {
             return "{\"status\":\"Error: " + e.getMessage() + "\"}";
         }
         return "{\"status\":\"User not found\"}";
+    }
+
+    public static class ResetRequest {
+        public String email;
+    }
+
+    public static class ResetPasswordRequest {
+        public String token;
+        public String password;
+    }
+
+    @POST
+    @Path("/reset-request")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    @jakarta.transaction.Transactional
+    public Response requestPasswordReset(ResetRequest request) {
+        log.info("SecretResource/requestPasswordReset for email: " + (request != null ? request.email : "null"));
+
+        if (request == null || request.email == null || request.email.isBlank()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("{\"status\":\"error\", \"message\":\"E-Mail-Adresse muss ausgefüllt sein\"}")
+                    .build();
+        }
+
+        model.User user = userOrm.findByEmail(request.email.trim());
+        if (user != null && user.getSecret() != null) {
+            String token = java.util.UUID.randomUUID().toString();
+            user.getSecret().setResetToken(token);
+            user.getSecret().setResetTokenTimestamp(tools.Time.currentTimeInMillis());
+            em.merge(user.getSecret());
+            try {
+                email.sendPasswordResetMail(user.getEmail(), token);
+            } catch (Exception e) {
+                log.log(java.util.logging.Level.SEVERE, "Fehler beim Senden der Passwort-Reset-E-Mail: " + e.getMessage(), e);
+            }
+        }
+
+        // Always return success to prevent email guessing
+        return Response.ok("{\"status\":\"success\", \"message\":\"Falls diese E-Mail-Adresse registriert ist, wurde ein Link zum Zurücksetzen des Passworts gesendet.\"}")
+                .build();
+    }
+
+    @POST
+    @Path("/reset-password")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    @jakarta.transaction.Transactional
+    public Response resetPassword(ResetPasswordRequest request) {
+        log.info("SecretResource/resetPassword");
+
+        if (request == null || request.token == null || request.token.isBlank() || request.password == null || request.password.isBlank()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("{\"status\":\"error\", \"message\":\"Token und neues Passwort müssen ausgefüllt sein\"}")
+                    .build();
+        }
+
+        model.Users.Secret secret = secretOrm.findByResetToken(request.token.trim());
+        if (secret == null) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("{\"status\":\"error\", \"message\":\"Ungültiger oder abgelaufener Reset-Link.\"}")
+                    .build();
+        }
+
+        Long timestamp = secret.getResetTokenTimestamp();
+        if (timestamp != null) {
+            long elapsed = tools.Time.currentTimeInMillis() - timestamp;
+            if (elapsed > 15 * 60 * 1000) {
+                return Response.status(Response.Status.BAD_REQUEST)
+                        .entity("{\"status\":\"error\", \"message\":\"Dieser Reset-Link ist abgelaufen.\"}")
+                        .build();
+            }
+        } else {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("{\"status\":\"error\", \"message\":\"Ungültiger Reset-Link.\"}")
+                    .build();
+        }
+
+        String passwordHash = io.quarkus.elytron.security.common.BcryptUtil.bcryptHash(request.password);
+        secret.setPassword(passwordHash);
+        secret.setResetToken(null);
+        secret.setResetTokenTimestamp(null);
+        em.merge(secret);
+
+        return Response.ok("{\"status\":\"success\", \"message\":\"Passwort erfolgreich geändert.\"}")
+                .build();
     }
 }

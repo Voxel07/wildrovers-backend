@@ -70,6 +70,51 @@ public class Email {
         return Response.accepted().build();
     }
 
+    public Response sendPasswordResetMail(String email, String resetToken) {
+        String frontendUrl = baseUrl;
+        if (baseUrl.contains("localhost:8080")) {
+            frontendUrl = "http://localhost:5173";
+        }
+        String resetLink = frontendUrl + "/password-reset?token=" + resetToken;
+
+        String htmlBody = "<!DOCTYPE html>" +
+            "<html>" +
+            "<head>" +
+            "  <meta charset=\"utf-8\">" +
+            "  <style>" +
+            "    .wrapper { padding: 40px 20px; background-color: #0d1117; font-family: sans-serif; text-align: center; }" +
+            "    .card { max-width: 480px; margin: 0 auto; background-color: #1e1e1e; border: 1px solid #2a2a2a; border-radius: 12px; padding: 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); text-align: center; }" +
+            "    .header { font-size: 24px; font-weight: bold; color: #ff9800; margin-bottom: 20px; }" +
+            "    .text { font-size: 16px; color: #b0bec5; line-height: 1.5; margin-bottom: 30px; text-align: center; }" +
+            "    .btn-container { margin-bottom: 30px; text-align: center; }" +
+            "    .btn { display: inline-block; background-color: #ff9800; color: #1e1e1e; font-weight: bold; font-size: 16px; padding: 12px 24px; border-radius: 8px; text-decoration: none; }" +
+            "    .footer { font-size: 12px; color: #666; margin-top: 30px; line-height: 1.4; text-align: center; }" +
+            "  </style>" +
+            "</head>" +
+            "<body>" +
+            "  <div class=\"wrapper\">" +
+            "    <div class=\"card\">" +
+            "      <div class=\"header\">Wild Rovers</div>" +
+            "      <div class=\"text\">" +
+            "        Hallo!<br><br>" +
+            "        Du hast eine Anfrage zum Zurücksetzen deines Passworts gestellt. Klicke auf den folgenden Button, um dein Passwort zurückzusetzen:" +
+            "      </div>" +
+            "      <div class=\"btn-container\">" +
+            "        <a class=\"btn\" href=\"" + resetLink + "\">Passwort zurücksetzen</a>" +
+            "      </div>" +
+            "      <div class=\"footer\">" +
+            "        Wenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail einfach ignorieren. Dein Passwort bleibt unverändert.<br><br>" +
+            "        Wild Rovers Team" +
+            "      </div>" +
+            "    </div>" +
+            "  </div>" +
+            "</body>" +
+            "</html>";
+
+        mailer.send(Mail.withHtml(email, "Wild Rovers - Passwort zurücksetzen", htmlBody));
+        return Response.accepted().build();
+    }
+
     @GET
     @Path("/async")
     public CompletionStage<Response> sendASimpleEmailAsync() {

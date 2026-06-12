@@ -10,8 +10,6 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 
-
-
 import model.User;
 
 @Entity
@@ -25,8 +23,6 @@ public class Secret {
     @Column(name = "id", unique = true)
     private Long id;
 
-
-
     @Column(name = "password")
     private String password;
 
@@ -39,10 +35,15 @@ public class Secret {
     @Column(name = "verificationTimestamp")
     private Long verificationTimestamp;
 
+    @Column(name = "resetToken")
+    private String resetToken;
+
+    @Column(name = "resetTokenTimestamp")
+    private Long resetTokenTimestamp;
+
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "user_id", referencedColumnName = "id")
     private User user;
-
 
     public Secret(){
 
@@ -56,8 +57,6 @@ public class Secret {
         this.password = password;
     }
 
-    
-
     public Secret(Boolean isVerifyed, String verificationId) {
         this.isVerifyed = isVerifyed;
         this.verificationId = verificationId;
@@ -70,8 +69,6 @@ public class Secret {
     public void setId(Long id) {
         this.id = id;
     }
-
-
 
     public Boolean getIsVerifyed() {
         return isVerifyed;
@@ -103,5 +100,21 @@ public class Secret {
 
     public void setVerificationTimestamp(Long verificationTimestamp) {
         this.verificationTimestamp = verificationTimestamp;
+    }
+
+    public String getResetToken() {
+        return resetToken;
+    }
+
+    public void setResetToken(String resetToken) {
+        this.resetToken = resetToken;
+    }
+
+    public Long getResetTokenTimestamp() {
+        return resetTokenTimestamp;
+    }
+
+    public void setResetTokenTimestamp(Long resetTokenTimestamp) {
+        this.resetTokenTimestamp = resetTokenTimestamp;
     }
 }

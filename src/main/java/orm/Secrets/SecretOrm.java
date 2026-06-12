@@ -93,4 +93,15 @@ public class SecretOrm {
         }
         return "Erfolgreich validiert";
     }
+
+    public Secret findByResetToken(String token) {
+        try {
+            return em.createQuery("SELECT s FROM Secret s WHERE s.resetToken = :val", Secret.class)
+                    .setParameter("val", token)
+                    .getSingleResult();
+        } catch (Exception e) {
+            log.log(Level.WARNING, "Failed to find secret by resetToken: " + token, e);
+            return null;
+        }
+    }
 }
