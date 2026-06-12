@@ -140,4 +140,46 @@ public class ForumPollOrm {
         .setParameter("userId", userId)
         .getResultList();
     }
+
+    @Transactional
+    public Response deletePoll(Long pollId, Long userId) {
+        log.info("ForumPollOrm/deletePoll: " + pollId + " by user: " + userId);
+        Polls poll = em.find(Polls.class, pollId);
+        if (poll == null) {
+            return Response.status(Response.Status.NOT_FOUND).entity("Umfrage nicht gefunden").build();
+        }
+
+        User user = em.find(User.class, userId);
+        if (user == null) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("Benutzer nicht gefunden").build();
+        }
+
+        ForumPost post = poll.getPost();
+        if (post == null) {
+            return Response.status(Response.Status.NOT_FOUND).entity("Zugehöriger Post nicht gefunden").build();
+        }
+
+        // Only post creator or admin can delete
+        if (!post.getCreatorObj().getId().equals(userId) && !user.getRole().equals("Admin")) {
+            return Response.status(Response.Status.FORBIDDEN).entity("Nicht berechtigt").build();
+        }
+
+        // Delete poll option votes
+        em.createNativeQuery("DELETE FROM FORUM_POLL_OPTION_VOTES WHERE option_id IN (SELECT id FROM FORUM_POLL_OPTIONS WHERE poll_id = :pollId)")
+                .setParameter("pollId", pollId).executeUpdate();
+        // Delete poll votes
+        em.createNativeQuery("DELETE FROM FORUM_POLL_VOTES WHERE poll_id = :pollId")
+                .setParameter("pollId", pollId).executeUpdate();
+        // Delete poll options
+        em.createQuery("DELETE FROM PollOptions o WHERE o.poll.id = :pollId")
+                .setParameter("pollId", pollId).executeUpdate();
+        // Remove poll from post's collection to satisfy orphanRemoval / cascade
+        post.getPolls().remove(poll);
+        em.merge(post);
+        // Delete poll
+        em.remove(poll);
+        em.flush();
+
+        return Response.ok("Umfrage erfolgreich gelöscht").build();
+    }
 }

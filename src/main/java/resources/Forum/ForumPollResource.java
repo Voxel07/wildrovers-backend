@@ -68,4 +68,15 @@ public class ForumPollResource {
         }
         return forumPollOrm.getVotedOptionIds(pollId, userId);
     }
+
+    @DELETE
+    @Path("/delete")
+    @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
+    public Response deletePoll(@QueryParam("poll") Long pollId) {
+        Long userId = userPrincipalResolver.resolveUserId();
+        if (userId == null) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("Nicht angemeldet").build();
+        }
+        return forumPollOrm.deletePoll(pollId, userId);
+    }
 }

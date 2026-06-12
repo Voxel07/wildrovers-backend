@@ -457,10 +457,14 @@ public class User {
         this.mentees = mentees;
     }
 
+    @JsonIgnore
+    @JsonbTransient
     public String getMentorName() {
         return mentor != null ? mentor.getUserName() : null;
     }
 
+    @JsonIgnore
+    @JsonbTransient
     public List<String> getMentorOf() {
         List<String> list = new ArrayList<>();
         if (mentees != null) {
