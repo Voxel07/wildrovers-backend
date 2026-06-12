@@ -24,6 +24,8 @@ import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
 import model.User;
 import orm.UserOrm;
+import orm.Forum.ForumPostOrm;
+import tools.SignupSettings;
 import jakarta.ws.rs.QueryParam;
 
 //Sicherheits Zeug
@@ -48,6 +50,12 @@ public class UserResouce {
 
     @Inject
     UserOrm userOrm;
+
+    @Inject
+    ForumPostOrm forumPostOrm;
+
+    @Inject
+    SignupSettings signupSettings;
 
     @Inject
     helper.UserPrincipalResolver userPrincipalResolver;
@@ -136,7 +144,64 @@ public class UserResouce {
     @Consumes(MediaType.APPLICATION_JSON)
     public Response addUser(@Valid User usr) {
         log.info("UserResource/addUser");
+        if (!signupSettings.isSignupEnabled()) {
+            return Response.status(Response.Status.FORBIDDEN)
+                    .entity("Die Registrierung ist derzeit deaktiviert.")
+                    .build();
+        }
         return userOrm.addUser(usr);
+    }
+
+    /**
+     * Admin-only: delete all forum posts created by a specific user.
+     * This is a separate step from deleting the user account itself,
+     * so admins can clean up spam posts before or during account removal.
+     */
+    @DELETE
+    @Path("/{userId}/posts")
+    @RolesAllowed({ "Admin", "Vorstand" })
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response deleteAllUserPosts(@jakarta.ws.rs.PathParam("userId") Long userId) {
+        log.info("UserResource/deleteAllUserPosts: " + userId);
+        try {
+            String result = forumPostOrm.deleteAllPostsFromUser(userId);
+            return Response.ok(result).build();
+        } catch (Exception e) {
+            log.log(java.util.logging.Level.SEVERE, "Error deleting posts for user " + userId, e);
+            return Response.status(500).entity("Fehler beim Löschen der Forumsbeiträge: " + e.getMessage()).build();
+        }
+    }
+
+    /**
+     * Public endpoint: returns whether new user registrations are currently allowed.
+     */
+    @GET
+    @Path("/signup-status")
+    @PermitAll
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getSignupStatus() {
+        log.info("UserResource/getSignupStatus");
+        jakarta.json.JsonObject result = jakarta.json.Json.createObjectBuilder()
+                .add("signupEnabled", signupSettings.isSignupEnabled())
+                .build();
+        return Response.ok(result).build();
+    }
+
+    /**
+     * Admin-only: enable or disable new user registrations at runtime.
+     */
+    @POST
+    @Path("/signup-enabled")
+    @RolesAllowed({ "Admin", "Vorstand" })
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response setSignupEnabled(@QueryParam("enabled") boolean enabled) {
+        log.info("UserResource/setSignupEnabled: " + enabled);
+        signupSettings.setSignupEnabled(enabled);
+        jakarta.json.JsonObject result = jakarta.json.Json.createObjectBuilder()
+                .add("signupEnabled", signupSettings.isSignupEnabled())
+                .build();
+        return Response.ok(result).build();
     }
 
     @DELETE
