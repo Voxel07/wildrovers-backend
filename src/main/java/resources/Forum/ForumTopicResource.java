@@ -99,7 +99,7 @@ public class ForumTopicResource {
         if (user == null || forumTopic == null || forumTopic.getTopic() == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
         }
-        if (Roles.VSISITOR.equals(user.getRole())) {
+        if (Roles.VSISITOR.equals(user.getRole()) && !user.getCanCreateCategory()) {
             return Response.status(403).entity("Besucher dürfen keine Themen erstellen/verwalten.").build();
         }
         return forumTopicOrm.addTopic(forumTopic, categoryId, user.getId());
@@ -116,7 +116,7 @@ public class ForumTopicResource {
         if (user == null || ft == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
         }
-        if (Roles.VSISITOR.equals(user.getRole())) {
+        if (Roles.VSISITOR.equals(user.getRole()) && !user.getCanCreateCategory()) {
             return Response.status(403).entity("Besucher dürfen keine Themen erstellen/verwalten.").build();
         }
         String result = forumTopicOrm.updateTopic(ft, user.getId());
@@ -134,7 +134,7 @@ public class ForumTopicResource {
         if (user == null || ft == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
         }
-        if (Roles.VSISITOR.equals(user.getRole())) {
+        if (Roles.VSISITOR.equals(user.getRole()) && !user.getCanCreateCategory()) {
             return Response.status(403).entity("Besucher dürfen keine Themen erstellen/verwalten.").build();
         }
         String result = forumTopicOrm.deleteTopic(ft, user.getId());

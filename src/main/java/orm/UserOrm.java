@@ -283,6 +283,9 @@ public class UserOrm {
             dbUser.setRole(u.getRole());
         }
         dbUser.setActive(u.isActive());
+        if (u.getIsBlocked() != null) {
+            dbUser.setIsBlocked(u.getIsBlocked());
+        }
         if (u.getYearlyFeePaid() != null) {
             dbUser.setYearlyFeePaid(u.getYearlyFeePaid());
         }
@@ -343,8 +346,8 @@ public class UserOrm {
         if (!user.getSecret().getIsVerifyed().booleanValue())
             return Response.status(401).entity("Bitte verifiziere dein Konto").build();
 
-        if (!user.isActive()) {
-            return Response.status(403).entity("Dein Account wurde deaktiviert.").build();
+        if (user.getIsBlocked()) {
+            return Response.status(403).entity("Dein Account wurde gesperrt.").build();
         }
 
         // Verify Password

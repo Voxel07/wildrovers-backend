@@ -121,6 +121,9 @@ public class User {
     @Column(name = "canCreateCategory", columnDefinition = "boolean default false")
     private Boolean canCreateCategory = false;
 
+    @Column(name = "isBlocked", columnDefinition = "boolean default false")
+    private Boolean isBlocked = false;
+
     @jakarta.persistence.Transient
     private Long eventsAttended = 0L;
 
@@ -412,6 +415,14 @@ public class User {
 
     public void setCanCreateCategory(Boolean canCreateCategory) {
         this.canCreateCategory = canCreateCategory;
+    }
+
+    public Boolean getIsBlocked() {
+        return isBlocked != null ? isBlocked : false;
+    }
+
+    public void setIsBlocked(Boolean isBlocked) {
+        this.isBlocked = isBlocked;
     }
 
     public Long getEventsAttended() {

@@ -75,6 +75,15 @@ public class UserPrincipalResolver {
             }
         }
 
+        if (user != null && user.getIsBlocked()) {
+            log.warning("User " + user.getUserName() + " is blocked. Denying access.");
+            throw new jakarta.ws.rs.WebApplicationException(
+                jakarta.ws.rs.core.Response.status(jakarta.ws.rs.core.Response.Status.FORBIDDEN)
+                        .entity("Dein Account wurde gesperrt.")
+                        .build()
+            );
+        }
+
         return user;
     }
 
