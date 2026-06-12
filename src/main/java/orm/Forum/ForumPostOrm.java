@@ -370,31 +370,65 @@ public class ForumPostOrm {
             return "Nur der Ersteller oder Mods dürfen das";
 
         try {
-            // Delete answers first
-            forumAnswerOrm.deleteAllAnswersFromTopic(postId);
-
-            // Delete votes and views
-            em.createQuery("DELETE FROM ForumPostVote v WHERE v.post.id = :postId").setParameter("postId", postId).executeUpdate();
-            em.createQuery("DELETE FROM ForumPostView v WHERE v.post.id = :postId").setParameter("postId", postId).executeUpdate();
-
-            // Delete poll option votes and native poll tables
-            if (forumPostAusDB.getPoll() != null) {
-                model.Forum.Polls.Polls poll = forumPostAusDB.getPoll();
-                em.createNativeQuery("DELETE FROM FORUM_POLL_OPTION_VOTES WHERE option_id IN (SELECT id FROM FORUM_POLL_OPTIONS WHERE poll_id = :pollId)")
-                        .setParameter("pollId", poll.getId()).executeUpdate();
-                em.createNativeQuery("DELETE FROM FORUM_POLL_VOTES WHERE poll_id = :pollId").setParameter("pollId", poll.getId()).executeUpdate();
-                em.createQuery("DELETE FROM PollOptions o WHERE o.poll.id = :pollId").setParameter("pollId", poll.getId()).executeUpdate();
-                em.remove(poll);
-                forumPostAusDB.setPoll(null);
+            // 1. Update stats (decrement post count on creator/topic)
+            if (creator != null && creator.getActivityForum() != null) {
+                creator.getActivityForum().decPostCount();
+                em.merge(creator);
             }
-
-            // Decrement counts
-            creator.getActivityForum().decPostCount();
             if (forumPostAusDB.getTopic() != null) {
                 forumPostAusDB.getTopic().decPostCount();
+                em.merge(forumPostAusDB.getTopic());
             }
 
-            em.remove(forumPostAusDB);
+            // Decrement answer counts of all users who answered the post
+            forumAnswerOrm.deleteAllAnswersFromTopic(postId);
+
+            // Flush stats updates to the DB before clearing the session!
+            em.flush();
+
+            // 2. Run manual native SQL delete queries to delete all linked resources
+            // A. Delete answer pictures
+            em.createNativeQuery("DELETE FROM FORUM_PICTURE WHERE answer_id IN (SELECT id FROM FORUM_ANSWERS WHERE post_id = :postId)")
+                    .setParameter("postId", postId).executeUpdate();
+
+            // B. Delete post pictures
+            em.createNativeQuery("DELETE FROM FORUM_PICTURE WHERE post_id = :postId")
+                    .setParameter("postId", postId).executeUpdate();
+
+            // C. Delete answers
+            em.createNativeQuery("DELETE FROM FORUM_ANSWERS WHERE post_id = :postId")
+                    .setParameter("postId", postId).executeUpdate();
+
+            // D. Delete poll option votes
+            em.createNativeQuery("DELETE FROM FORUM_POLL_OPTION_VOTES WHERE option_id IN (SELECT id FROM FORUM_POLL_OPTIONS WHERE poll_id IN (SELECT id FROM FORUM_POLLS WHERE post_id = :postId))")
+                    .setParameter("postId", postId).executeUpdate();
+
+            // E. Delete poll votes
+            em.createNativeQuery("DELETE FROM FORUM_POLL_VOTES WHERE poll_id IN (SELECT id FROM FORUM_POLLS WHERE post_id = :postId)")
+                    .setParameter("postId", postId).executeUpdate();
+
+            // F. Delete poll options
+            em.createNativeQuery("DELETE FROM FORUM_POLL_OPTIONS WHERE poll_id IN (SELECT id FROM FORUM_POLLS WHERE post_id = :postId)")
+                    .setParameter("postId", postId).executeUpdate();
+
+            // G. Delete polls
+            em.createNativeQuery("DELETE FROM FORUM_POLLS WHERE post_id = :postId")
+                    .setParameter("postId", postId).executeUpdate();
+
+            // H. Delete post votes
+            em.createNativeQuery("DELETE FROM FORUM_POST_VOTES WHERE post_id = :postId")
+                    .setParameter("postId", postId).executeUpdate();
+
+            // I. Delete post views
+            em.createNativeQuery("DELETE FROM FORUM_POST_VIEWS WHERE post_id = :postId")
+                    .setParameter("postId", postId).executeUpdate();
+
+            // J. Delete the post itself
+            em.createNativeQuery("DELETE FROM FORUM_POSTS WHERE id = :postId")
+                    .setParameter("postId", postId).executeUpdate();
+
+            // 3. Clear the persistence context so Hibernate forgets about the deleted objects in memory
+            em.clear();
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return "Fehler beim Löschen des Posts";

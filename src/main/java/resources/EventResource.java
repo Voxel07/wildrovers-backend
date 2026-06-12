@@ -19,6 +19,7 @@ import jakarta.validation.Valid;
 import model.Event;
 import model.User;
 import orm.EventOrm;
+import orm.UserOrm;
 import tools.HtmlSanitizer;
 import tools.GoogleCalendarService;
 import model.Forum.ForumPost;
@@ -27,6 +28,7 @@ import model.EventAttendance;
 import jakarta.persistence.EntityManager;
 import java.time.format.DateTimeFormatter;
 import java.util.logging.Level;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.List;
 import java.util.logging.Logger;
@@ -39,6 +41,9 @@ public class EventResource {
 
     @Inject
     EventOrm eventOrm;
+
+    @Inject
+    UserOrm userOrm;
 
     @Inject
     helper.UserPrincipalResolver userPrincipalResolver;
@@ -55,12 +60,17 @@ public class EventResource {
     @Inject
     EntityManager em;
 
+    @Inject
+    @ConfigProperty(name = "app.frontend-url", defaultValue = "http://localhost:5173")
+    String frontendUrl;
+
     @GET
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     public Response getAllEvents() {
         log.info("EventResource/getAllEvents");
         List<Event> list = eventOrm.getAllEvents();
+        populateNonRespondents(list);
         return Response.ok(list).build();
     }
 
@@ -71,6 +81,7 @@ public class EventResource {
     public Response getUpcomingEvents() {
         log.info("EventResource/getUpcomingEvents");
         List<Event> list = eventOrm.getUpcomingEvents(3);
+        populateNonRespondents(list);
         return Response.ok(list).build();
     }
 
@@ -101,7 +112,7 @@ public class EventResource {
         try {
             ForumPost post = new ForumPost();
             post.setTitle("Event: " + event.getTitle());
-            String postContent = "<p><strong>Termin:</strong> " + formatEventDateForPost(event.getEventDate()) + "</p>"
+            String postContent = "<p><strong>Termin:</strong> " + formatEventDateForPost(event.getEventDate(), event.getEventEndDate()) + "</p>"
                     + "<p><strong>Ort:</strong> " + event.getLocation() + "</p>"
                     + "<hr/>"
                     + "<p>" + (event.getDescription() != null ? event.getDescription() : "") + "</p>";
@@ -109,7 +120,7 @@ public class EventResource {
             Response postResponse = forumPostOrm.addPost(post, 1L, user.getId());
             if (postResponse.getStatus() == 201) {
                 postId = (Long) postResponse.getEntity();
-                String forumUrl = "http://localhost:5173/Forum/Post/" + postId;
+                String forumUrl = frontendUrl + "/Forum/Post/" + postId;
                 event.setForumPostUrl(forumUrl);
             }
         } catch (Exception e) {
@@ -125,6 +136,7 @@ public class EventResource {
         // 2. Save in Database
         try {
             Event created = eventOrm.addEvent(event, user.getId());
+            populateNonRespondents(java.util.Collections.singletonList(created));
             return Response.status(201).entity(created).build();
         } catch (Exception e) {
             // Rollback calendar entry if DB save fails
@@ -135,10 +147,18 @@ public class EventResource {
         }
     }
 
-    private String formatEventDateForPost(java.time.LocalDateTime dateTime) {
+    private String formatEventDateForPost(java.time.LocalDateTime dateTime, java.time.LocalDateTime endDateTime) {
         if (dateTime == null)
             return "";
-        return dateTime.format(DateTimeFormatter.ofPattern("dd.MM.yyyy 'um' HH:mm 'Uhr'"));
+        String startStr = dateTime.format(DateTimeFormatter.ofPattern("dd.MM.yyyy 'um' HH:mm 'Uhr'"));
+        if (endDateTime != null) {
+            if (dateTime.toLocalDate().equals(endDateTime.toLocalDate())) {
+                return startStr + " bis " + endDateTime.format(DateTimeFormatter.ofPattern("HH:mm 'Uhr'"));
+            } else {
+                return startStr + " bis " + endDateTime.format(DateTimeFormatter.ofPattern("dd.MM.yyyy 'um' HH:mm 'Uhr'"));
+            }
+        }
+        return startStr;
     }
 
     @PUT
@@ -167,6 +187,7 @@ public class EventResource {
         existing.setTitle(htmlSanitizer.sanitizeTitle(event.getTitle()));
         existing.setLocation(htmlSanitizer.sanitizeTitle(event.getLocation()));
         existing.setEventDate(event.getEventDate());
+        existing.setEventEndDate(event.getEventEndDate());
         if (event.getDescription() != null) {
             existing.setDescription(htmlSanitizer.sanitize(event.getDescription()));
         } else {
@@ -182,6 +203,7 @@ public class EventResource {
         // 2. Update Database
         try {
             Event updated = eventOrm.updateEvent(existing);
+            populateNonRespondents(java.util.Collections.singletonList(updated));
             return Response.ok(updated).build();
         } catch (Exception e) {
             return Response.status(500).entity("Fehler beim Aktualisieren des Events").build();
@@ -266,6 +288,60 @@ public class EventResource {
             em.merge(attendance);
         }
 
-        return Response.ok(eventOrm.getEventById(eventId)).build();
+        Event updatedEvent = eventOrm.getEventById(eventId);
+        populateNonRespondents(java.util.Collections.singletonList(updatedEvent));
+        return Response.ok(updatedEvent).build();
+    }
+
+    @GET
+    @Path("/by-post/{postId}")
+    @PermitAll
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getEventByPost(@PathParam("postId") Long postId) {
+        log.info("EventResource/getEventByPost: " + postId);
+        Event event = eventOrm.getEventByForumPostId(postId);
+        if (event == null) {
+            return Response.status(404).entity("Kein zugehöriges Event gefunden").build();
+        }
+        populateNonRespondents(java.util.Collections.singletonList(event));
+        return Response.ok(event).build();
+    }
+
+    private void populateNonRespondents(List<Event> events) {
+        if (events == null || events.isEmpty()) {
+            return;
+        }
+        User currentUser = userPrincipalResolver.resolveUser();
+        boolean isTeam = currentUser != null && model.Users.Roles.hasRequiredRole(currentUser.getRole(), model.Users.Roles.FRESHMAN);
+
+        List<User> team = null;
+        if (isTeam) {
+            team = userOrm.getTeamMembers();
+        }
+
+        for (Event e : events) {
+            java.util.Set<String> respondedUsernames = new java.util.HashSet<>();
+            if (e.getAttendances() != null) {
+                for (EventAttendance att : e.getAttendances()) {
+                    // Force loading the lazy User entity to prevent LazyInitializationException during serialization
+                    String uName = att.getUserName();
+                    att.getUserId();
+                    if (uName != null && !uName.equals("Anonym")) {
+                        respondedUsernames.add(uName);
+                    }
+                }
+            }
+            if (isTeam && team != null) {
+                List<String> nonResps = new java.util.ArrayList<>();
+                for (User u : team) {
+                    if (!respondedUsernames.contains(u.getUserName())) {
+                        nonResps.add(u.getUserName());
+                    }
+                }
+                e.setNonRespondents(nonResps);
+            } else {
+                e.setNonRespondents(new java.util.ArrayList<>());
+            }
+        }
     }
 }

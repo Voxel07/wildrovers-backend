@@ -40,6 +40,9 @@ public class Event {
     @Column(name = "event_date")
     private LocalDateTime eventDate;
 
+    @Column(name = "event_end_date")
+    private LocalDateTime eventEndDate;
+
     @NotBlank(message = "Veranstaltungsort darf nicht leer sein.")
     @Column(name = "location")
     private String location;
@@ -58,6 +61,9 @@ public class Event {
 
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     private List<EventAttendance> attendances = new ArrayList<>();
+
+    @jakarta.persistence.Transient
+    private List<String> nonRespondents = new java.util.ArrayList<>();
 
     public Event() {
     }
@@ -92,6 +98,14 @@ public class Event {
 
     public void setEventDate(LocalDateTime eventDate) {
         this.eventDate = eventDate;
+    }
+
+    public LocalDateTime getEventEndDate() {
+        return eventEndDate;
+    }
+
+    public void setEventEndDate(LocalDateTime eventEndDate) {
+        this.eventEndDate = eventEndDate;
     }
 
     public String getLocation() {
@@ -141,5 +155,13 @@ public class Event {
 
     public void setAttendances(List<EventAttendance> attendances) {
         this.attendances = attendances;
+    }
+
+    public List<String> getNonRespondents() {
+        return nonRespondents;
+    }
+
+    public void setNonRespondents(List<String> nonRespondents) {
+        this.nonRespondents = nonRespondents;
     }
 }

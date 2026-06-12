@@ -71,4 +71,13 @@ public class EventOrm {
             em.remove(event);
         }
     }
+
+    public Event getEventByForumPostId(Long postId) {
+        log.info("EventOrm/getEventByForumPostId: " + postId);
+        TypedQuery<Event> query = em.createQuery(
+                "SELECT e FROM Event e LEFT JOIN FETCH e.creator WHERE e.forumPostUrl LIKE :pattern", Event.class);
+        query.setParameter("pattern", "%/Forum/Post/" + postId);
+        List<Event> results = query.getResultList();
+        return results.isEmpty() ? null : results.get(0);
+    }
 }

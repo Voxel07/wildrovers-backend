@@ -148,9 +148,9 @@ public class GoogleCalendarService {
                     .put("dateTime", formatIso(event.getEventDate()))
                     .put("timeZone", ZoneId.systemDefault().getId());
 
-            // Default event duration: 2 hours
+            LocalDateTime endDateTime = event.getEventEndDate() != null ? event.getEventEndDate() : event.getEventDate().plusHours(2);
             JSONObject end = new JSONObject()
-                    .put("dateTime", formatIso(event.getEventDate().plusHours(2)))
+                    .put("dateTime", formatIso(endDateTime))
                     .put("timeZone", ZoneId.systemDefault().getId());
 
             String desc = event.getDescription() != null ? event.getDescription() : "";

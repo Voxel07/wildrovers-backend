@@ -187,7 +187,7 @@ public class Functiontest {
                 map.put("answerCount", p.getAnswerCount());
                 map.put("answersSize", p.getAnswers() != null ? p.getAnswers().size() : 0);
                 map.put("picturesSize", p.getPictures() != null ? p.getPictures().size() : 0);
-                map.put("pollNull", p.getPoll() == null);
+                map.put("pollNull", p.getPolls() == null || p.getPolls().isEmpty());
                 return Response.ok(map).build();
             } catch (Exception e) {
                 log.log(java.util.logging.Level.SEVERE, "postDetail failed", e);

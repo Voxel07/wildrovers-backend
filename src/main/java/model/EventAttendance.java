@@ -82,10 +82,42 @@ public class EventAttendance {
 
     // JSON Helper fields
     public String getUserName() {
-        return user != null ? user.getUserName() : null;
+        if (user == null) {
+            return null;
+        }
+        try {
+            if (io.quarkus.arc.Arc.container().requestContext().isActive()) {
+                helper.UserPrincipalResolver resolver = io.quarkus.arc.Arc.container().instance(helper.UserPrincipalResolver.class).get();
+                if (resolver != null) {
+                    model.User currentUser = resolver.resolveUser();
+                    if (currentUser == null || !model.Users.Roles.hasRequiredRole(currentUser.getRole(), model.Users.Roles.FRESHMAN)) {
+                        return "Anonym";
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // fallback
+        }
+        return user.getUserName();
     }
 
     public Long getUserId() {
-        return user != null ? user.getId() : null;
+        if (user == null) {
+            return null;
+        }
+        try {
+            if (io.quarkus.arc.Arc.container().requestContext().isActive()) {
+                helper.UserPrincipalResolver resolver = io.quarkus.arc.Arc.container().instance(helper.UserPrincipalResolver.class).get();
+                if (resolver != null) {
+                    model.User currentUser = resolver.resolveUser();
+                    if (currentUser == null || !model.Users.Roles.hasRequiredRole(currentUser.getRole(), model.Users.Roles.FRESHMAN)) {
+                        return null;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // fallback
+        }
+        return user.getId();
     }
 }

@@ -6,6 +6,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Column;
 import jakarta.persistence.OneToOne;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.CascadeType;
@@ -31,7 +32,7 @@ public class Polls {
     @Column(name = "question")
     private String question;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "post_id")
     @JsonbTransient
     private ForumPost post;

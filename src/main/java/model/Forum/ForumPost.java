@@ -80,8 +80,8 @@ public class ForumPost {
     @OneToMany(mappedBy ="post", cascade = {CascadeType.ALL}, fetch = FetchType.LAZY)
     private List<ForumPicture> pictures = new ArrayList<>();
 
-    @OneToOne(mappedBy = "post", cascade = {CascadeType.ALL}, fetch = FetchType.EAGER)
-    private model.Forum.Polls.Polls poll;
+    @OneToMany(mappedBy = "post", cascade = {CascadeType.ALL}, fetch = FetchType.EAGER, orphanRemoval = true)
+    private List<model.Forum.Polls.Polls> polls = new ArrayList<>();
 
     @jakarta.persistence.Transient
     private boolean viewed;
@@ -263,11 +263,11 @@ public class ForumPost {
         this.views = views;
     }
 
-    public model.Forum.Polls.Polls getPoll() {
-        return poll;
+    public List<model.Forum.Polls.Polls> getPolls() {
+        return polls;
     }
 
-    public void setPoll(model.Forum.Polls.Polls poll) {
-        this.poll = poll;
+    public void setPolls(List<model.Forum.Polls.Polls> polls) {
+        this.polls = polls;
     }
 }

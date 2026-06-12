@@ -36,4 +36,29 @@ public class GalleryOrm {
         em.persist(gallery);
         return gallery;
     }
+
+    public Gallery getGalleryById(Long id) {
+        log.info("GalleryOrm/getGalleryById: " + id);
+        TypedQuery<Gallery> query = em.createQuery("SELECT g FROM Gallery g LEFT JOIN FETCH g.creator WHERE g.id = :id", Gallery.class);
+        query.setParameter("id", id);
+        List<Gallery> results = query.getResultList();
+        return results.isEmpty() ? null : results.get(0);
+    }
+
+    @Transactional
+    public Gallery updateGallery(Gallery gallery) {
+        log.info("GalleryOrm/updateGallery: " + gallery.getId());
+        Gallery merged = em.merge(gallery);
+        em.flush();
+        return getGalleryById(merged.getId());
+    }
+
+    @Transactional
+    public void deleteGallery(Long id) {
+        log.info("GalleryOrm/deleteGallery: " + id);
+        Gallery g = em.find(Gallery.class, id);
+        if (g != null) {
+            em.remove(g);
+        }
+    }
 }

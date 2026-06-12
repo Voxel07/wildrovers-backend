@@ -42,11 +42,6 @@ public class ForumPollOrm {
             return Response.status(Response.Status.FORBIDDEN).entity("Nicht berechtigt").build();
         }
 
-        // Check if a poll already exists for this post
-        if (post.getPoll() != null) {
-            return Response.status(Response.Status.BAD_REQUEST).entity("Dieser Post hat bereits eine Umfrage").build();
-        }
-
         poll.setPost(post);
         for (PollOptions option : poll.getOptions()) {
             option.setPoll(poll);
@@ -54,7 +49,7 @@ public class ForumPollOrm {
         }
 
         em.persist(poll);
-        post.setPoll(poll);
+        post.getPolls().add(poll);
         em.merge(post);
 
         return Response.status(Response.Status.CREATED).entity(poll).build();
