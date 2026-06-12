@@ -89,6 +89,7 @@ public class EventResource {
     @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
+    @jakarta.transaction.Transactional
     public Response addEvent(@Valid Event event) {
         log.info("EventResource/addEvent");
         User user = userPrincipalResolver.resolveUser();
@@ -139,6 +140,7 @@ public class EventResource {
             populateNonRespondents(java.util.Collections.singletonList(created));
             return Response.status(201).entity(created).build();
         } catch (Exception e) {
+            log.log(java.util.logging.Level.SEVERE, "EventResource/createEvent failed", e);
             // Rollback calendar entry if DB save fails
             if (googleEventId != null) {
                 googleCalendarService.deleteEvent(googleEventId);
@@ -165,6 +167,7 @@ public class EventResource {
     @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
+    @jakarta.transaction.Transactional
     public Response updateEvent(@Valid Event event) {
         log.info("EventResource/updateEvent: " + event.getId());
         User user = userPrincipalResolver.resolveUser();
@@ -206,6 +209,7 @@ public class EventResource {
             populateNonRespondents(java.util.Collections.singletonList(updated));
             return Response.ok(updated).build();
         } catch (Exception e) {
+            log.log(java.util.logging.Level.SEVERE, "EventResource/updateEvent failed for event " + event.getId(), e);
             return Response.status(500).entity("Fehler beim Aktualisieren des Events").build();
         }
     }
@@ -242,6 +246,7 @@ public class EventResource {
             eventOrm.deleteEvent(id);
             return Response.ok().entity("Event gelöscht").build();
         } catch (Exception e) {
+            log.log(java.util.logging.Level.SEVERE, "EventResource/deleteEvent failed for id " + id, e);
             return Response.status(500).entity("Fehler beim Löschen des Events").build();
         }
     }
