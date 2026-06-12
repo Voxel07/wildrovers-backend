@@ -12,6 +12,7 @@ import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.CookieParam;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 
 import jakarta.ws.rs.Produces;
@@ -35,18 +36,32 @@ public class SecretRecource {
     @Inject orm.UserOrm userOrm;
     @Inject jakarta.persistence.EntityManager em;
 
-    @GET
+    public static class VerificationRequest {
+        public String email;
+        public String code;
+    }
+
+    @POST
     @Path("/verify")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String verifyUser(@QueryParam("userId") Long userId, @QueryParam("verificationId") String verificationId){
-        log.info("SecretResource/verifyUser");
+    public Response verifyUser(VerificationRequest request){
+        log.info("SecretResource/verifyUser for email: " + (request != null ? request.email : "null"));
 
-        /**
-         * Prevent verification spam here.
-         * Maybe set a timeout if it failes
-         */
-        return secretOrm.verifyUser(userId, verificationId);
+        if (request == null || request.email == null || request.code == null) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("{\"status\":\"error\", \"message\":\"E-Mail und Code müssen ausgefüllt sein\"}")
+                    .build();
+        }
+
+        String result = secretOrm.verifyUser(request.email, request.code);
+        if ("Erfolgreich validiert".equals(result)) {
+            return Response.ok("{\"status\":\"success\", \"message\":\"Erfolgreich validiert\"}").build();
+        } else {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("{\"status\":\"error\", \"message\":\"" + result + "\"}")
+                    .build();
+        }
     }
 
     @GET

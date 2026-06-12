@@ -193,7 +193,16 @@ public class UserOrm {
         /**
          * Send Email so that the user can verify his acc
          */
-        email.sendVerificationMail(usr.getEmail(), userId, verificationId);
+        try {
+            email.sendVerificationMail(usr.getEmail(), verificationId);
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Fehler beim Senden der Verifizierungs-E-Mail: " + e.getMessage(), e);
+            throw new jakarta.ws.rs.WebApplicationException(
+                Response.status(500)
+                    .entity("Fehler beim Senden der Verifizierungs-E-Mail: " + e.getMessage())
+                    .build()
+            );
+        }
 
         return Response.status(201).entity("Nutzer erfolgreich erstellt").build();
 

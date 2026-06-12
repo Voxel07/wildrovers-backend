@@ -27,6 +27,9 @@ services:
       OPENOBSERVE_ENDPOINT: "${OPENOBSERVE_ENDPOINT:-http://openobserve:5080/api/default}"
       OPENOBSERVE_TOKEN: "${OPENOBSERVE_TOKEN}"
       MAILER_MOCK: "${MAILER_MOCK:-true}"
+      APP_BASE_URL: "${APP_BASE_URL:-http://localhost:8080}"
+      EMAIL_GOOGLE_USERNAME: "${EMAIL_GOOGLE_USERNAME}"
+      EMAIL_GOOGLE_PASSWORD: "${EMAIL_GOOGLE_PASSWORD}"
       # JWT key paths (override in .env for custom locations)
       JWT_PRIVATE_KEY_PATH: "/work/keys/privateKey.pem"
       JWT_PUBLIC_KEY_PATH: "/work/keys/publicKey.pem"
@@ -60,14 +63,14 @@ services:
       VITE_OPENOBSERVE_INSECURE_HTTP: "${VITE_OPENOBSERVE_INSECURE_HTTP}"
 
   openobserve:
-    image: public.ecr.aws/zinclabs/openobserve:v0.10.4 # Or latest stable
+    image: public.ecr.aws/zinclabs/openobserve:v0.90.3
     container_name: openobserve
     restart: unless-stopped
     ports:
       - "5080:5080"
     environment:
       - ZO_ROOT_USER_EMAIL=admin@example.com
-      - ZO_ROOT_USER_PASSWORD=YourSecurePassword123 # Change to a strong password
+      - ZO_ROOT_USER_PASSWORD=YourSecurePassword123
     volumes:
       - openobserve_data:/data
     networks:

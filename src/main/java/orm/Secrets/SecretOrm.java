@@ -36,6 +36,7 @@ public class SecretOrm {
         Secret secret = new Secret(isVerifyed,verificationId);
         secret.setPassword(password);
         secret.setUser(user);
+        secret.setVerificationTimestamp(tools.Time.currentTimeInMillis());
 
         try {
             em.persist(secret);
@@ -48,33 +49,46 @@ public class SecretOrm {
 
     public String generateVerificationId()
     {
-        return UUID.randomUUID().toString();
+        java.util.Random rand = new java.util.Random();
+        int code = 100000 + rand.nextInt(900000);
+        return String.valueOf(code);
     }
 
     @Transactional
-    public String verifyUser(Long userId, String verificationId)
+    public String verifyUser(String email, String verificationId)
     {
-        log.info("SecretOrm/verifyUser");
+        log.info("SecretOrm/verifyUser for email: " + email);
 
-        User user;
-        try {
-            user = userOrm.getUserById(userId).get(0);
-        } catch (Exception e) {
-            log.info("User not found");
-            return"Der User wurde nich gefunden";
+        User user = userOrm.findByEmail(email);
+        if (user == null) {
+            log.info("User not found: " + email);
+            return "Der User wurde nicht gefunden";
         }
-        if (!user.getSecret().getVerificationId().equals(verificationId)){
-            return "ID stimmt nicht";
+        if (user.getSecret() == null) {
+            return "Keine Verifizierungsdaten vorhanden";
         }
-        if(user.getSecret().getIsVerifyed().equals(true)){
+        if (Boolean.TRUE.equals(user.getSecret().getIsVerifyed())) {
             return "User ist bereits verifiziert";
         }
+        
+        Long timestamp = user.getSecret().getVerificationTimestamp();
+        if (timestamp != null) {
+            long elapsed = tools.Time.currentTimeInMillis() - timestamp;
+            if (elapsed > 5 * 60 * 1000) {
+                return "Der Code ist abgelaufen";
+            }
+        }
+
+        if (user.getSecret().getVerificationId() == null || !user.getSecret().getVerificationId().equals(verificationId)) {
+            return "ID stimmt nicht";
+        }
+        
         user.getSecret().setIsVerifyed(true);
 
         try {
             em.merge(user);
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            log.log(Level.SEVERE, "Result: " + e.getMessage(), e);
             return "Fehler beim update";
         }
         return "Erfolgreich validiert";

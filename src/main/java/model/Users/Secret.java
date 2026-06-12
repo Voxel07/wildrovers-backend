@@ -36,6 +36,9 @@ public class Secret {
     @Column(name = "verificationId") 
     String verificationId;
 
+    @Column(name = "verificationTimestamp")
+    private Long verificationTimestamp;
+
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "user_id", referencedColumnName = "id")
     private User user;
@@ -94,7 +97,11 @@ public class Secret {
         this.user = user;
     }
 
-    
+    public Long getVerificationTimestamp() {
+        return verificationTimestamp;
+    }
 
-    
+    public void setVerificationTimestamp(Long verificationTimestamp) {
+        this.verificationTimestamp = verificationTimestamp;
+    }
 }
