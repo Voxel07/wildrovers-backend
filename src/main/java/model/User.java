@@ -83,6 +83,12 @@ public class User {
     @Column(name = "lastLogin")
     private Long lastLogin;
 
+    @Column(name = "lastLoginIp", length = 45)
+    private String lastLoginIp;
+
+    @Column(name = "lastLoginCountry", length = 100)
+    private String lastLoginCountry;
+
     @Column(name = "regestrationDate")
     private Long regDate;
 
@@ -268,6 +274,22 @@ public class User {
 
     public void setLastLogin(Long lastLogin) {
         this.lastLogin = lastLogin;
+    }
+
+    public String getLastLoginIp() {
+        return lastLoginIp;
+    }
+
+    public void setLastLoginIp(String lastLoginIp) {
+        this.lastLoginIp = lastLoginIp;
+    }
+
+    public String getLastLoginCountry() {
+        return lastLoginCountry;
+    }
+
+    public void setLastLoginCountry(String lastLoginCountry) {
+        this.lastLoginCountry = lastLoginCountry;
     }
 
     public Long getRegDate() {

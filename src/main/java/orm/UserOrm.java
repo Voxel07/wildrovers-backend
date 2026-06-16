@@ -22,6 +22,8 @@ import orm.Forum.ForumCategoryOrm;
 import orm.Secrets.SecretOrm;
 import orm.UserStuff.ActivityForumOrm;
 import tools.Email;
+import tools.GeoIPService;
+import helper.RequestIpCapture;
 import resources.JWT;
 import tools.Time;
 
@@ -52,6 +54,12 @@ public class UserOrm {
 
     @Inject
     ForumCategoryOrm forumCategoryOrm;
+
+    @Inject
+    RequestIpCapture ipCapture;
+
+    @Inject
+    GeoIPService geoIPService;
 
     public Long getEventsAttendedCount(Long userId) {
         try {
@@ -354,6 +362,16 @@ public class UserOrm {
         }
 
         user.setLastLogin(Time.currentTimeInMillis());
+
+        // Save IP and country for session hijacking detection
+        String clientIp = ipCapture.getClientIp();
+        user.setLastLoginIp(clientIp);
+        if (clientIp != null && !"unknown".equals(clientIp)) {
+            String country = geoIPService.getCountry(clientIp);
+            user.setLastLoginCountry(country);
+            log.info("Login from IP: " + clientIp + " country: " + country);
+        }
+
         em.merge(user);
 
         // Return cookie and Auth Object

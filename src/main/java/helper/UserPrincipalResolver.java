@@ -6,6 +6,7 @@ import io.quarkus.security.identity.SecurityIdentity;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import model.User;
 import orm.UserOrm;
+import tools.GeoIPService;
 import java.util.Set;
 import java.util.logging.Logger;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,6 +36,12 @@ public class UserPrincipalResolver {
     @Inject
     UserOrm userOrm;
 
+    @Inject
+    RequestIpCapture ipCapture;
+
+    @Inject
+    GeoIPService geoIPService;
+
     public User resolveUser() {
         if (identity.isAnonymous()) {
             log.warning("Cannot resolve user: Current request is anonymous.");
@@ -54,6 +61,8 @@ public class UserPrincipalResolver {
                             .build()
                 );
             }
+            // Re-verify country for cached entries (cheap: GeoIPService has 24h cache)
+            checkCountryMismatch(entry.user);
             return entry.user;
         }
 
@@ -112,6 +121,9 @@ public class UserPrincipalResolver {
             );
         }
 
+        // ── IP country-change detection ──
+        checkCountryMismatch(user);
+
         // Cache the resolved user globally for a short duration (5 seconds) to handle concurrent frontend requests
         if (user != null) {
             globalCache.put(username, new CacheEntry(user, Instant.now().plusMillis(5000)));
@@ -155,5 +167,39 @@ public class UserPrincipalResolver {
         if (isFrischling) return "Frischling";
         
         return "Besucher";
+    }
+
+    /**
+     * If the user's current IP resolves to a different country than the one
+     * recorded at login time, the auth token may have been stolen.
+     * Throws 401 to force re-login.
+     */
+    private void checkCountryMismatch(User user) {
+        if (user == null) return;
+        String savedCountry = user.getLastLoginCountry();
+        if (savedCountry == null || savedCountry.isBlank()
+                || "Unknown".equals(savedCountry) || "Local".equals(savedCountry)) {
+            return;
+        }
+
+        String currentIp = ipCapture.getClientIp();
+        if (currentIp == null || "unknown".equals(currentIp)
+                || geoIPService == null) return;
+
+        String currentCountry = geoIPService.getCountry(currentIp);
+        if (currentCountry == null || "Unknown".equals(currentCountry)
+                || "Local".equals(currentCountry)) return;
+
+        if (!currentCountry.equals(savedCountry)) {
+            log.warning("SECURITY: Country mismatch for user '" + user.getUserName()
+                    + "'. Last login: " + savedCountry
+                    + ", current: " + currentCountry
+                    + " (IP: " + currentIp + "). Possible token theft — logging out.");
+            throw new jakarta.ws.rs.WebApplicationException(
+                jakarta.ws.rs.core.Response.status(401)
+                        .entity("{\"status\":\"error\",\"message\":\"Sicherheitswarnung: Deine Sitzung wurde aus Sicherheitsgründen beendet. Bitte melde dich erneut an.\"}")
+                        .build()
+            );
+        }
     }
 }
