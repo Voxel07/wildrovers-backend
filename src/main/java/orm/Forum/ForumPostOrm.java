@@ -327,6 +327,9 @@ public class ForumPostOrm {
             return "Nur der Ersteller oder Mods dürfen das";
 
         // Extract base64 images from ORIGINAL content first, then sanitize
+        if (forumPost.getTitle() != null && !forumPost.getTitle().isBlank()) {
+            forumPostAusDB.setTitle(htmlSanitizer.sanitizeTitle(forumPost.getTitle()));
+        }
         String baseUrl = "http://" + serverHost + ":" + serverPort;
         String contentWithImages = imageExtractor.extractAndSaveImages(
                 forumPost.getContent(), forumPost.getId(), baseUrl);

@@ -91,13 +91,15 @@ public class UserPrincipalResolver {
             
             user = userOrm.createOidcUser(username, email, firstName, lastName, mappedRole);
         } else {
-            // Update roles if they changed in Authentik
-            Set<String> groups = identity.getRoles();
-            String currentMappedRole = mapOidcGroupsToRole(groups);
-            if (!currentMappedRole.equals(user.getRole())) {
-                log.info("User role changed in identity provider. Syncing role: " + user.getRole() + " -> " + currentMappedRole);
-                user.setRole(currentMappedRole);
-                userOrm.updateUserRole(user.getId(), currentMappedRole);
+            // Update roles if they changed in Authentik (skip for local logins)
+            if (!Boolean.TRUE.equals(identity.getAttribute("local-jwt"))) {
+                Set<String> groups = identity.getRoles();
+                String currentMappedRole = mapOidcGroupsToRole(groups);
+                if (!currentMappedRole.equals(user.getRole())) {
+                    log.info("User role changed in identity provider. Syncing role: " + user.getRole() + " -> " + currentMappedRole);
+                    user.setRole(currentMappedRole);
+                    userOrm.updateUserRole(user.getId(), currentMappedRole);
+                }
             }
         }
 

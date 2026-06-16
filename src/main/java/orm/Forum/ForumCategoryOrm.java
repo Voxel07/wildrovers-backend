@@ -165,6 +165,28 @@ public class ForumCategoryOrm {
 
         forumCategoryAusDB.setCategory(forumCategory.getCategory());
 
+        // Update visibility if set
+        if (forumCategory.getVisibility() != null) {
+            List<String> allowedVis = Roles.getRoles();
+            if (allowedVis.contains(forumCategory.getVisibility())) {
+                if (Roles.hasRequiredRole(user.getRole(), forumCategory.getVisibility())) {
+                    forumCategoryAusDB.setVisibility(forumCategory.getVisibility());
+                } else {
+                    return "Die angegebene Nutzergruppe hat mehr Rechte als deine eigene";
+                }
+            } else {
+                return "Die angegebene Nutzergruppe existiert nicht";
+            }
+        }
+
+        // Update position if set and changed
+        if (forumCategory.getPosition() != null && !forumCategory.getPosition().equals(forumCategoryAusDB.getPosition())) {
+            forumCategoryAusDB.setPosition(forumCategory.getPosition());
+            if (!positionCategory(forumCategoryAusDB)) {
+                return "Reihenfolge konnte nicht geändert werden";
+            }
+        }
+
         try{
             em.merge(forumCategoryAusDB);
         }catch(Exception e){

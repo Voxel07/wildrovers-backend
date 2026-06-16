@@ -32,7 +32,7 @@ public class ForumAnswer {
     @Column(name = "id", unique = true)
     private Long id;
 
-    @Column(name = "content")
+    @Column(name = "content", columnDefinition = "LONGTEXT")
     private String content;
 
     @Column(name = "creationDate")
