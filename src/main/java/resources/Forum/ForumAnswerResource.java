@@ -10,6 +10,7 @@ import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 
+import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
 
 import jakarta.ws.rs.GET;
@@ -41,6 +42,7 @@ public class ForumAnswerResource{
     helper.UserPrincipalResolver userPrincipalResolver;
 
     @GET
+    @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public List<ForumAnswer> getAnswers(@QueryParam("answer") Long answerId,

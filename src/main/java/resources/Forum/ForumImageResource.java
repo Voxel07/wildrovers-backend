@@ -1,5 +1,6 @@
 package resources.Forum;
 
+import jakarta.annotation.security.PermitAll;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -31,6 +32,7 @@ public class ForumImageResource {
 
     @GET
     @Path("/{postId}/{variant}/{filename}")
+    @PermitAll
     @Produces("image/*")
     public Response getImage(
             @PathParam("postId") String postId,

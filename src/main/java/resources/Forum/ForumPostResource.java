@@ -22,6 +22,7 @@ import jakarta.ws.rs.QueryParam;
 import java.util.logging.Logger;
 import java.util.logging.Level;
 
+import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
 import model.Forum.ForumPost;
 import orm.Forum.ForumPostOrm;
@@ -41,6 +42,7 @@ public class ForumPostResource {
     helper.UserPrincipalResolver userPrincipalResolver;
 
     @GET
+    @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public List<ForumPost> getPosts( @QueryParam("post") Long postId,
@@ -125,6 +127,7 @@ public class ForumPostResource {
 
     @GET
     @Path("/latest")
+    @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     public Response getLatestPost(@QueryParam("topic") Long topicId){
         ForumPost fp = forumPostOrm.getLatestPost(topicId);

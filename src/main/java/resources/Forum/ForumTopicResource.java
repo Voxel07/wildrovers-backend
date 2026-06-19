@@ -23,6 +23,7 @@ import model.Users.Roles;
 //Logging
 import java.util.logging.Logger;
 
+import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
 import model.Forum.ForumTopic;
 import orm.Forum.ForumTopicOrm;
@@ -39,6 +40,7 @@ public class ForumTopicResource {
     helper.UserPrincipalResolver userPrincipalResolver;
 
     @GET
+    @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public List<ForumTopic> getTopics(  @QueryParam("topicId") Long topicId,

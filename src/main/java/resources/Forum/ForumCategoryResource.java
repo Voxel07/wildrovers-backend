@@ -23,6 +23,7 @@ import jakarta.ws.rs.core.Response;
 //Logging
 import java.util.logging.Logger;
 
+import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
 import model.Forum.ForumCategory;
 import orm.Forum.ForumCategoryOrm;
@@ -42,6 +43,7 @@ public class ForumCategoryResource {
     helper.UserPrincipalResolver userPrincipalResolver;
 
     @GET
+    @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public List<ForumCategory> getCategorys(@QueryParam("categoryId") Long categoryId,

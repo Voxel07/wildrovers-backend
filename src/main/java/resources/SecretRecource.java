@@ -17,6 +17,7 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.annotation.security.PermitAll;
 
 //Eigene Imports
 import orm.Secrets.SecretOrm;
@@ -38,6 +39,7 @@ public class SecretRecource {
 
     @POST
     @Path("/verify")
+    @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response verifyUser(VerificationRequest request){
@@ -61,6 +63,7 @@ public class SecretRecource {
 
     @GET
     @Path("/auto-verify")
+    @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @jakarta.transaction.Transactional
     public String autoVerify(@QueryParam("username") String username) {
@@ -89,6 +92,7 @@ public class SecretRecource {
 
     @POST
     @Path("/reset-request")
+    @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     @jakarta.transaction.Transactional
@@ -121,6 +125,7 @@ public class SecretRecource {
 
     @POST
     @Path("/reset-password")
+    @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     @jakarta.transaction.Transactional

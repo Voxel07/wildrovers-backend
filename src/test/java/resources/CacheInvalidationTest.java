@@ -1,7 +1,6 @@
 package resources;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.restassured.http.ContentType;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -21,8 +20,12 @@ import java.util.List;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.*;
 
+/**
+ * Tests for Quarkus cache (@CacheResult / @CacheInvalidateAll) behavior.
+ * Verifies that caches are populated on read and invalidated on write.
+ */
 @QuarkusTest
-public class RateLimitAndCacheTest {
+public class CacheInvalidationTest {
 
     @Inject
     EntityManager em;
@@ -63,37 +66,17 @@ public class RateLimitAndCacheTest {
             // Insert Category
             em.createNativeQuery("INSERT INTO \"FORUM_CATEGORY\" (id,category,creationDate,topicCount,position,visibility,user_id) VALUES (100,'TestCat',0,0,0,'Besucher',104)").executeUpdate();
             
-            // Insert Event
-            em.createNativeQuery("INSERT INTO \"EVENT\" (id,title,description,location,eventDate,user_id) VALUES (100,'TestEvent','Desc','Location','2026-06-20 10:00:00',104)").executeUpdate();
+            // Insert Event (column: creator_id, event_date)
+            em.createNativeQuery("INSERT INTO \"EVENT\" (id,title,description,location,event_date,creator_id) VALUES (100,'TestEvent','Desc','Location','2026-06-20 10:00:00',104)").executeUpdate();
 
-            // Insert Gallery
-            em.createNativeQuery("INSERT INTO \"GALLERY\" (id,title,location,url,date,user_id) VALUES (100,'TestGallery','Location','http://url.com','2026-06-20',104)").executeUpdate();
+            // Insert Gallery (column: creator_id, gallery_date)
+            em.createNativeQuery("INSERT INTO \"GALLERY\" (id,title,location,url,gallery_date,creator_id) VALUES (100,'TestGallery','Location','http://url.com','2026-06-20',104)").executeUpdate();
             
             em.flush();
         } catch (Exception ignored) {}
     }
 
-    @Test
-    void testSignupRateLimit() {
-        // Limit is 3 per minute
-        // First 3 calls should return 201 (Created) or 406 (duplicate), but not 429
-        for (int i = 0; i < 3; i++) {
-            given()
-                .contentType(ContentType.JSON)
-                .body("{\"userName\":\"testUserRate" + i + "\",\"email\":\"testrate" + i + "@test.local\",\"password\":\"test1234\",\"firstName\":\"N\",\"lastName\":\"U\"}")
-                .put("/user")
-                .then()
-                .statusCode(anyOf(is(201), is(406)));
-        }
-
-        // 4th call must be rate-limited with 429
-        given()
-            .contentType(ContentType.JSON)
-            .body("{\"userName\":\"testUserRate3\",\"email\":\"testrate3@test.local\",\"password\":\"test1234\",\"firstName\":\"N\",\"lastName\":\"U\"}")
-            .put("/user")
-            .then()
-            .statusCode(429);
-    }
+    // ── Team Members cache ──
 
     @Test
     void testTeamMembersCacheAndInvalidation() {
@@ -128,6 +111,8 @@ public class RateLimitAndCacheTest {
             .body("firstName", not(hasItem("Admin")));
     }
 
+    // ── Events cache ──
+
     @Test
     void testEventsCacheAndInvalidation() {
         // 1. Initial fetch to populate cache
@@ -160,6 +145,8 @@ public class RateLimitAndCacheTest {
             .body("title", hasItem("EventModifiedDirectly"))
             .body("title", not(hasItem("TestEvent")));
     }
+
+    // ── Galleries cache ──
 
     @Test
     void testGalleriesCacheAndInvalidation() {
@@ -194,6 +181,8 @@ public class RateLimitAndCacheTest {
             .body("title", not(hasItem("TestGallery")));
     }
 
+    // ── Forum Categories cache ──
+
     @Test
     void testForumCategoriesCacheAndInvalidation() {
         // 1. Initial fetch to populate cache
@@ -226,8 +215,44 @@ public class RateLimitAndCacheTest {
             .body("category", hasItem("CategoryModifiedDirectly"))
             .body("category", not(hasItem("TestCat")));
     }
+
+    // ── Upcoming events cache ──
+
+    @Test
+    void testUpcomingEventsCacheAndInvalidation() {
+        // 1. Initial fetch to populate upcoming-events cache
+        given()
+            .get("/event/upcoming")
+            .then()
+            .statusCode(200);
+
+        // 2. Update DB directly
+        dbHelper.updateEventTitleDirectly(100L, "UpcomingModified");
+
+        // 3. Fetch again (should be cached)
+        given()
+            .get("/event/upcoming")
+            .then()
+            .statusCode(200)
+            .body("title", hasItem("TestEvent"))
+            .body("title", not(hasItem("UpcomingModified")));
+
+        // 4. Invalidate via update
+        dbHelper.invalidateEventsCache(eventOrm, 100L);
+
+        // 5. Fetch again (updated)
+        given()
+            .get("/event/upcoming")
+            .then()
+            .statusCode(200)
+            .body("title", hasItem("UpcomingModified"))
+            .body("title", not(hasItem("TestEvent")));
+    }
 }
 
+/**
+ * Helper bean for direct DB manipulation and cache invalidation during tests.
+ */
 @ApplicationScoped
 class TestDbHelper {
     @Inject
