@@ -48,6 +48,9 @@ public class Polls {
     @Column(name = "allow_multiple", columnDefinition = "boolean default false")
     private Boolean allowMultiple = false;
 
+    @Column(name = "anonymous", columnDefinition = "boolean default false")
+    private Boolean anonymous = false;
+
     public Polls() {
     }
 
@@ -69,6 +72,14 @@ public class Polls {
 
     public void setAllowMultiple(Boolean allowMultiple) {
         this.allowMultiple = allowMultiple;
+    }
+
+    public Boolean getAnonymous() {
+        return anonymous;
+    }
+
+    public void setAnonymous(Boolean anonymous) {
+        this.anonymous = anonymous;
     }
 
     public void setQuestion(String question) {

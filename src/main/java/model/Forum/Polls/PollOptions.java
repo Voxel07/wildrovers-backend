@@ -15,6 +15,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.FetchType;
 import jakarta.json.bind.annotation.JsonbTransient;
+import jakarta.persistence.Transient;
 
 @Entity
 @Table(name = "FORUM_POLL_OPTIONS")
@@ -40,6 +41,9 @@ public class PollOptions {
     @JoinTable(name = "FORUM_POLL_OPTION_VOTES", joinColumns = @JoinColumn(name = "option_id"), inverseJoinColumns = @JoinColumn(name = "user_id"))
     @JsonbTransient
     private List<User> votedUsers = new ArrayList<>();
+
+    @Transient
+    private List<String> voterNames;
 
     public PollOptions() {}
 
@@ -68,5 +72,13 @@ public class PollOptions {
 
     public void setVotedUsers(List<User> votedUsers) {
         this.votedUsers = votedUsers;
+    }
+
+    public List<String> getVoterNames() {
+        return voterNames;
+    }
+
+    public void setVoterNames(List<String> voterNames) {
+        this.voterNames = voterNames;
     }
 }

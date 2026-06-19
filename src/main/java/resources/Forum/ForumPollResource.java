@@ -5,17 +5,21 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
 import model.Forum.Polls.Polls;
 import model.Users.Roles;
 import orm.Forum.ForumPollOrm;
 import helper.UserPrincipalResolver;
 import java.util.List;
+import java.util.logging.Logger;
 
 @Path("/forum/poll")
 @ApplicationScoped
 @Produces(MediaType.APPLICATION_JSON)
 public class ForumPollResource {
+
+    private static final Logger log = Logger.getLogger(ForumPollResource.class.getName());
 
     @Inject
     ForumPollOrm forumPollOrm;
@@ -69,6 +73,19 @@ public class ForumPollResource {
         return forumPollOrm.getVotedOptionIds(pollId, userId);
     }
 
+    @GET
+    @Path("/voters")
+    @PermitAll
+    public Response getVoters(@QueryParam("poll") Long pollId) {
+        log.info("ForumPollResource/getVoters: " + pollId);
+        if (pollId == null) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("poll parameter required").build();
+        }
+        // Returns voter names per option (empty for anonymous polls)
+        jakarta.json.JsonArray result = forumPollOrm.getVoterNames(pollId);
+        return Response.ok(result).build();
+    }
+
     @DELETE
     @Path("/delete")
     @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
@@ -78,5 +95,17 @@ public class ForumPollResource {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Nicht angemeldet").build();
         }
         return forumPollOrm.deletePoll(pollId, userId);
+    }
+
+    @POST
+    @Path("/update")
+    @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response updatePoll(@QueryParam("poll") Long pollId, Polls poll) {
+        Long userId = userPrincipalResolver.resolveUserId();
+        if (userId == null) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("Nicht angemeldet").build();
+        }
+        return forumPollOrm.updatePoll(pollId, poll, userId);
     }
 }

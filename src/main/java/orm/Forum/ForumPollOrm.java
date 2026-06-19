@@ -153,6 +153,118 @@ public class ForumPollOrm {
         .getResultList();
     }
 
+    /**
+     * Returns voter names grouped by option for a given poll.
+     * Returns empty names if the poll is anonymous.
+     */
+    public jakarta.json.JsonArray getVoterNames(Long pollId) {
+        Polls poll = em.find(Polls.class, pollId);
+        if (poll == null) {
+            return jakarta.json.Json.createArrayBuilder().build();
+        }
+
+        jakarta.json.JsonArrayBuilder result = jakarta.json.Json.createArrayBuilder();
+
+        for (PollOptions option : poll.getOptions()) {
+            jakarta.json.JsonArrayBuilder names = jakarta.json.Json.createArrayBuilder();
+
+            // Only expose voter names if the poll is NOT anonymous
+            if (!Boolean.TRUE.equals(poll.getAnonymous())) {
+                // Force-load the lazy votedUsers collection
+                List<User> voters = option.getVotedUsers();
+                if (voters != null) {
+                    for (User u : voters) {
+                        names.add(u.getUserName());
+                    }
+                }
+            }
+
+            result.add(jakarta.json.Json.createObjectBuilder()
+                .add("optionId", option.getId())
+                .add("voterNames", names)
+                .build());
+        }
+
+        return result.build();
+    }
+
+    /**
+     * Updates an existing poll: question, allowMultiple, anonymous, and options.
+     * Options with an ID are updated (text change, votes preserved).
+     * Options without an ID are created as new.
+     * Existing options not present in the update are deleted along with their votes.
+     */
+    @Transactional
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "poll-has-voted"),
+        @CacheInvalidateAll(cacheName = "poll-voted-options")
+    })
+    public Response updatePoll(Long pollId, Polls updatedPoll, Long userId) {
+        log.info("ForumPollOrm/updatePoll: " + pollId + " by user: " + userId);
+        Polls poll = em.find(Polls.class, pollId);
+        if (poll == null) {
+            return Response.status(Response.Status.NOT_FOUND).entity("Umfrage nicht gefunden").build();
+        }
+
+        User user = em.find(User.class, userId);
+        if (user == null) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("Benutzer nicht gefunden").build();
+        }
+
+        ForumPost post = poll.getPost();
+        if (post == null) {
+            return Response.status(Response.Status.NOT_FOUND).entity("Zugehöriger Post nicht gefunden").build();
+        }
+
+        // Only post creator or admin can edit
+        if (!post.getCreatorObj().getId().equals(userId) && !user.getRole().equals("Admin")) {
+            return Response.status(Response.Status.FORBIDDEN).entity("Nicht berechtigt").build();
+        }
+
+        // Update poll fields
+        if (updatedPoll.getQuestion() != null && !updatedPoll.getQuestion().isBlank()) {
+            poll.setQuestion(updatedPoll.getQuestion());
+        }
+        poll.setAllowMultiple(updatedPoll.getAllowMultiple());
+        poll.setAnonymous(updatedPoll.getAnonymous());
+
+        // Collect IDs of options that should remain
+        java.util.Set<Long> keptOptionIds = new java.util.HashSet<>();
+        if (updatedPoll.getOptions() != null) {
+            for (PollOptions incoming : updatedPoll.getOptions()) {
+                if (incoming.getId() != null) {
+                    // Existing option — update text, preserve votes
+                    PollOptions existing = em.find(PollOptions.class, incoming.getId());
+                    if (existing != null && existing.getPoll().getId().equals(pollId)) {
+                        existing.setOptionText(incoming.getOptionText());
+                        em.merge(existing);
+                        keptOptionIds.add(incoming.getId());
+                    }
+                } else {
+                    // New option
+                    incoming.setPoll(poll);
+                    incoming.setVotes(0L);
+                    em.persist(incoming);
+                }
+            }
+        }
+
+        // Delete options that were removed from the update payload
+        for (PollOptions existing : poll.getOptions()) {
+            if (!keptOptionIds.contains(existing.getId())) {
+                // Delete votes for this option first
+                em.createNativeQuery("DELETE FROM FORUM_POLL_OPTION_VOTES WHERE option_id = :optId")
+                    .setParameter("optId", existing.getId()).executeUpdate();
+                em.remove(existing);
+            }
+        }
+
+        em.flush();
+        // Return fresh poll data
+        Polls refreshed = em.find(Polls.class, pollId);
+        return Response.ok(refreshed).build();
+    }
+
     @Transactional
     @CacheInvalidateAll.List({
         @CacheInvalidateAll(cacheName = "poll-has-voted"),
