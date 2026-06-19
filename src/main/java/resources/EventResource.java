@@ -25,7 +25,6 @@ import tools.GoogleCalendarService;
 import model.Forum.ForumPost;
 import orm.Forum.ForumPostOrm;
 import model.EventAttendance;
-import jakarta.persistence.EntityManager;
 import java.time.format.DateTimeFormatter;
 import java.util.logging.Level;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -56,9 +55,6 @@ public class EventResource {
 
     @Inject
     ForumPostOrm forumPostOrm;
-
-    @Inject
-    EntityManager em;
 
     @Inject
     @ConfigProperty(name = "app.frontend-url", defaultValue = "http://localhost:5173")
@@ -256,7 +252,6 @@ public class EventResource {
     @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    @jakarta.transaction.Transactional
     public Response setAttendance(@PathParam("id") Long eventId, EventAttendance attendanceInput) {
         log.info("EventResource/setAttendance: " + eventId);
         User user = userPrincipalResolver.resolveUser();
@@ -274,26 +269,12 @@ public class EventResource {
             return Response.status(400).entity("Ungültiger Status").build();
         }
 
-        jakarta.persistence.TypedQuery<EventAttendance> query = em.createQuery(
-                "SELECT a FROM EventAttendance a WHERE a.user.id = :userId AND a.event.id = :eventId",
-                EventAttendance.class);
-        query.setParameter("userId", user.getId());
-        query.setParameter("eventId", eventId);
-
-        List<EventAttendance> list = query.getResultList();
-        if (list.isEmpty()) {
-            EventAttendance attendance = new EventAttendance();
-            attendance.setUser(user);
-            attendance.setEvent(event);
-            attendance.setStatus(status);
-            em.persist(attendance);
-        } else {
-            EventAttendance attendance = list.get(0);
-            attendance.setStatus(status);
-            em.merge(attendance);
+        // Delegates to EventOrm which handles DB persistence AND cache invalidation
+        Event updatedEvent = eventOrm.saveAttendance(eventId, user.getId(), status);
+        if (updatedEvent == null) {
+            return Response.status(500).entity("Fehler beim Speichern der Teilnahme").build();
         }
 
-        Event updatedEvent = eventOrm.getEventById(eventId);
         populateNonRespondents(java.util.Collections.singletonList(updatedEvent));
         return Response.ok(updatedEvent).build();
     }

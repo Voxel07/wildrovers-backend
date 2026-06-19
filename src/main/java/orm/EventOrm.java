@@ -104,4 +104,52 @@ public class EventOrm {
         List<Event> results = query.getResultList();
         return results.isEmpty() ? null : results.get(0);
     }
+
+    /**
+     * Persists or updates attendance for an event and invalidates all event caches.
+     * Must be called instead of raw em.persist/merge on EventAttendance to ensure
+     * cached event data stays consistent after attendance changes.
+     */
+    @Transactional
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "events"),
+        @CacheInvalidateAll(cacheName = "upcoming-events"),
+        @CacheInvalidateAll(cacheName = "events-by-id"),
+        @CacheInvalidateAll(cacheName = "events-by-post-id")
+    })
+    public Event saveAttendance(Long eventId, Long userId, String status) {
+        log.info("EventOrm/saveAttendance: eventId=" + eventId + " userId=" + userId + " status=" + status);
+
+        Event event = em.find(Event.class, eventId);
+        if (event == null) {
+            return null;
+        }
+        User user = em.find(User.class, userId);
+        if (user == null) {
+            return null;
+        }
+
+        jakarta.persistence.TypedQuery<model.EventAttendance> query = em.createQuery(
+                "SELECT a FROM EventAttendance a WHERE a.user.id = :userId AND a.event.id = :eventId",
+                model.EventAttendance.class);
+        query.setParameter("userId", userId);
+        query.setParameter("eventId", eventId);
+
+        java.util.List<model.EventAttendance> list = query.getResultList();
+        if (list.isEmpty()) {
+            model.EventAttendance attendance = new model.EventAttendance();
+            attendance.setUser(user);
+            attendance.setEvent(event);
+            attendance.setStatus(status);
+            em.persist(attendance);
+        } else {
+            model.EventAttendance attendance = list.get(0);
+            attendance.setStatus(status);
+            em.merge(attendance);
+        }
+
+        em.flush();
+        // Re-fetch with fresh data (caches were just invalidated)
+        return getEventById(eventId);
+    }
 }
