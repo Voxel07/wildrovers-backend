@@ -11,6 +11,8 @@ import model.Forum.Polls.PollOptions;
 import model.User;
 import java.util.logging.Logger;
 import java.util.List;
+import io.quarkus.cache.CacheResult;
+import io.quarkus.cache.CacheInvalidateAll;
 
 @ApplicationScoped
 public class ForumPollOrm {
@@ -20,6 +22,10 @@ public class ForumPollOrm {
     EntityManager em;
 
     @Transactional
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "poll-has-voted"),
+        @CacheInvalidateAll(cacheName = "poll-voted-options")
+    })
     public Response createPoll(Long postId, Polls poll, Long userId) {
         log.info("ForumPollOrm/createPoll for post: " + postId);
         ForumPost post = em.find(ForumPost.class, postId);
@@ -56,6 +62,10 @@ public class ForumPollOrm {
     }
 
     @Transactional
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "poll-has-voted"),
+        @CacheInvalidateAll(cacheName = "poll-voted-options")
+    })
     public Response vote(Long pollId, List<Long> optionIds, Long userId) {
         log.info("ForumPollOrm/vote on poll: " + pollId + ", options: " + optionIds + " by user: " + userId);
         Polls poll = em.find(Polls.class, pollId);
@@ -121,6 +131,7 @@ public class ForumPollOrm {
         return Response.ok(updatedPoll).build();
     }
 
+    @CacheResult(cacheName = "poll-has-voted")
     public boolean hasVoted(Long pollId, Long userId) {
         Polls poll = em.find(Polls.class, pollId);
         if (poll == null)
@@ -131,6 +142,7 @@ public class ForumPollOrm {
         return poll.getVotedUsers().contains(user);
     }
 
+    @CacheResult(cacheName = "poll-voted-options")
     public List<Long> getVotedOptionIds(Long pollId, Long userId) {
         return em.createQuery(
             "SELECT o.id FROM PollOptions o JOIN o.votedUsers u WHERE o.poll.id = :pollId AND u.id = :userId",
@@ -142,6 +154,10 @@ public class ForumPollOrm {
     }
 
     @Transactional
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "poll-has-voted"),
+        @CacheInvalidateAll(cacheName = "poll-voted-options")
+    })
     public Response deletePoll(Long pollId, Long userId) {
         log.info("ForumPollOrm/deletePoll: " + pollId + " by user: " + userId);
         Polls poll = em.find(Polls.class, pollId);

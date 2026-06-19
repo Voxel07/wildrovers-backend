@@ -7,25 +7,13 @@ import org.eclipse.microprofile.jwt.JsonWebToken;
 import model.User;
 import orm.UserOrm;
 import tools.GeoIPService;
+import io.quarkus.cache.CacheResult;
 import java.util.Set;
 import java.util.logging.Logger;
-import java.util.concurrent.ConcurrentHashMap;
-import java.time.Instant;
 
 @ApplicationScoped
 public class UserPrincipalResolver {
     private static final Logger log = Logger.getLogger(UserPrincipalResolver.class.getName());
-
-    private static class CacheEntry {
-        final User user;
-        final Instant expiry;
-        CacheEntry(User user, Instant expiry) {
-            this.user = user;
-            this.expiry = expiry;
-        }
-    }
-
-    private final ConcurrentHashMap<String, CacheEntry> globalCache = new ConcurrentHashMap<>();
 
     @Inject
     SecurityIdentity identity;
@@ -42,6 +30,9 @@ public class UserPrincipalResolver {
     @Inject
     GeoIPService geoIPService;
 
+    @Inject
+    UserPrincipalResolver self;
+
     public User resolveUser() {
         if (identity.isAnonymous()) {
             log.warning("Cannot resolve user: Current request is anonymous.");
@@ -49,68 +40,21 @@ public class UserPrincipalResolver {
         }
 
         String username = identity.getPrincipal().getName();
-        Instant now = Instant.now();
-        CacheEntry entry = globalCache.get(username);
-        if (entry != null && entry.expiry.isAfter(now)) {
-            // Re-verify blocked status
-            if (entry.user.getIsBlocked()) {
-                log.warning("User " + entry.user.getUserName() + " is blocked. Denying access.");
-                throw new jakarta.ws.rs.WebApplicationException(
-                    jakarta.ws.rs.core.Response.status(jakarta.ws.rs.core.Response.Status.FORBIDDEN)
-                            .entity("Dein Account wurde gesperrt.")
-                            .build()
-                );
-            }
-            // Re-verify country for cached entries (cheap: GeoIPService has 24h cache)
-            checkCountryMismatch(entry.user);
-            return entry.user;
-        }
-
-        // For locally-signed JWTs (username/password login), LocalJwtAuthMechanism stores
-        // the email as a SecurityIdentity attribute. Accessing @Inject JsonWebToken jwt for
-        // these requests would trigger Quarkus OIDC's OidcJsonWebTokenProducer, which logs
-        // a spurious WARNING because there is no OIDC access token on the request.
+        boolean isLocalJwt = Boolean.TRUE.equals(identity.getAttribute("local-jwt"));
         String email;
-        if (Boolean.TRUE.equals(identity.getAttribute("local-jwt"))) {
+        if (isLocalJwt) {
             email = identity.getAttribute("email"); // set by LocalJwtAuthMechanism
         } else {
-            email = jwt.getClaim("email"); // OIDC access token — safe to access here
-        }
-        
-        log.info("Resolving user for principal: " + username + " (email: " + email + ")");
-
-        User user = null;
-        if (email != null && !email.isBlank()) {
-            user = userOrm.findByEmail(email);
-        }
-        
-        if (user == null && username != null && !username.isBlank()) {
-            user = userOrm.findByUsername(username);
+            email = jwt.getClaim("email"); // OIDC access token
         }
 
-        // If user is not in database, JIT-provision them
-        if (user == null) {
-            log.info("User not found in DB. JIT-provisioning a new user...");
-            String firstName = jwt.getClaim("given_name");
-            String lastName = jwt.getClaim("family_name");
-            
-            // Map the OIDC groups/roles to local DB roles
-            Set<String> groups = identity.getRoles();
-            String mappedRole = mapOidcGroupsToRole(groups);
-            
-            user = userOrm.createOidcUser(username, email, firstName, lastName, mappedRole);
-        } else {
-            // Update roles if they changed in Authentik (skip for local logins)
-            if (!Boolean.TRUE.equals(identity.getAttribute("local-jwt"))) {
-                Set<String> groups = identity.getRoles();
-                String currentMappedRole = mapOidcGroupsToRole(groups);
-                if (!currentMappedRole.equals(user.getRole())) {
-                    log.info("User role changed in identity provider. Syncing role: " + user.getRole() + " -> " + currentMappedRole);
-                    user.setRole(currentMappedRole);
-                    userOrm.updateUserRole(user.getId(), currentMappedRole);
-                }
-            }
-        }
+        String firstName = isLocalJwt ? null : jwt.getClaim("given_name");
+        String lastName = isLocalJwt ? null : jwt.getClaim("family_name");
+        Set<String> groups = identity.getRoles();
+        String mappedRole = mapOidcGroupsToRole(groups);
+
+        // Fetch user from DB (or get cached result) via CDI proxy to trigger @CacheResult
+        User user = self.fetchAndCacheUser(username, email, firstName, lastName, mappedRole, isLocalJwt);
 
         if (user != null && user.getIsBlocked()) {
             log.warning("User " + user.getUserName() + " is blocked. Denying access.");
@@ -124,9 +68,34 @@ public class UserPrincipalResolver {
         // ── IP country-change detection ──
         checkCountryMismatch(user);
 
-        // Cache the resolved user globally for a short duration (5 seconds) to handle concurrent frontend requests
-        if (user != null) {
-            globalCache.put(username, new CacheEntry(user, Instant.now().plusMillis(5000)));
+        return user;
+    }
+
+    @CacheResult(cacheName = "resolved-users")
+    public User fetchAndCacheUser(String username, String email, String firstName, String lastName, String mappedRole, boolean isLocalJwt) {
+        log.info("Resolving user from DB for principal: " + username + " (email: " + email + ")");
+        User user = null;
+        if (email != null && !email.isBlank()) {
+            user = userOrm.findByEmail(email);
+        }
+        
+        if (user == null && username != null && !username.isBlank()) {
+            user = userOrm.findByUsername(username);
+        }
+
+        // If user is not in database, JIT-provision them
+        if (user == null) {
+            log.info("User not found in DB. JIT-provisioning a new user...");
+            user = userOrm.createOidcUser(username, email, firstName, lastName, mappedRole);
+        } else {
+            // Update roles if they changed in Authentik (skip for local logins)
+            if (!isLocalJwt && mappedRole != null) {
+                if (!mappedRole.equals(user.getRole())) {
+                    log.info("User role changed in identity provider. Syncing role: " + user.getRole() + " -> " + mappedRole);
+                    user.setRole(mappedRole);
+                    userOrm.updateUserRole(user.getId(), mappedRole);
+                }
+            }
         }
 
         return user;

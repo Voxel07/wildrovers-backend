@@ -1,25 +1,33 @@
 package tools;
 
-import java.util.concurrent.ConcurrentHashMap;
+import io.github.bucket4j.Bucket;
+import io.github.bucket4j.Bandwidth;
+import io.quarkus.security.identity.SecurityIdentity;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
-import jakarta.enterprise.context.ApplicationScoped;
-
 /**
- * Token-bucket rate limiter keyed by "IP:endpoint".
- * Each bucket refills at a constant rate up to a maximum burst capacity.
+ * Rate limiter using Bucket4j and backed by a Caffeine cache for auto-cleanup.
+ * Enforces dynamic limits per-endpoint based on user roles and identity.
  */
 @ApplicationScoped
 public class RateLimiter {
 
     private static final Logger log = Logger.getLogger(RateLimiter.class.getName());
 
-    private final ConcurrentHashMap<String, TokenBucket> buckets = new ConcurrentHashMap<>();
+    @Inject
+    SecurityIdentity identity;
 
-    // Periodic cleanup every 5 minutes to prevent memory leak
-    private long lastCleanup = System.nanoTime();
-    private static final long CLEANUP_INTERVAL_NANOS = TimeUnit.MINUTES.toNanos(5);
+    // Cache to store the rate-limit buckets with an idle expiration of 10 minutes
+    private final Cache<String, Bucket> buckets = Caffeine.newBuilder()
+            .expireAfterAccess(10, TimeUnit.MINUTES)
+            .build();
 
     /**
      * Predefined rate-limit configurations per endpoint pattern.
@@ -74,20 +82,35 @@ public class RateLimiter {
         // Find the matching config
         Config match = findConfig(path, method);
 
-        String key = ip + "|" + match.pathPrefix + "|" + canonicalMethod(match, method);
-        TokenBucket bucket = buckets.computeIfAbsent(key,
-                k -> new TokenBucket(match.limit, match.windowSeconds));
+        // Determine user identity key and role multiplier
+        String role = getRoleName();
+        double multiplier = getRoleMultiplier(role);
+        String identityKey = getIdentityKey(ip, role);
 
-        boolean allowed = bucket.tryConsume();
+        String key = identityKey + "|" + match.pathPrefix + "|" + canonicalMethod(match, method);
 
-        // Periodic cleanup of stale entries
-        periodicCleanup();
+        Bucket bucket = buckets.get(key, k -> createBucket(match, multiplier));
+
+        boolean allowed = bucket.tryConsume(1);
 
         if (!allowed) {
-            log.warning("Rate limit exceeded for " + ip + " on " + path + " [" + match.pathPrefix + "] "
-                    + match.limit + "/" + match.windowSeconds + "s");
+            log.warning("Rate limit exceeded for " + identityKey + " (IP: " + ip + ", Role: " + role + ") on " + path 
+                    + " [" + match.pathPrefix + "] limit is " + (int) Math.round(match.limit * multiplier) + "/" + match.windowSeconds + "s");
         }
         return allowed;
+    }
+
+    private Bucket createBucket(Config match, double multiplier) {
+        int capacity = (int) Math.round(match.limit * multiplier);
+        if (capacity <= 0) {
+            capacity = 1;
+        }
+        return Bucket.builder()
+                .addLimit(Bandwidth.builder()
+                        .capacity(capacity)
+                        .refillIntervally(capacity, Duration.ofSeconds(match.windowSeconds))
+                        .build())
+                .build();
     }
 
     private Config findConfig(String path, String method) {
@@ -115,53 +138,40 @@ public class RateLimiter {
         return method.toUpperCase();
     }
 
-    private void periodicCleanup() {
-        long now = System.nanoTime();
-        if (now - lastCleanup > CLEANUP_INTERVAL_NANOS) {
-            synchronized (this) {
-                if (now - lastCleanup > CLEANUP_INTERVAL_NANOS) {
-                    lastCleanup = now;
-                    // Remove buckets that haven't been used in 10 minutes
-                    long staleThreshold = System.nanoTime() - TimeUnit.MINUTES.toNanos(10);
-                    buckets.entrySet().removeIf(e -> e.getValue().lastAccess < staleThreshold);
-                }
-            }
+    private String getRoleName() {
+        if (identity == null || identity.isAnonymous()) {
+            return "Anonymous";
+        }
+        // Match highest privilege role
+        if (identity.hasRole("Admin")) return "Admin";
+        if (identity.hasRole("Vorstand")) return "Vorstand";
+        if (identity.hasRole("Mitglied")) return "Mitglied";
+        if (identity.hasRole("Frischling")) return "Frischling";
+        if (identity.hasRole("Besucher")) return "Besucher";
+        return "Besucher";
+    }
+
+    private double getRoleMultiplier(String role) {
+        switch (role) {
+            case "Admin":
+                return 100.0; // Admins get massive limits
+            case "Vorstand":
+                return 5.0;   // 5x base limit
+            case "Mitglied":
+                return 3.0;   // 3x base limit
+            case "Frischling":
+                return 2.0;   // 2x base limit
+            case "Besucher":
+                return 1.2;   // 1.2x base limit
+            default:
+                return 1.0;   // Anonymous/unauthenticated clients get 1x
         }
     }
 
-    /**
-     * Token bucket with smooth refill.
-     */
-    static class TokenBucket {
-        private final double maxTokens;
-        private final long windowNanos;
-        private double tokens;
-        private long lastRefill;
-        volatile long lastAccess;
-
-        TokenBucket(int maxTokens, int windowSeconds) {
-            this.maxTokens = maxTokens;
-            this.windowNanos = TimeUnit.SECONDS.toNanos(windowSeconds);
-            this.tokens = maxTokens; // start full
-            this.lastRefill = System.nanoTime();
-            this.lastAccess = lastRefill;
+    private String getIdentityKey(String ip, String role) {
+        if (identity != null && !identity.isAnonymous()) {
+            return "user:" + identity.getPrincipal().getName() + ":" + role;
         }
-
-        synchronized boolean tryConsume() {
-            refill();
-            lastAccess = System.nanoTime();
-            if (tokens >= 1.0) {
-                tokens -= 1.0;
-                return true;
-            }
-            return false;
-        }
-
-        private void refill() {
-            long now = System.nanoTime();
-            double elapsed = (double) (now - lastRefill) / (double) windowNanos;
-            tokens = Math.min(maxTokens, tokens + elapsed * maxTokens);
-            lastRefill = now;
-        }
+        return "ip:" + ip + ":" + role;
     }
 }

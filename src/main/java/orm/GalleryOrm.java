@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.logging.Logger;
 import model.Gallery;
 import model.User;
+import io.quarkus.cache.CacheResult;
+import io.quarkus.cache.CacheInvalidateAll;
 
 @ApplicationScoped
 public class GalleryOrm {
@@ -18,6 +20,7 @@ public class GalleryOrm {
     @Inject
     EntityManager em;
 
+    @CacheResult(cacheName = "galleries")
     public List<Gallery> getAllGalleries() {
         log.info("GalleryOrm/getAllGalleries");
         TypedQuery<Gallery> query = em.createQuery("SELECT g FROM Gallery g ORDER BY g.date DESC, g.id DESC", Gallery.class);
@@ -25,6 +28,10 @@ public class GalleryOrm {
     }
 
     @Transactional
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "galleries"),
+        @CacheInvalidateAll(cacheName = "galleries-by-id")
+    })
     public Gallery addGallery(Gallery gallery, Long userId) {
         log.info("GalleryOrm/addGallery by user: " + userId);
         User user = em.find(User.class, userId);
@@ -37,6 +44,7 @@ public class GalleryOrm {
         return gallery;
     }
 
+    @CacheResult(cacheName = "galleries-by-id")
     public Gallery getGalleryById(Long id) {
         log.info("GalleryOrm/getGalleryById: " + id);
         TypedQuery<Gallery> query = em.createQuery("SELECT g FROM Gallery g LEFT JOIN FETCH g.creator WHERE g.id = :id", Gallery.class);
@@ -46,6 +54,10 @@ public class GalleryOrm {
     }
 
     @Transactional
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "galleries"),
+        @CacheInvalidateAll(cacheName = "galleries-by-id")
+    })
     public Gallery updateGallery(Gallery gallery) {
         log.info("GalleryOrm/updateGallery: " + gallery.getId());
         Gallery merged = em.merge(gallery);
@@ -54,6 +66,10 @@ public class GalleryOrm {
     }
 
     @Transactional
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "galleries"),
+        @CacheInvalidateAll(cacheName = "galleries-by-id")
+    })
     public void deleteGallery(Long id) {
         log.info("GalleryOrm/deleteGallery: " + id);
         Gallery g = em.find(Gallery.class, id);

@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.logging.Logger;
 import model.Event;
 import model.User;
+import io.quarkus.cache.CacheResult;
+import io.quarkus.cache.CacheInvalidateAll;
 
 @ApplicationScoped
 public class EventOrm {
@@ -19,12 +21,14 @@ public class EventOrm {
     @Inject
     EntityManager em;
 
+    @CacheResult(cacheName = "events")
     public List<Event> getAllEvents() {
         log.info("EventOrm/getAllEvents");
         TypedQuery<Event> query = em.createQuery("SELECT e FROM Event e LEFT JOIN FETCH e.creator ORDER BY e.eventDate ASC", Event.class);
         return query.getResultList();
     }
 
+    @CacheResult(cacheName = "upcoming-events")
     public List<Event> getUpcomingEvents(int limit) {
         log.info("EventOrm/getUpcomingEvents limit=" + limit);
         LocalDateTime now = LocalDateTime.now();
@@ -34,6 +38,7 @@ public class EventOrm {
         return query.getResultList();
     }
 
+    @CacheResult(cacheName = "events-by-id")
     public Event getEventById(Long id) {
         log.info("EventOrm/getEventById: " + id);
         TypedQuery<Event> query = em.createQuery("SELECT e FROM Event e LEFT JOIN FETCH e.creator WHERE e.id = :id", Event.class);
@@ -43,6 +48,12 @@ public class EventOrm {
     }
 
     @Transactional
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "events"),
+        @CacheInvalidateAll(cacheName = "upcoming-events"),
+        @CacheInvalidateAll(cacheName = "events-by-id"),
+        @CacheInvalidateAll(cacheName = "events-by-post-id")
+    })
     public Event addEvent(Event event, Long userId) {
         log.info("EventOrm/addEvent by user: " + userId);
         User user = em.find(User.class, userId);
@@ -56,6 +67,12 @@ public class EventOrm {
     }
 
     @Transactional
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "events"),
+        @CacheInvalidateAll(cacheName = "upcoming-events"),
+        @CacheInvalidateAll(cacheName = "events-by-id"),
+        @CacheInvalidateAll(cacheName = "events-by-post-id")
+    })
     public Event updateEvent(Event event) {
         log.info("EventOrm/updateEvent: " + event.getId());
         Event merged = em.merge(event);
@@ -64,6 +81,12 @@ public class EventOrm {
     }
 
     @Transactional
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "events"),
+        @CacheInvalidateAll(cacheName = "upcoming-events"),
+        @CacheInvalidateAll(cacheName = "events-by-id"),
+        @CacheInvalidateAll(cacheName = "events-by-post-id")
+    })
     public void deleteEvent(Long eventId) {
         log.info("EventOrm/deleteEvent: " + eventId);
         Event event = em.find(Event.class, eventId);
@@ -72,6 +95,7 @@ public class EventOrm {
         }
     }
 
+    @CacheResult(cacheName = "events-by-post-id")
     public Event getEventByForumPostId(Long postId) {
         log.info("EventOrm/getEventByForumPostId: " + postId);
         TypedQuery<Event> query = em.createQuery(

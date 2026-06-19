@@ -58,6 +58,19 @@
       <artifactId>quarkus-micrometer-opentelemetry</artifactId>
     </dependency>
     <dependency>
+      <groupId>io.quarkiverse.bucket4j</groupId>
+      <artifactId>quarkus-bucket4j</artifactId>
+      <version>1.0.7</version>
+    </dependency>
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-cache</artifactId>
+    </dependency>
+    <!-- <dependency>
+      <groupId>com.github.benmanes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
+    </dependency> -->
+    <dependency>
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-junit</artifactId>
       <scope>test</scope>
@@ -83,27 +96,19 @@
     </dependency>
     <dependency>
       <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-jdbc-postgresql</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.quarkus</groupId>
       <artifactId>quarkus-mailer</artifactId>
     </dependency>
-    <dependency>
-        <groupId>org.json</groupId>
-        <artifactId>json</artifactId>
+   <dependency>
+      <groupId>org.json</groupId>
+      <artifactId>json</artifactId>
       <version>20210307</version>
     </dependency>
-    <!-- OIDC support for Authentik -->
     <dependency>
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-security-jpa</artifactId>
     </dependency>
-    <!-- <dependency>
-      <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-jdbc-mysql</artifactId>
-    </dependency> -->
-   <dependency>
+    <!-- OWASP HTML Sanitizer — strips XSS from user-submitted HTML content -->
+    <dependency>
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-smallrye-jwt</artifactId>
     </dependency>
@@ -111,7 +116,7 @@
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-smallrye-jwt-build</artifactId>
     </dependency>
-    <!-- OWASP HTML Sanitizer — strips XSS from user-submitted HTML content -->
+    <!-- OIDC support for Authentik -->
     <dependency>
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-oidc</artifactId>

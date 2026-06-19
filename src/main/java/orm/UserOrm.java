@@ -8,6 +8,8 @@ import jakarta.persistence.TypedQuery;
 import jakarta.transaction.Transactional;
 
 import io.quarkus.elytron.security.common.BcryptUtil;
+import io.quarkus.cache.CacheResult;
+import io.quarkus.cache.CacheInvalidateAll;
 import org.wildfly.security.password.Password;
 import org.wildfly.security.password.PasswordFactory;
 import org.wildfly.security.password.WildFlyElytronPasswordProvider;
@@ -74,14 +76,37 @@ public class UserOrm {
         }
     }
 
+    private void populateEventsAttended(List<User> users) {
+        if (users == null || users.isEmpty()) {
+            return;
+        }
+        List<Long> userIds = users.stream().map(User::getId).toList();
+        try {
+            List<Object[]> counts = em.createQuery(
+                    "SELECT ea.user.id, COUNT(ea) FROM EventAttendance ea WHERE ea.user.id IN :userIds AND ea.status = 'YES' GROUP BY ea.user.id",
+                    Object[].class)
+                    .setParameter("userIds", userIds)
+                    .getResultList();
+
+            java.util.Map<Long, Long> countsMap = new java.util.HashMap<>();
+            for (Object[] row : counts) {
+                countsMap.put((Long) row[0], (Long) row[1]);
+            }
+
+            for (User u : users) {
+                u.setEventsAttended(countsMap.getOrDefault(u.getId(), 0L));
+            }
+        } catch (Exception e) {
+            log.warning("Failed to populate events attended count: " + e.getMessage());
+        }
+    }
+
     public List<User> getUsers() {
         log.info("UserOrm/getUsers");
 
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u", User.class);
         List<User> users = query.getResultList();
-        for (User u : users) {
-            u.setEventsAttended(getEventsAttendedCount(u.getId()));
-        }
+        populateEventsAttended(users);
         return users;
     }
 
@@ -91,9 +116,7 @@ public class UserOrm {
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE id =: val", User.class);
         query.setParameter("val", userId);
         List<User> users = query.getResultList();
-        for (User u : users) {
-            u.setEventsAttended(getEventsAttendedCount(u.getId()));
-        }
+        populateEventsAttended(users);
         return users;
     }
 
@@ -126,6 +149,7 @@ public class UserOrm {
     }
 
     @Transactional
+    @CacheInvalidateAll(cacheName = "team-members")
     public User createOidcUser(String username, String email, String firstName, String lastName, String role) {
         log.info("UserOrm/createOidcUser: " + username + " (" + email + ")");
         User usr = new User();
@@ -155,6 +179,7 @@ public class UserOrm {
     }
 
     @Transactional
+    @CacheInvalidateAll(cacheName = "team-members")
     public Response addUser(User usr) {
         log.info("UserOrm/addUser");
 
@@ -216,6 +241,7 @@ public class UserOrm {
     }
 
     @Transactional
+    @CacheInvalidateAll(cacheName = "team-members")
     public String updateUser(User u) {
         log.info("UserOrm/updateUser");
 
@@ -406,6 +432,7 @@ public class UserOrm {
         return passwordFactory.verify(userPasswordRestored, passwordToVerify.toCharArray());
     }
 
+    @CacheResult(cacheName = "team-members")
     public List<User> getTeamMembers() {
         log.info("UserOrm/getTeamMembers");
         TypedQuery<User> query = em.createQuery(
@@ -415,6 +442,7 @@ public class UserOrm {
     }
 
     @Transactional
+    @CacheInvalidateAll(cacheName = "team-members")
     public User updateUserProfile(Long userId, String phrase, java.time.LocalDate birthday, String firstName,
             String lastName, String email) {
         log.info("UserOrm/updateUserProfile");
@@ -442,6 +470,7 @@ public class UserOrm {
     }
 
     @Transactional
+    @CacheInvalidateAll(cacheName = "team-members")
     public void updateUserPhotoUrl(Long userId, String photoUrl) {
         log.info("UserOrm/updateUserPhotoUrl");
         User user = em.find(User.class, userId);
@@ -452,6 +481,7 @@ public class UserOrm {
     }
 
     @Transactional
+    @CacheInvalidateAll(cacheName = "team-members")
     public void updateUserBackgroundUrl(Long userId, String backgroundUrl) {
         log.info("UserOrm/updateUserBackgroundUrl");
         User user = em.find(User.class, userId);
@@ -462,6 +492,7 @@ public class UserOrm {
     }
 
     @Transactional
+    @CacheInvalidateAll(cacheName = "team-members")
     public Response deleteUser(Long userId) {
         log.info("UserOrm/deleteUser: " + userId);
         User user = em.find(User.class, userId);
@@ -565,6 +596,7 @@ public class UserOrm {
      * which could inadvertently trigger password re-hashing.
      */
     @Transactional
+    @CacheInvalidateAll(cacheName = "team-members")
     public void updateUserRole(Long userId, String role) {
         log.info("UserOrm/updateUserRole: userId=" + userId + " role=" + role);
         User user = em.find(User.class, userId);

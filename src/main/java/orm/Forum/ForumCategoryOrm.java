@@ -11,6 +11,8 @@ import jakarta.persistence.TypedQuery;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.core.Response;
 import jakarta.persistence.Query;
+import io.quarkus.cache.CacheResult;
+import io.quarkus.cache.CacheInvalidateAll;
 
 
 import java.util.logging.Level;
@@ -34,23 +36,27 @@ public class ForumCategoryOrm {
     ForumTopicOrm forumTopicOrm;
 
     //Basic GET methods
+    @CacheResult(cacheName = "forum-categories")
     public List<ForumCategory>getAllCategories(){
        log.info("ForumCategoryOrm/getAllCategories");
         TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c ORDER BY position ASC", ForumCategory.class);
         return query.getResultList();
     }
+    @CacheResult(cacheName = "forum-categories-by-name")
     public List<ForumCategory>getCategoriesByName(String category){
         log.info("ForumCategoryOrm/getCategoriesByName");
         TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c WHERE category =: val", ForumCategory.class);
         query.setParameter("val", category);
         return query.getResultList();
     }
+    @CacheResult(cacheName = "forum-categories-by-id")
     public List<ForumCategory>getCategoriesById(Long id){
         log.info("ForumCategoryOrm/getCategoriesById");
         TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c WHERE id =: val", ForumCategory.class);
         query.setParameter("val", id);
         return query.getResultList();
     }
+    @CacheResult(cacheName = "forum-category-count")
     public long getCategoryCnt(){
         log.info("ForumCategoryOrm/getCategoryCnt");
         Query query = em.createQuery("SELECT COUNT(*) FROM ForumCategory");
@@ -65,6 +71,12 @@ public class ForumCategoryOrm {
         - returns success or the error that accured as a string
     */
     @Transactional
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "forum-categories"),
+        @CacheInvalidateAll(cacheName = "forum-categories-by-name"),
+        @CacheInvalidateAll(cacheName = "forum-categories-by-id"),
+        @CacheInvalidateAll(cacheName = "forum-category-count")
+    })
     public Response addCategory(ForumCategory category, Long userId){
         log.info("ForumCategoryOrm/addCategory");
         if(!getCategoriesByName(category.getCategory()).isEmpty()) return Response.status(406).entity("Kategorie existiert bereits").build(); //Check if category already exists
@@ -149,6 +161,12 @@ public class ForumCategoryOrm {
     }
 
     @Transactional
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "forum-categories"),
+        @CacheInvalidateAll(cacheName = "forum-categories-by-name"),
+        @CacheInvalidateAll(cacheName = "forum-categories-by-id"),
+        @CacheInvalidateAll(cacheName = "forum-category-count")
+    })
     public String updateCategory(ForumCategory forumCategory, Long userId){
         log.info("ForumCategoryOrm/updateCategory");
 
@@ -200,6 +218,12 @@ public class ForumCategoryOrm {
      * Only the category creator or an Admin may delete a category.
      */
     @Transactional
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "forum-categories"),
+        @CacheInvalidateAll(cacheName = "forum-categories-by-name"),
+        @CacheInvalidateAll(cacheName = "forum-categories-by-id"),
+        @CacheInvalidateAll(cacheName = "forum-category-count")
+    })
     public Response deleteCategory(ForumCategory forumCategory, Long userId){
         log.info("ForumCategoryOrm/removeCategory");
         User user = em.find(User.class, userId);
@@ -226,6 +250,13 @@ public class ForumCategoryOrm {
     }
 
     //Custom SQL Querys
+    @Transactional
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "forum-categories"),
+        @CacheInvalidateAll(cacheName = "forum-categories-by-name"),
+        @CacheInvalidateAll(cacheName = "forum-categories-by-id"),
+        @CacheInvalidateAll(cacheName = "forum-category-count")
+    })
     public int insertCategory(long position)
     {
         log.info("ForumCategoryOrm/insertCategory");
@@ -233,6 +264,13 @@ public class ForumCategoryOrm {
         query.setParameter("val", position);
         return query.executeUpdate();
     }
+    @Transactional
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "forum-categories"),
+        @CacheInvalidateAll(cacheName = "forum-categories-by-name"),
+        @CacheInvalidateAll(cacheName = "forum-categories-by-id"),
+        @CacheInvalidateAll(cacheName = "forum-category-count")
+    })
     public int updateCategoryUserName(String newUserName, String oldUserName){
         log.info("ForumCategoryOrm/updateCategoryUserName");
         Query query = em.createNativeQuery("UPDATE FORUM_CATEGORY SET userName =:newUserName WHERE userName =:oldUserName", ForumCategory.class);
