@@ -48,3 +48,4 @@ service_account.json
 .env
 
 target/
+*.code-workspace
