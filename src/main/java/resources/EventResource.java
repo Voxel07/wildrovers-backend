@@ -82,7 +82,7 @@ public class EventResource {
     }
 
     @POST
-    @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
+    @RolesAllowed({ "Frischling", "Mitglied", "Vorstand", "Admin" })
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     @jakarta.transaction.Transactional
@@ -160,7 +160,7 @@ public class EventResource {
     }
 
     @PUT
-    @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
+    @RolesAllowed({ "Frischling", "Mitglied", "Vorstand", "Admin" })
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     @jakarta.transaction.Transactional
@@ -212,7 +212,7 @@ public class EventResource {
 
     @DELETE
     @Path("/{id}")
-    @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
+    @RolesAllowed({ "Frischling", "Mitglied", "Vorstand", "Admin" })
     @Produces(MediaType.APPLICATION_JSON)
     public Response deleteEvent(@PathParam("id") Long id) {
         log.info("EventResource/deleteEvent: " + id);

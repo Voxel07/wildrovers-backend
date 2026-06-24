@@ -49,7 +49,7 @@ public class GalleryResource {
     }
 
     @POST
-    @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
+    @RolesAllowed({ "Frischling", "Mitglied", "Vorstand", "Admin" })
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response addGallery(@Valid Gallery gallery) {
@@ -79,7 +79,7 @@ public class GalleryResource {
 
     @PUT
     @Path("/{id}")
-    @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
+    @RolesAllowed({ "Frischling", "Mitglied", "Vorstand", "Admin" })
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response updateGallery(@PathParam("id") Long id, @Valid Gallery gallery) {
@@ -116,7 +116,7 @@ public class GalleryResource {
 
     @DELETE
     @Path("/{id}")
-    @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
+    @RolesAllowed({ "Frischling", "Mitglied", "Vorstand", "Admin" })
     @Produces(MediaType.APPLICATION_JSON)
     public Response deleteGallery(@PathParam("id") Long id) {
         log.info("GalleryResource/deleteGallery: " + id);
