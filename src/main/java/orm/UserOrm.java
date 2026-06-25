@@ -694,6 +694,8 @@ public class UserOrm {
 
                 em.createNativeQuery("DELETE FROM FORUM_POLL_OPTION_VOTES WHERE user_id = :uid")
                         .setParameter("uid", userId).executeUpdate();
+                em.createNativeQuery("DELETE FROM FORUM_POLL_VOTES WHERE user_id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
                 em.createQuery("DELETE FROM ForumPostVote v WHERE v.user.id = :uid")
                         .setParameter("uid", userId).executeUpdate();
                 em.createQuery("DELETE FROM ForumPostView v WHERE v.user.id = :uid")
