@@ -214,13 +214,15 @@ public class UserResouce {
             @QueryParam("deleteAccount") @DefaultValue("true") boolean deleteAccount,
             @QueryParam("deleteEvents") @DefaultValue("true") boolean deleteEvents,
             @QueryParam("deletePosts") @DefaultValue("false") boolean deletePosts,
-            @QueryParam("deleteGallery") @DefaultValue("true") boolean deleteGallery) {
+            @QueryParam("deleteGallery") @DefaultValue("true") boolean deleteGallery,
+            @QueryParam("hardDelete") @DefaultValue("false") boolean hardDelete) {
         log.info("UserResource/deleteUser: " + userId
             + " (account=" + deleteAccount
             + ", events=" + deleteEvents
             + ", posts=" + deletePosts
-            + ", gallery=" + deleteGallery + ")");
-        return userOrm.deleteUserWithOptions(userId, deleteAccount, deleteEvents, deletePosts, deleteGallery);
+            + ", gallery=" + deleteGallery
+            + ", hardDelete=" + hardDelete + ")");
+        return userOrm.deleteUserWithOptions(userId, deleteAccount, deleteEvents, deletePosts, deleteGallery, hardDelete);
     }
 
     @POST

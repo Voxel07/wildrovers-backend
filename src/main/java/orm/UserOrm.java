@@ -504,7 +504,7 @@ public class UserOrm {
         @CacheInvalidateAll(cacheName = "galleries-by-id")
     })
     public Response deleteUser(Long userId) {
-        return deleteUserWithOptions(userId, true, true, false, true);
+        return deleteUserWithOptions(userId, true, true, false, true, false);
     }
 
     @Transactional
@@ -517,7 +517,7 @@ public class UserOrm {
         @CacheInvalidateAll(cacheName = "galleries"),
         @CacheInvalidateAll(cacheName = "galleries-by-id")
     })
-    public Response deleteUserWithOptions(Long userId, boolean deleteAccount, boolean deleteEvents, boolean deletePosts, boolean deleteGallery) {
+    public Response deleteUserWithOptions(Long userId, boolean deleteAccount, boolean deleteEvents, boolean deletePosts, boolean deleteGallery, boolean hardDelete) {
         log.info("UserOrm/deleteUserWithOptions: " + userId + " (account=" + deleteAccount + ", events=" + deleteEvents + ", posts=" + deletePosts + ", gallery=" + deleteGallery + ")");
         User user = em.find(User.class, userId);
         if (user == null) {
@@ -723,14 +723,18 @@ public class UserOrm {
                 // the isBlocked check in UserPrincipalResolver returns 403.
                 user = em.find(User.class, userId);
                 if (user != null) {
-                    user.setActive(false);
-                    user.setIsBlocked(true);
-                    user.setFirstName("Gelöscht");
-                    user.setLastName("Gelöscht");
-                    user.setPhrase(null);
-                    user.setPhotoUrl(null);
-                    user.setBackgroundUrl(null);
-                    em.merge(user);
+                    if (hardDelete) {
+                        em.remove(user);
+                    } else {
+                        user.setActive(false);
+                        user.setIsBlocked(true);
+                        user.setFirstName("Gelöscht");
+                        user.setLastName("Gelöscht");
+                        user.setPhrase(null);
+                        user.setPhotoUrl(null);
+                        user.setBackgroundUrl(null);
+                        em.merge(user);
+                    }
                 }
             } else {
                 em.merge(user);
