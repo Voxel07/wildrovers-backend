@@ -20,6 +20,8 @@ import jakarta.json.JsonObject;
 
 //Eigene
 import model.User;
+import model.Event;
+import model.Gallery;
 import orm.Forum.ForumCategoryOrm;
 import orm.Secrets.SecretOrm;
 import orm.UserStuff.ActivityForumOrm;
@@ -492,97 +494,248 @@ public class UserOrm {
     }
 
     @Transactional
-    @CacheInvalidateAll(cacheName = "team-members")
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "team-members"),
+        @CacheInvalidateAll(cacheName = "events"),
+        @CacheInvalidateAll(cacheName = "upcoming-events"),
+        @CacheInvalidateAll(cacheName = "events-by-id"),
+        @CacheInvalidateAll(cacheName = "events-by-post-id"),
+        @CacheInvalidateAll(cacheName = "galleries"),
+        @CacheInvalidateAll(cacheName = "galleries-by-id")
+    })
     public Response deleteUser(Long userId) {
-        log.info("UserOrm/deleteUser: " + userId);
+        return deleteUserWithOptions(userId, true, true, false, true);
+    }
+
+    @Transactional
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "team-members"),
+        @CacheInvalidateAll(cacheName = "events"),
+        @CacheInvalidateAll(cacheName = "upcoming-events"),
+        @CacheInvalidateAll(cacheName = "events-by-id"),
+        @CacheInvalidateAll(cacheName = "events-by-post-id"),
+        @CacheInvalidateAll(cacheName = "galleries"),
+        @CacheInvalidateAll(cacheName = "galleries-by-id")
+    })
+    public Response deleteUserWithOptions(Long userId, boolean deleteAccount, boolean deleteEvents, boolean deletePosts, boolean deleteGallery) {
+        log.info("UserOrm/deleteUserWithOptions: " + userId + " (account=" + deleteAccount + ", events=" + deleteEvents + ", posts=" + deletePosts + ", gallery=" + deleteGallery + ")");
         User user = em.find(User.class, userId);
         if (user == null) {
             return Response.status(404).entity("Benutzer nicht gefunden").build();
         }
         try {
-            // Nullify mentor relationship
-            em.createQuery("UPDATE User u SET u.mentor = null WHERE u.mentor.id = :uid")
-                    .setParameter("uid", userId)
-                    .executeUpdate();
+            if (deleteEvents) {
+                em.createQuery("DELETE FROM EventAttendance ea WHERE ea.event.id IN (SELECT e.id FROM Event e WHERE e.creator.id = :uid)")
+                        .setParameter("uid", userId).executeUpdate();
+                em.createQuery("DELETE FROM EventAttendance ea WHERE ea.user.id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
+                em.createQuery("DELETE FROM Event e WHERE e.creator.id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
+            }
 
-            // Delete EventAttendance records first.
-            em.createQuery("DELETE FROM EventAttendance ea WHERE ea.user.id = :uid")
-                    .setParameter("uid", userId)
-                    .executeUpdate();
+            if (deleteGallery) {
+                em.createQuery("DELETE FROM Gallery g WHERE g.creator.id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
+            }
 
-            // Delete Secret via JPQL (owns the user_id FK, must go before User).
-            em.createQuery("DELETE FROM Secret s WHERE s.user.id = :uid")
-                    .setParameter("uid", userId)
-                    .executeUpdate();
+            if (deletePosts) {
+                // ── Smart cascade: delete user's forum content bottom-up ──
+                // 1. Delete pictures of answers by this user, then delete the answers
+                em.createNativeQuery("DELETE FROM FORUM_PICTURE WHERE answer_id IN (SELECT id FROM FORUM_ANSWERS WHERE user_id = :uid)")
+                        .setParameter("uid", userId).executeUpdate();
+                em.createNativeQuery("DELETE FROM FORUM_ANSWERS WHERE user_id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
 
-            // Decrement votes in PollOptions for options the user voted for
-            try {
+                // 2. Identify user's posts that still have answers from other users
                 @SuppressWarnings("unchecked")
-                List<Object> optionIds = em.createNativeQuery("SELECT option_id FROM FORUM_POLL_OPTION_VOTES WHERE user_id = :uid")
-                        .setParameter("uid", userId)
-                        .getResultList();
-                for (Object optionIdObj : optionIds) {
-                    Long optionId = ((Number) optionIdObj).longValue();
-                    em.createQuery("UPDATE PollOptions o SET o.votes = o.votes - 1 WHERE o.id = :oid AND o.votes > 0")
-                            .setParameter("oid", optionId)
-                            .executeUpdate();
+                List<Object> postsWithOtherAnswers = em.createNativeQuery(
+                        "SELECT DISTINCT fp.id FROM FORUM_POSTS fp "
+                        + "INNER JOIN FORUM_ANSWERS fa ON fa.post_id = fp.id "
+                        + "WHERE fp.user_id = :uid")
+                        .setParameter("uid", userId).getResultList();
+
+                @SuppressWarnings("unchecked")
+                List<Object> allUserPostIds = em.createNativeQuery(
+                        "SELECT id FROM FORUM_POSTS WHERE user_id = :uid")
+                        .setParameter("uid", userId).getResultList();
+
+                java.util.Set<Long> postsToKeep = new java.util.HashSet<>();
+                for (Object id : postsWithOtherAnswers) postsToKeep.add(((Number) id).longValue());
+
+                java.util.List<Long> postsToDelete = new java.util.ArrayList<>();
+                for (Object id : allUserPostIds) {
+                    Long pid = ((Number) id).longValue();
+                    if (!postsToKeep.contains(pid)) postsToDelete.add(pid);
                 }
-            } catch (Exception e) {
-                log.warning("Failed to decrement user poll votes: " + e.getMessage());
+
+                // Delete posts that have no remaining answers
+                if (!postsToDelete.isEmpty()) {
+                    em.createNativeQuery("DELETE FROM FORUM_PICTURE WHERE answer_id IN (SELECT id FROM FORUM_ANSWERS WHERE post_id IN (:pids))")
+                            .setParameter("pids", postsToDelete).executeUpdate();
+                    em.createNativeQuery("DELETE FROM FORUM_ANSWERS WHERE post_id IN (:pids)")
+                            .setParameter("pids", postsToDelete).executeUpdate();
+                    em.createNativeQuery("DELETE FROM FORUM_PICTURE WHERE post_id IN (:pids)")
+                            .setParameter("pids", postsToDelete).executeUpdate();
+                    em.createNativeQuery("DELETE FROM FORUM_POLL_OPTION_VOTES WHERE option_id IN (SELECT id FROM FORUM_POLL_OPTIONS WHERE poll_id IN (SELECT id FROM FORUM_POLLS WHERE post_id IN (:pids)))")
+                            .setParameter("pids", postsToDelete).executeUpdate();
+                    em.createNativeQuery("DELETE FROM FORUM_POLL_VOTES WHERE poll_id IN (SELECT id FROM FORUM_POLLS WHERE post_id IN (:pids))")
+                            .setParameter("pids", postsToDelete).executeUpdate();
+                    em.createNativeQuery("DELETE FROM FORUM_POLL_OPTIONS WHERE poll_id IN (SELECT id FROM FORUM_POLLS WHERE post_id IN (:pids))")
+                            .setParameter("pids", postsToDelete).executeUpdate();
+                    em.createNativeQuery("DELETE FROM FORUM_POLLS WHERE post_id IN (:pids)")
+                            .setParameter("pids", postsToDelete).executeUpdate();
+                    em.createNativeQuery("DELETE FROM FORUM_POST_VOTES WHERE post_id IN (:pids)")
+                            .setParameter("pids", postsToDelete).executeUpdate();
+                    em.createNativeQuery("DELETE FROM FORUM_POST_VIEWS WHERE post_id IN (:pids)")
+                            .setParameter("pids", postsToDelete).executeUpdate();
+                    em.createNativeQuery("DELETE FROM FORUM_POSTS WHERE id IN (:pids)")
+                            .setParameter("pids", postsToDelete).executeUpdate();
+                }
+
+                // Nullify creator on posts kept because they still have answers
+                if (!postsToKeep.isEmpty()) {
+                    java.util.List<Long> keepList = new java.util.ArrayList<>(postsToKeep);
+                    em.createNativeQuery("UPDATE FORUM_POSTS SET user_id = NULL WHERE id IN (:pids) AND user_id = :uid")
+                            .setParameter("pids", keepList).setParameter("uid", userId).executeUpdate();
+                    em.createNativeQuery("UPDATE FORUM_POSTS SET editor_id = NULL WHERE id IN (:pids) AND editor_id = :uid")
+                            .setParameter("pids", keepList).setParameter("uid", userId).executeUpdate();
+                }
+
+                // Clean up user's own poll/vote/view records
+                em.createNativeQuery("DELETE FROM FORUM_POLL_OPTION_VOTES WHERE user_id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
+                em.createNativeQuery("DELETE FROM FORUM_POST_VOTES WHERE user_id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
+                em.createNativeQuery("DELETE FROM FORUM_POST_VIEWS WHERE user_id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
+
+                // 3. Smart cascade for topics: delete empty ones, nullify others
+                @SuppressWarnings("unchecked")
+                List<Object> userTopicIds = em.createNativeQuery(
+                        "SELECT id FROM FORUM_TOPIC WHERE user_id = :uid")
+                        .setParameter("uid", userId).getResultList();
+
+                if (!userTopicIds.isEmpty()) {
+                    java.util.List<Long> topicIdList = new java.util.ArrayList<>();
+                    for (Object id : userTopicIds) topicIdList.add(((Number) id).longValue());
+
+                    @SuppressWarnings("unchecked")
+                    List<Object> topicsWithPosts = em.createNativeQuery(
+                            "SELECT DISTINCT ft.id FROM FORUM_TOPIC ft "
+                            + "INNER JOIN FORUM_POSTS fp ON fp.topic_id = ft.id "
+                            + "WHERE ft.id IN (:tids)")
+                            .setParameter("tids", topicIdList).getResultList();
+
+                    java.util.Set<Long> topicsToKeepSet = new java.util.HashSet<>();
+                    for (Object id : topicsWithPosts) topicsToKeepSet.add(((Number) id).longValue());
+
+                    java.util.List<Long> topicsToDelete = new java.util.ArrayList<>();
+                    java.util.List<Long> topicsToNullify = new java.util.ArrayList<>();
+                    for (Long tid : topicIdList) {
+                        if (topicsToKeepSet.contains(tid)) topicsToNullify.add(tid);
+                        else topicsToDelete.add(tid);
+                    }
+
+                    if (!topicsToDelete.isEmpty()) {
+                        em.createNativeQuery("DELETE FROM FORUM_TOPIC WHERE id IN (:tids)")
+                                .setParameter("tids", topicsToDelete).executeUpdate();
+                    }
+                    if (!topicsToNullify.isEmpty()) {
+                        em.createNativeQuery("UPDATE FORUM_TOPIC SET user_id = NULL WHERE id IN (:tids)")
+                                .setParameter("tids", topicsToNullify).executeUpdate();
+                    }
+                }
+
+                // 4. Categories: never delete, only nullify creator
+                em.createQuery("UPDATE ForumCategory c SET c.creator = null WHERE c.creator.id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
+
+                if (user.getActivityForum() != null) {
+                    user.getActivityForum().setPostCount(0L);
+                    user.getActivityForum().setAnswerCount(0L);
+                }
             }
 
-            // Delete votes from option votes table
-            em.createNativeQuery("DELETE FROM FORUM_POLL_OPTION_VOTES WHERE user_id = :uid")
-                    .setParameter("uid", userId)
-                    .executeUpdate();
+            if (deleteAccount) {
+                // Delete EventAttendance records to prevent FK violations
+                em.createQuery("DELETE FROM EventAttendance ea WHERE ea.user.id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
 
-            // Delete votes and views
-            em.createQuery("DELETE FROM ForumPostVote v WHERE v.user.id = :uid")
-                    .setParameter("uid", userId)
-                    .executeUpdate();
-            em.createQuery("DELETE FROM ForumPostView v WHERE v.user.id = :uid")
-                    .setParameter("uid", userId)
-                    .executeUpdate();
+                if (!deleteEvents) {
+                    em.createQuery("UPDATE Event e SET e.creator = null WHERE e.creator.id = :uid")
+                            .setParameter("uid", userId).executeUpdate();
+                }
+                if (!deleteGallery) {
+                    em.createQuery("UPDATE Gallery g SET g.creator = null WHERE g.creator.id = :uid")
+                            .setParameter("uid", userId).executeUpdate();
+                }
 
-            // Nullify creator/editor referencing this user on forum entities
-            em.createQuery("UPDATE ForumCategory c SET c.creator = null WHERE c.creator.id = :uid")
-                    .setParameter("uid", userId)
-                    .executeUpdate();
-            em.createQuery("UPDATE ForumTopic t SET t.creator = null WHERE t.creator.id = :uid")
-                    .setParameter("uid", userId)
-                    .executeUpdate();
-            em.createQuery("UPDATE ForumPost p SET p.creator = null WHERE p.creator.id = :uid")
-                    .setParameter("uid", userId)
-                    .executeUpdate();
-            em.createQuery("UPDATE ForumPost p SET p.editor = null WHERE p.editor.id = :uid")
-                    .setParameter("uid", userId)
-                    .executeUpdate();
-            em.createQuery("UPDATE ForumAnswer a SET a.creator = null WHERE a.creator.id = :uid")
-                    .setParameter("uid", userId)
-                    .executeUpdate();
-            em.createQuery("UPDATE ForumAnswer a SET a.editor = null WHERE a.editor.id = :uid")
-                    .setParameter("uid", userId)
-                    .executeUpdate();
+                // Nullify mentor relationship
+                em.createQuery("UPDATE User u SET u.mentor = null WHERE u.mentor.id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
 
-            // 3. Flush and clear the persistence context.
-            //    JPQL bulk deletes bypass Hibernate's PC (first-level cache), leaving it
-            //    out of sync with the DB. Without this, em.remove(user) can fail because
-            //    Hibernate still sees the old Secret entity as "managed" and tries to
-            //    interact with it during the cascade analysis at flush time.
-            em.flush();
-            em.clear();
+                // Delete Secret
+                em.createQuery("DELETE FROM Secret s WHERE s.user.id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
 
-            // 4. Re-fetch the user on the now-clean PC and remove it.
-            //    Hibernate will cascade to Address, ActivityForum, Phones, and Forum
-            //    entities as configured via CascadeType.ALL on those relationships.
-            user = em.find(User.class, userId);
-            if (user == null) {
-                // Secret was already deleted above; user was somehow gone — treat as success.
-                return Response.ok("Benutzer erfolgreich gelöscht").build();
+                // Decrement votes in PollOptions
+                try {
+                    @SuppressWarnings("unchecked")
+                    List<Object> optionIds = em.createNativeQuery("SELECT option_id FROM FORUM_POLL_OPTION_VOTES WHERE user_id = :uid")
+                            .setParameter("uid", userId).getResultList();
+                    for (Object optionIdObj : optionIds) {
+                        Long optionId = ((Number) optionIdObj).longValue();
+                        em.createQuery("UPDATE PollOptions o SET o.votes = o.votes - 1 WHERE o.id = :oid AND o.votes > 0")
+                                .setParameter("oid", optionId).executeUpdate();
+                    }
+                } catch (Exception e) {
+                    log.warning("Failed to decrement user poll votes: " + e.getMessage());
+                }
+
+                em.createNativeQuery("DELETE FROM FORUM_POLL_OPTION_VOTES WHERE user_id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
+                em.createQuery("DELETE FROM ForumPostVote v WHERE v.user.id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
+                em.createQuery("DELETE FROM ForumPostView v WHERE v.user.id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
+
+                // Nullify creator/editor on remaining forum entities
+                if (!deletePosts) {
+                    em.createQuery("UPDATE ForumCategory c SET c.creator = null WHERE c.creator.id = :uid")
+                            .setParameter("uid", userId).executeUpdate();
+                    em.createQuery("UPDATE ForumTopic t SET t.creator = null WHERE t.creator.id = :uid")
+                            .setParameter("uid", userId).executeUpdate();
+                    em.createQuery("UPDATE ForumPost p SET p.creator = null WHERE p.creator.id = :uid")
+                            .setParameter("uid", userId).executeUpdate();
+                    em.createQuery("UPDATE ForumAnswer a SET a.creator = null WHERE a.creator.id = :uid")
+                            .setParameter("uid", userId).executeUpdate();
+                }
+                em.createQuery("UPDATE ForumPost p SET p.editor = null WHERE p.editor.id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
+                em.createQuery("UPDATE ForumAnswer a SET a.editor = null WHERE a.editor.id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
+
+                em.flush();
+                em.clear();
+
+                // Block the user instead of deleting to prevent OIDC JIT re-provisioning.
+                // Keep email + userName so the OIDC lookup finds this record and
+                // the isBlocked check in UserPrincipalResolver returns 403.
+                user = em.find(User.class, userId);
+                if (user != null) {
+                    user.setActive(false);
+                    user.setIsBlocked(true);
+                    user.setFirstName("Gelöscht");
+                    user.setLastName("Gelöscht");
+                    user.setPhrase(null);
+                    user.setPhotoUrl(null);
+                    user.setBackgroundUrl(null);
+                    em.merge(user);
+                }
+            } else {
+                em.merge(user);
             }
 
-            log.info("Lösche Benutzer: " + user.getUserName());
-            em.remove(user);
             return Response.ok("Benutzer erfolgreich gelöscht").build();
         } catch (Exception e) {
             log.log(Level.SEVERE, "Error deleting user " + userId, e);

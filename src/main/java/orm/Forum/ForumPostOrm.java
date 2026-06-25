@@ -320,10 +320,10 @@ public class ForumPostOrm {
             return "Antwort nicht in der DB gefunden";
 
         User creator = forumPostAusDB.getCreatorObj();
-        if (creator == null)
-            return "creator nicht gesetzt";
+        if (creator == null && !user.getRole().equals("Admin"))
+            return "Nur Admins dürfen verwaiste Einträge bearbeiten";
 
-        if (!creator.getId().equals(userId) && !user.getRole().equals("Admin"))
+        if (creator != null && !creator.getId().equals(userId) && !user.getRole().equals("Admin"))
             return "Nur der Ersteller oder Mods dürfen das";
 
         // Extract base64 images from ORIGINAL content first, then sanitize
@@ -366,10 +366,10 @@ public class ForumPostOrm {
             return "Antwort nicht in der DB gefunden";
 
         User creator = forumPostAusDB.getCreatorObj();
-        if (creator == null)
-            return "creator nicht gesetzt";
+        if (creator == null && !user.getRole().equals("Admin"))
+            return "Nur Admins dürfen verwaiste Einträge bearbeiten";
 
-        if (!creator.getId().equals(userId) && !user.getRole().equals("Admin"))
+        if (creator != null && !creator.getId().equals(userId) && !user.getRole().equals("Admin"))
             return "Nur der Ersteller oder Mods dürfen das";
 
         try {

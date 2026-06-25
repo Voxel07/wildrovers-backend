@@ -67,7 +67,7 @@ public class CacheInvalidationTest {
             em.createNativeQuery("INSERT INTO \"FORUM_CATEGORY\" (id,category,creationDate,topicCount,position,visibility,user_id) VALUES (100,'TestCat',0,0,0,'Besucher',104)").executeUpdate();
             
             // Insert Event (column: creator_id, event_date)
-            em.createNativeQuery("INSERT INTO \"EVENT\" (id,title,description,location,event_date,creator_id) VALUES (100,'TestEvent','Desc','Location','2026-06-20 10:00:00',104)").executeUpdate();
+            em.createNativeQuery("INSERT INTO \"EVENT\" (id,title,description,location,event_date,creator_id) VALUES (100,'TestEvent','Desc','Location',DATEADD('DAY', 2, CURRENT_TIMESTAMP),104)").executeUpdate();
 
             // Insert Gallery (column: creator_id, gallery_date)
             em.createNativeQuery("INSERT INTO \"GALLERY\" (id,title,location,url,gallery_date,creator_id) VALUES (100,'TestGallery','Location','http://url.com','2026-06-20',104)").executeUpdate();

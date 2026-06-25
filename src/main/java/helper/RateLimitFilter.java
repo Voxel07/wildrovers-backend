@@ -7,6 +7,7 @@ import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerResponseContext;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.Provider;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.logging.Logger;
 
@@ -32,6 +33,10 @@ public class RateLimitFilter implements ContainerRequestFilter {
     @Inject
     RequestIpCapture ipCapture;
 
+    @Inject
+    @ConfigProperty(name = "rate-limiter.enabled", defaultValue = "true")
+    boolean rateLimitingEnabled;
+
     /**
      * Injected via Quarkus REST (RESTEasy Reactive) @Context proxy.
      * Must be a field so the proxy can be injected.
@@ -44,6 +49,11 @@ public class RateLimitFilter implements ContainerRequestFilter {
         // 1. Resolve client IP
         String ip = resolveClientIp();
         ipCapture.setClientIp(ip);
+
+        // If rate limiting is disabled, skip checking
+        if (!rateLimitingEnabled) {
+            return;
+        }
 
         // 2. Rate-limit check
         String path = requestContext.getUriInfo().getPath();

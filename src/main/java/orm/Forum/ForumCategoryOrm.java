@@ -177,9 +177,9 @@ public class ForumCategoryOrm {
         if(forumCategoryAusDB == null) return "Kategorie nicht in der DB gefunden";
 
         User creator = forumCategoryAusDB.getCreatorObj();
-        if (creator == null) return "creator nicht gesetzt";
+        if (creator == null && !user.getRole().equals("Admin")) return "Nur Admins dürfen verwaiste Einträge bearbeiten";
 
-        if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
+        if (creator != null && !creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
 
         forumCategoryAusDB.setCategory(forumCategory.getCategory());
 
@@ -233,13 +233,15 @@ public class ForumCategoryOrm {
         if(forumCategoryAusDB == null) return Response.status(406).entity("Kategorie nicht in der DB gefunden").build();
 
         User creator = forumCategoryAusDB.getCreatorObj();
-        if (creator == null) return Response.status(406).entity("Ersteller nicht gesetzt").build();
+        if (creator == null && !user.getRole().equals("Admin")) return Response.status(406).entity("Nur Admins dürfen verwaiste Einträge bearbeiten").build();
 
-        if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return Response.status(406).entity("Nur der Ersteller oder Mods dürfen das").build();
+        if (creator != null && !creator.getId().equals(userId) && !user.getRole().equals("Admin")) return Response.status(406).entity("Nur der Ersteller oder Mods dürfen das").build();
 
         try {
             forumTopicOrm.deleteAllTopicsFromCategory(categoryId);
-            creator.getActivityForum().decCategoryCount();
+            if (creator != null && creator.getActivityForum() != null) {
+                creator.getActivityForum().decCategoryCount();
+            }
             em.remove(forumCategoryAusDB);
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());

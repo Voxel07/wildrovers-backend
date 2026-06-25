@@ -153,9 +153,9 @@ public class ForumTopicOrm {
         if(forumTopicAusDB == null) return "Thema nicht in der DB gefunden";
 
         User creator = forumTopicAusDB.getCreatorObj();
-        if (creator == null) return "creator nicht gesetzt";
+        if (creator == null && !user.getRole().equals("Admin")) return "Nur Admins dürfen verwaiste Einträge bearbeiten";
 
-        if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
+        if (creator != null && !creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
 
         // Sanitize topic name before merging
         forumTopicAusDB.setTopic(htmlSanitizer.sanitizeTitle(forumTopic.getTopic()));
@@ -182,14 +182,16 @@ public class ForumTopicOrm {
         if(forumTopicAusDB == null) return "Thema nicht in der DB gefunden";
 
         User creator = forumTopicAusDB.getCreatorObj();
-        if (creator == null) return "creator nicht gesetzt";
+        if (creator == null && !user.getRole().equals("Admin")) return "Nur Admins dürfen verwaiste Einträge bearbeiten";
 
-        if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
+        if (creator != null && !creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
 
         try {
             forumPostOrm.deleteAllPostsFromTopic(topicId);
 
-            creator.getActivityForum().decTopicCount();
+            if (creator != null && creator.getActivityForum() != null) {
+                creator.getActivityForum().decTopicCount();
+            }
             if (forumTopicAusDB.getCategory() != null) {
                 forumTopicAusDB.getCategory().decTopicCount();
             }

@@ -43,7 +43,7 @@ public class ForumCategory {
     private Long id;
 
     @NotBlank(message = "Category is required")
-    @Size(min = 4, max = 100, message = "Category must be between 4 and 100 characters")
+    @Size(min = 4, max = 35, message = "Category must be between 4 and 35 characters")
     @Column(name = "category", unique = true)
     private String category;
 

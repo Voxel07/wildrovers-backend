@@ -109,9 +109,9 @@ public class ForumAnswerOrm {
         if(forumAnswerAusDB == null) return "Antwort nicht in der DB gefunden";
 
         User creator = forumAnswerAusDB.getCreatorObj();
-        if (creator == null) return "creator nicht gesetzt";
+        if (creator == null && !user.getRole().equals("Admin")) return "Nur Admins dürfen verwaiste Einträge bearbeiten";
 
-        if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
+        if (creator != null && !creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
 
         // Sanitize content before merging
         forumAnswerAusDB.setContent(htmlSanitizer.sanitize(forumAnswer.getContent()));
@@ -140,19 +140,22 @@ public class ForumAnswerOrm {
         if(forumAnswerAusDB == null) return "Antwort nicht in der DB gefunden";
 
         User creator = forumAnswerAusDB.getCreatorObj();
-        if (creator == null) return "creator nicht gesetzt";
+        if (creator == null && !user.getRole().equals("Admin")) return "Nur Admins dürfen verwaiste Einträge bearbeiten";
 
-        if(!creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
+        if (creator != null && !creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
 
         try {
             em.remove(forumAnswerAusDB);
+            if (creator != null && creator.getActivityForum() != null) {
+                creator.getActivityForum().decAnswerCount();
+            }
+            if (forumAnswerAusDB.getPost() != null) {
+                forumAnswerAusDB.getPost().decAnswerCount();
+            }
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return "Fehler beim Löschen der Antwort";
         }
-
-        creator.getActivityForum().decAnswerCount();
-        forumAnswerAusDB.getPost().decAnswerCount();
 
         return "Antwort erfolgreich gelöscht";
     }

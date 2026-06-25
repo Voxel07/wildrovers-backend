@@ -24,7 +24,7 @@ public class EventAttendance {
 
     @JsonIgnore
     @JsonbTransient
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id")
     private User user;
 

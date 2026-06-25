@@ -268,6 +268,10 @@ public class User {
         this.isActive = isActive;
     }
 
+    public void setIsActive(boolean isActive) {
+        this.isActive = isActive;
+    }
+
     public Long getLastLogin() {
         return lastLogin;
     }
@@ -301,6 +305,10 @@ public class User {
     }
 
     public boolean isActive() {
+        return isActive;
+    }
+
+    public boolean getIsActive() {
         return isActive;
     }
 

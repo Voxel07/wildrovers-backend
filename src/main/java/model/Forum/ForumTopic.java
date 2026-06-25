@@ -2,6 +2,8 @@ package model.Forum;
 
 import java.util.ArrayList;
 import java.util.List;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import jakarta.persistence.FetchType;
 import jakarta.json.bind.annotation.JsonbTransient;
 import jakarta.persistence.CascadeType;
@@ -29,6 +31,8 @@ public class ForumTopic {
     @Column(name = "id", unique = true)
     private Long id;
 
+    @NotBlank(message = "Topic is required")
+    @Size(min = 3, max = 35, message = "Topic must be between 3 and 35 characters")
     @Column(name = "topic", unique = true)
     private String topic;
 

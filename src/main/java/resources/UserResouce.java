@@ -27,6 +27,7 @@ import orm.UserOrm;
 import orm.Forum.ForumPostOrm;
 import tools.SignupSettings;
 import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.DefaultValue;
 
 //Sicherheits Zeug
 // Validator
@@ -208,9 +209,18 @@ public class UserResouce {
     @Path("/{userId}")
     @RolesAllowed({ "Admin", "Vorstand" })
     @Produces(MediaType.APPLICATION_JSON)
-    public Response deleteUser(@PathParam("userId") Long userId) {
-        log.info("UserResource/deleteUser: " + userId);
-        return userOrm.deleteUser(userId);
+    public Response deleteUser(
+            @PathParam("userId") Long userId,
+            @QueryParam("deleteAccount") @DefaultValue("true") boolean deleteAccount,
+            @QueryParam("deleteEvents") @DefaultValue("true") boolean deleteEvents,
+            @QueryParam("deletePosts") @DefaultValue("false") boolean deletePosts,
+            @QueryParam("deleteGallery") @DefaultValue("true") boolean deleteGallery) {
+        log.info("UserResource/deleteUser: " + userId
+            + " (account=" + deleteAccount
+            + ", events=" + deleteEvents
+            + ", posts=" + deletePosts
+            + ", gallery=" + deleteGallery + ")");
+        return userOrm.deleteUserWithOptions(userId, deleteAccount, deleteEvents, deletePosts, deleteGallery);
     }
 
     @POST

@@ -1,12 +1,16 @@
 package resources;
 
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
 import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.util.Map;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.*;
@@ -16,7 +20,15 @@ import static org.hamcrest.CoreMatchers.*;
  * Rate limits are enforced by {@link helper.RateLimitFilter} using {@link tools.RateLimiter}.
  */
 @QuarkusTest
+@TestProfile(RateLimitTest.Profile.class)
 public class RateLimitTest {
+
+    public static class Profile implements QuarkusTestProfile {
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            return Map.of("rate-limiter.enabled", "true");
+        }
+    }
 
     @Inject
     EntityManager em;
