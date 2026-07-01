@@ -22,6 +22,7 @@ import jakarta.json.JsonObject;
 import model.User;
 import model.Event;
 import model.Gallery;
+import model.YearlyFee;
 import orm.Forum.ForumCategoryOrm;
 import orm.Secrets.SecretOrm;
 import orm.UserStuff.ActivityForumOrm;
@@ -103,12 +104,45 @@ public class UserOrm {
         }
     }
 
+    /**
+     * Populates transient fields hasPaidCurrentYear and paidYears on each user.
+     */
+    private void populateYearlyFees(List<User> users) {
+        if (users == null || users.isEmpty()) {
+            return;
+        }
+        int currentYear = java.time.Year.now().getValue();
+        List<Long> userIds = users.stream().map(User::getId).toList();
+        try {
+            List<YearlyFee> allFees = em.createQuery(
+                    "SELECT yf FROM YearlyFee yf WHERE yf.user.id IN :userIds ORDER BY yf.feeYear",
+                    YearlyFee.class)
+                    .setParameter("userIds", userIds)
+                    .getResultList();
+
+            java.util.Map<Long, java.util.List<Integer>> feesByUser = new java.util.HashMap<>();
+            for (YearlyFee yf : allFees) {
+                feesByUser.computeIfAbsent(yf.getUser().getId(), k -> new java.util.ArrayList<>())
+                        .add(yf.getFeeYear());
+            }
+
+            for (User u : users) {
+                java.util.List<Integer> years = feesByUser.getOrDefault(u.getId(), java.util.Collections.emptyList());
+                u.setPaidYears(years);
+                u.setHasPaidCurrentYear(years.contains(currentYear));
+            }
+        } catch (Exception e) {
+            log.warning("Failed to populate yearly fees: " + e.getMessage());
+        }
+    }
+
     public List<User> getUsers() {
         log.info("UserOrm/getUsers");
 
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u", User.class);
         List<User> users = query.getResultList();
         populateEventsAttended(users);
+        populateYearlyFees(users);
         return users;
     }
 
@@ -119,6 +153,7 @@ public class UserOrm {
         query.setParameter("val", userId);
         List<User> users = query.getResultList();
         populateEventsAttended(users);
+        populateYearlyFees(users);
         return users;
     }
 
@@ -127,7 +162,9 @@ public class UserOrm {
 
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE userName =: val", User.class);
         query.setParameter("val", userName);
-        return query.getResultList();
+        List<User> users = query.getResultList();
+        populateYearlyFees(users);
+        return users;
     }
 
     public User findByUsername(String username) {
@@ -322,8 +359,22 @@ public class UserOrm {
         if (u.getIsBlocked() != null) {
             dbUser.setIsBlocked(u.getIsBlocked());
         }
-        if (u.getYearlyFeePaid() != null) {
-            dbUser.setYearlyFeePaid(u.getYearlyFeePaid());
+        // Handle yearlyFeePaid toggle: add/remove YearlyFee for current year
+        if (u.getHasPaidCurrentYear() != null) {
+            int currentYear = java.time.Year.now().getValue();
+            boolean currentlyPaid = dbUser.getYearlyFees().stream()
+                    .anyMatch(yf -> yf.getFeeYear() == currentYear);
+            if (u.getHasPaidCurrentYear() && !currentlyPaid) {
+                YearlyFee yf = new YearlyFee(currentYear, dbUser);
+                em.persist(yf);
+                dbUser.getYearlyFees().add(yf);
+            } else if (!u.getHasPaidCurrentYear() && currentlyPaid) {
+                dbUser.getYearlyFees().removeIf(yf -> yf.getFeeYear() == currentYear);
+                em.createQuery("DELETE FROM YearlyFee yf WHERE yf.user.id = :uid AND yf.feeYear = :year")
+                        .setParameter("uid", dbUser.getId())
+                        .setParameter("year", currentYear)
+                        .executeUpdate();
+            }
         }
         if (u.getCanCreateCategory() != null) {
             dbUser.setCanCreateCategory(u.getCanCreateCategory());
@@ -440,7 +491,9 @@ public class UserOrm {
         TypedQuery<User> query = em.createQuery(
                 "SELECT u FROM User u WHERE u.role IN ('Admin', 'Vorstand', 'Mitglied', 'Frischling') AND u.isActive = true",
                 User.class);
-        return query.getResultList();
+        List<User> users = query.getResultList();
+        populateYearlyFees(users);
+        return users;
     }
 
     @Transactional

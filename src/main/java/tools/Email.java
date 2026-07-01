@@ -18,6 +18,9 @@ public class Email {
     @org.eclipse.microprofile.config.inject.ConfigProperty(name = "app.base-url", defaultValue = "http://localhost:8080")
     String baseUrl;
 
+    @org.eclipse.microprofile.config.inject.ConfigProperty(name = "app.frontend-url", defaultValue = "http://localhost:5173")
+    String appFrontendUrl;
+
     public Response sendVerificationMail(String email, String verificationCode) {
         String htmlBody = "<!DOCTYPE html>" +
             "<html>" +
@@ -55,11 +58,7 @@ public class Email {
     }
 
     public Response sendPasswordResetMail(String email, String resetToken) {
-        String frontendUrl = baseUrl;
-        if (baseUrl.contains("localhost:8080")) {
-            frontendUrl = "http://localhost:5173";
-        }
-        String resetLink = frontendUrl + "/password-reset?token=" + resetToken;
+        String resetLink = appFrontendUrl + "/password-reset?token=" + resetToken;
 
         String htmlBody = "<!DOCTYPE html>" +
             "<html>" +

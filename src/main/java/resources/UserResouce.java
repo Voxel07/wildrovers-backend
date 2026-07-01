@@ -27,6 +27,7 @@ import orm.UserOrm;
 import orm.Forum.ForumPostOrm;
 import tools.SignupSettings;
 import tools.AuditLogger;
+import model.Users.Roles;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.DefaultValue;
 
@@ -115,13 +116,19 @@ public class UserResouce {
     @RolesAllowed({ "Admin", "Vorstand" })
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public String updateUser(User user) {
+    public Response updateUser(User user) {
         log.info("UserResource/updateUser");
         User admin = userPrincipalResolver.resolveUser();
         AuditLogger.crud(log, admin != null ? admin.getUserName() : "unknown",
                 admin != null ? admin.getId() : null,
                 "UPDATE", "User", user.getId(), "userName=" + user.getUserName());
-        return userOrm.updateUser(user);
+        // Block Vorstand from modifying Admin users
+        if (admin != null && "Vorstand".equals(admin.getRole()) && "Admin".equals(user.getRole())) {
+            log.warning("Vorstand attempted to modify Admin user: " + user.getId());
+            return Response.status(403).entity("Vorstand darf keine Admin-Benutzer bearbeiten.").build();
+        }
+        String result = userOrm.updateUser(user);
+        return Response.ok(result).build();
     }
 
     @POST
@@ -238,6 +245,13 @@ public class UserResouce {
                 admin != null ? admin.getId() : null,
                 "DELETE", "User", userId,
                 "hardDelete=" + hardDelete + " events=" + deleteEvents + " posts=" + deletePosts + " gallery=" + deleteGallery);
+        // Block Vorstand from deleting Admin users
+        if (admin != null && "Vorstand".equals(admin.getRole())) {
+            List<User> targetUsers = userOrm.getUserById(userId);
+            if (!targetUsers.isEmpty() && "Admin".equals(targetUsers.get(0).getRole())) {
+                return Response.status(403).entity("Vorstand darf keine Admin-Benutzer löschen.").build();
+            }
+        }
         return userOrm.deleteUserWithOptions(userId, deleteAccount, deleteEvents, deletePosts, deleteGallery, hardDelete);
     }
 
@@ -301,7 +315,7 @@ public class UserResouce {
 
             ImageIO.write(scaled, "jpg", destPath.toFile());
 
-            String photoUrl = "/user/photo/" + user.getId();
+            String photoUrl = "/user/photo/" + user.getId() + "?v=" + System.currentTimeMillis();
             userOrm.updateUserPhotoUrl(user.getId(), photoUrl);
 
             jakarta.json.JsonObject result = jakarta.json.Json.createObjectBuilder()
@@ -390,6 +404,35 @@ public class UserResouce {
         }
     }
 
+    @DELETE
+    @Path("/me/photo")
+    @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response deletePhoto() {
+        log.info("UserResource/deletePhoto");
+        User user = userPrincipalResolver.resolveUser();
+        if (user == null) {
+            return Response.status(401).entity("Nicht eingeloggt").build();
+        }
+
+        try {
+            String base = uploadDir.replace("${user.home}", System.getProperty("user.home"));
+            java.nio.file.Path filePath = Paths.get(base, user.getId() + ".jpg");
+            File file = filePath.toFile();
+            if (file.exists() && file.isFile()) {
+                Files.deleteIfExists(filePath);
+            }
+            userOrm.updateUserPhotoUrl(user.getId(), null);
+
+            return Response.ok(jakarta.json.Json.createObjectBuilder()
+                    .add("message", "Profilbild gelöscht")
+                    .build()).build();
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Failed to delete photo", e);
+            return Response.status(500).entity("Fehler beim Löschen des Profilbildes").build();
+        }
+    }
+
     @GET
     @Path("/photo/{userId}")
     @PermitAll
@@ -428,7 +471,36 @@ public class UserResouce {
     @Produces(MediaType.APPLICATION_JSON)
     public Response getTeamMembers() {
         log.info("UserResource/getTeamMembers");
-        return Response.ok(userOrm.getTeamMembers()).build();
+        List<User> members = userOrm.getTeamMembers();
+        User currentUser = userPrincipalResolver.resolveUser();
+        boolean isTeamMember = currentUser != null
+                && model.Users.Roles.hasRequiredRole(currentUser.getRole(), model.Users.Roles.FRESHMAN);
+        if (!isTeamMember) {
+            // Strip real names for non-team members — work on copies to avoid
+            // Hibernate validation failures on managed entities
+            List<User> stripped = new java.util.ArrayList<>();
+            for (User u : members) {
+                User copy = new User();
+                copy.setId(u.getId());
+                copy.setUserName(u.getUserName());
+                copy.setEmail(u.getEmail());
+                copy.setRole(u.getRole());
+                copy.setPhotoUrl(u.getPhotoUrl());
+                copy.setBackgroundUrl(u.getBackgroundUrl());
+                copy.setPhrase(u.getPhrase());
+                copy.setBirthday(u.getBirthday());
+                copy.setRegDate(u.getRegDate());
+                copy.setRibbon(u.getRibbon());
+                copy.setVisitedOps(u.getVisitedOps());
+                copy.setHasPaidCurrentYear(u.getHasPaidCurrentYear());
+                copy.setPaidYears(u.getPaidYears());
+                copy.setEventsAttended(u.getEventsAttended());
+                // firstName and lastName intentionally left null
+                stripped.add(copy);
+            }
+            return Response.ok(stripped).build();
+        }
+        return Response.ok(members).build();
     }
 
     private BufferedImage scaleImage(BufferedImage src, int maxDim) {

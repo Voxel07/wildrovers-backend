@@ -41,15 +41,22 @@ public class UserPrincipalResolver {
 
         String username = identity.getPrincipal().getName();
         boolean isLocalJwt = Boolean.TRUE.equals(identity.getAttribute("local-jwt"));
-        String email;
+        String email = null;
+        String firstName = null;
+        String lastName = null;
+
         if (isLocalJwt) {
             email = identity.getAttribute("email"); // set by LocalJwtAuthMechanism
         } else {
-            email = jwt.getClaim("email"); // OIDC access token
+            try {
+                email = jwt.getClaim("email"); // OIDC access token
+                firstName = jwt.getClaim("given_name");
+                lastName = jwt.getClaim("family_name");
+            } catch (Exception e) {
+                // Running under @TestSecurity or without a real JWT — resolve by username
+                log.fine("JWT claims not available, resolving by username: " + username);
+            }
         }
-
-        String firstName = isLocalJwt ? null : jwt.getClaim("given_name");
-        String lastName = isLocalJwt ? null : jwt.getClaim("family_name");
         Set<String> groups = identity.getRoles();
         String mappedRole = mapOidcGroupsToRole(groups);
 
@@ -83,18 +90,22 @@ public class UserPrincipalResolver {
             user = userOrm.findByUsername(username);
         }
 
-        // If user is not in database, JIT-provision them
-        if (user == null) {
+        // If user is not in database, JIT-provision them (only with valid OIDC data)
+        if (user == null && email != null && !email.isBlank()) {
             log.info("User not found in DB. JIT-provisioning a new user...");
             user = userOrm.createOidcUser(username, email, firstName, lastName, mappedRole);
-        } else {
-            // Update roles if they changed in Authentik (skip for local logins)
-            if (!isLocalJwt && mappedRole != null) {
-                if (!mappedRole.equals(user.getRole())) {
-                    log.info("User role changed in identity provider. Syncing role: " + user.getRole() + " -> " + mappedRole);
-                    user.setRole(mappedRole);
-                    userOrm.updateUserRole(user.getId(), mappedRole);
-                }
+        }
+
+        if (user == null) {
+            return null;
+        }
+
+        // Update roles if they changed in Authentik (skip for local logins)
+        if (!isLocalJwt && mappedRole != null) {
+            if (!mappedRole.equals(user.getRole())) {
+                log.info("User role changed in identity provider. Syncing role: " + user.getRole() + " -> " + mappedRole);
+                user.setRole(mappedRole);
+                userOrm.updateUserRole(user.getId(), mappedRole);
             }
         }
 

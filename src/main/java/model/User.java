@@ -121,8 +121,17 @@ public class User {
     @Column(name = "ribbon")
     private String ribbon;
 
-    @Column(name = "yearlyFeePaid", columnDefinition = "boolean default false")
-    private Boolean yearlyFeePaid = false;
+    @JsonIgnore
+    @JsonbTransient
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private List<YearlyFee> yearlyFees = new ArrayList<>();
+
+    // Transient computed fields for frontend convenience
+    @jakarta.persistence.Transient
+    private Boolean hasPaidCurrentYear = false;
+
+    @jakarta.persistence.Transient
+    private List<Integer> paidYears = new ArrayList<>();
 
     @Column(name = "canCreateCategory", columnDefinition = "boolean default false")
     private Boolean canCreateCategory = false;
@@ -432,11 +441,35 @@ public class User {
     }
 
     public Boolean getYearlyFeePaid() {
-        return yearlyFeePaid != null ? yearlyFeePaid : false;
+        return hasPaidCurrentYear != null ? hasPaidCurrentYear : false;
     }
 
     public void setYearlyFeePaid(Boolean yearlyFeePaid) {
-        this.yearlyFeePaid = yearlyFeePaid;
+        this.hasPaidCurrentYear = yearlyFeePaid;
+    }
+
+    public List<YearlyFee> getYearlyFees() {
+        return yearlyFees;
+    }
+
+    public void setYearlyFees(List<YearlyFee> yearlyFees) {
+        this.yearlyFees = yearlyFees;
+    }
+
+    public Boolean getHasPaidCurrentYear() {
+        return hasPaidCurrentYear != null ? hasPaidCurrentYear : false;
+    }
+
+    public void setHasPaidCurrentYear(Boolean hasPaidCurrentYear) {
+        this.hasPaidCurrentYear = hasPaidCurrentYear;
+    }
+
+    public List<Integer> getPaidYears() {
+        return paidYears;
+    }
+
+    public void setPaidYears(List<Integer> paidYears) {
+        this.paidYears = paidYears;
     }
 
     public Boolean getCanCreateCategory() {

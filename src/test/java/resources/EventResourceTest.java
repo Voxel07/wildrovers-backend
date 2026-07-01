@@ -18,11 +18,11 @@ class EventResourceTest {
     @BeforeEach @Transactional
     void setup() {
         try {
-            em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked,yearlyFeePaid) VALUES (200,'evtest@t.l','evTest','test1234','Ev','Test','Frischling',true,0,false,false,false)").executeUpdate();
+            em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (200,'evtest@t.l','evTest','test1234','Ev','Test','Frischling',true,0,false,false)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (200,'test1234',true,'v-ev',200)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"ACTVITY_FORUM\" (id,categoryCount,topicCount,postCount,answerCount,user_id) VALUES (200,0,0,0,0,200)").executeUpdate();
 
-            em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked,yearlyFeePaid) VALUES (201,'visitor@t.l','visitorTest','test1234','Visitor','Test','Besucher',true,0,false,false,false)").executeUpdate();
+            em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (201,'visitor@t.l','visitorTest','test1234','Visitor','Test','Besucher',true,0,false,false)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (201,'test1234',true,'v-vis',201)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"ACTVITY_FORUM\" (id,categoryCount,topicCount,postCount,answerCount,user_id) VALUES (201,0,0,0,0,201)").executeUpdate();
 

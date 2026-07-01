@@ -40,7 +40,7 @@ class UserDeletionTest {
             em.flush();
 
             // Admin user + full forum data
-            em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked,yearlyFeePaid) VALUES (500,'del@t.l','delTest','test1234','Del','Test','Admin',true,0,true,false,true)").executeUpdate();
+            em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (500,'del@t.l','delTest','test1234','Del','Test','Admin',true,0,true,false)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (500,'test1234',true,'v-del',500)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"ACTVITY_FORUM\" (id,categoryCount,topicCount,postCount,answerCount,user_id) VALUES (500,0,0,0,0,500)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"FORUM_CATEGORY\" (id,category,creationDate,topicCount,position,visibility,user_id) VALUES (500,'DelCat',0,0,0,'Besucher',500)").executeUpdate();
@@ -54,7 +54,7 @@ class UserDeletionTest {
     @Transactional
     Long createUser(String username, String role) {
         Long id = ((Number) em.createNativeQuery("SELECT NEXT VALUE FOR ZSEQ_USER_ID").getSingleResult()).longValue();
-        em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked,yearlyFeePaid) VALUES (:id,:em,:un,'test1234','T','T',:role,true,0,:cc,false,false)")
+        em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (:id,:em,:un,'test1234','T','T',:role,true,0,:cc,false)")
             .setParameter("id",id).setParameter("em",username+"@t.l").setParameter("un",username).setParameter("role",role).setParameter("cc",!"Besucher".equals(role)).executeUpdate();
         Long sid = ((Number) em.createNativeQuery("SELECT NEXT VALUE FOR ZSEQ_KEYS_ID").getSingleResult()).longValue();
         em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (:id,'test1234',true,:vid,:uid)").setParameter("id",sid).setParameter("vid","v-"+username).setParameter("uid",id).executeUpdate();

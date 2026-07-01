@@ -148,9 +148,9 @@ public class SecretRecource {
         Long timestamp = secret.getResetTokenTimestamp();
         if (timestamp != null) {
             long elapsed = tools.Time.currentTimeInMillis() - timestamp;
-            if (elapsed > 15 * 60 * 1000) {
+            if (elapsed > 5 * 60 * 1000) {
                 return Response.status(Response.Status.BAD_REQUEST)
-                        .entity("{\"status\":\"error\", \"message\":\"Dieser Reset-Link ist abgelaufen.\"}")
+                        .entity("{\"status\":\"error\", \"message\":\"Dieser Reset-Link ist abgelaufen (max. 5 Minuten gültig).\"}")
                         .build();
             }
         } else {
