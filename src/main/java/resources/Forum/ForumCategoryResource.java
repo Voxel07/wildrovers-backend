@@ -28,6 +28,7 @@ import jakarta.annotation.security.RolesAllowed;
 import model.Forum.ForumCategory;
 import orm.Forum.ForumCategoryOrm;
 import model.Users.Roles;
+import tools.AuditLogger;
 
 
 
@@ -92,6 +93,8 @@ public class ForumCategoryResource {
         if (Roles.VSISITOR.equals(user.getRole()) && !user.getCanCreateCategory()) {
             return Response.status(403).entity("Du hast keine Berechtigung, Kategorien zu verwalten.").build();
         }
+        AuditLogger.crud(log, user.getUserName(), user.getId(), "CREATE", "Category",
+                forumCategory.getCategory());
         return forumCategoryOrm.addCategory(forumCategory, user.getId());
     }
 
@@ -109,6 +112,8 @@ public class ForumCategoryResource {
         if (Roles.VSISITOR.equals(user.getRole()) && !user.getCanCreateCategory()) {
             return Response.status(403).entity("Du hast keine Berechtigung, Kategorien zu verwalten.").build();
         }
+        AuditLogger.crud(log, user.getUserName(), user.getId(), "UPDATE", "Category",
+                forumCategory.getId());
         String result = forumCategoryOrm.updateCategory(forumCategory, user.getId());
         return Response.ok(result).build();
     }
@@ -127,6 +132,8 @@ public class ForumCategoryResource {
         if (Roles.VSISITOR.equals(user.getRole()) && !user.getCanCreateCategory()) {
             return Response.status(403).entity("Du hast keine Berechtigung, Kategorien zu verwalten.").build();
         }
+        AuditLogger.crud(log, user.getUserName(), user.getId(), "DELETE", "Category",
+                forumCategory.getId());
         return forumCategoryOrm.deleteCategory(forumCategory, user.getId());
     }
 }

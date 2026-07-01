@@ -27,6 +27,7 @@ import jakarta.annotation.security.RolesAllowed;
 import model.Forum.ForumPost;
 import orm.Forum.ForumPostOrm;
 import model.Forum.Pictures;
+import tools.AuditLogger;
 
 import model.Users.Roles;
 
@@ -172,6 +173,9 @@ public class ForumPostResource {
         }
         else
         {
+            model.User user = userPrincipalResolver.resolveUser();
+            AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+                    "CREATE", "Post", forumPost.getTitle());
             return forumPostOrm.addPost(forumPost, topicId, userId);
         }
     }
@@ -204,6 +208,9 @@ public class ForumPostResource {
         if (userId == null || forumPost == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
         } else {
+            model.User user = userPrincipalResolver.resolveUser();
+            AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+                    "UPDATE", "Post", forumPost.getId());
             String result = forumPostOrm.updatePost(forumPost, userId);
             return Response.ok(result).build();
         }
@@ -219,6 +226,9 @@ public class ForumPostResource {
         if (userId == null || forumPost == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
         } else {
+            model.User user = userPrincipalResolver.resolveUser();
+            AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+                    "DELETE", "Post", forumPost.getId());
             String result = forumPostOrm.deletePost(forumPost, userId);
             return Response.ok(result).build();
         }
@@ -236,6 +246,9 @@ public class ForumPostResource {
         if (userId == null || postId == null || type == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
         }
+        model.User user = userPrincipalResolver.resolveUser();
+        AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+                "VOTE", "Post", postId, "type=" + type);
         return forumPostOrm.votePost(postId, type, userId);
     }
 }

@@ -11,6 +11,7 @@ import model.Forum.Polls.Polls;
 import model.Users.Roles;
 import orm.Forum.ForumPollOrm;
 import helper.UserPrincipalResolver;
+import tools.AuditLogger;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -36,6 +37,9 @@ public class ForumPollResource {
         if (userId == null) {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Nicht angemeldet").build();
         }
+        model.User user = userPrincipalResolver.resolveUser();
+        AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+                "CREATE", "Poll", "post=" + postId);
         return forumPollOrm.createPoll(postId, poll, userId);
     }
 
@@ -47,6 +51,9 @@ public class ForumPollResource {
         if (userId == null) {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Nicht angemeldet").build();
         }
+        model.User user = userPrincipalResolver.resolveUser();
+        AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+                "VOTE", "Poll", pollId);
         return forumPollOrm.vote(pollId, optionIds, userId);
     }
 
@@ -94,6 +101,9 @@ public class ForumPollResource {
         if (userId == null) {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Nicht angemeldet").build();
         }
+        model.User user = userPrincipalResolver.resolveUser();
+        AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+                "DELETE", "Poll", pollId);
         return forumPollOrm.deletePoll(pollId, userId);
     }
 
@@ -106,6 +116,9 @@ public class ForumPollResource {
         if (userId == null) {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Nicht angemeldet").build();
         }
+        model.User user = userPrincipalResolver.resolveUser();
+        AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+                "UPDATE", "Poll", pollId);
         return forumPollOrm.updatePoll(pollId, poll, userId);
     }
 }

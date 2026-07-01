@@ -25,6 +25,7 @@ import tools.GoogleCalendarService;
 import model.Forum.ForumPost;
 import orm.Forum.ForumPostOrm;
 import model.EventAttendance;
+import tools.AuditLogger;
 import java.time.format.DateTimeFormatter;
 import java.util.logging.Level;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -92,6 +93,8 @@ public class EventResource {
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
         }
+        AuditLogger.crud(log, user.getUserName(), user.getId(), "CREATE", "Event",
+                event.getTitle());
 
         // Sanitize inputs
         event.setTitle(htmlSanitizer.sanitizeTitle(event.getTitle()));
@@ -170,6 +173,8 @@ public class EventResource {
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
         }
+        AuditLogger.crud(log, user.getUserName(), user.getId(), "UPDATE", "Event",
+                event.getId());
 
         Event existing = eventOrm.getEventById(event.getId());
         if (existing == null) {
@@ -220,6 +225,7 @@ public class EventResource {
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
         }
+        AuditLogger.crud(log, user.getUserName(), user.getId(), "DELETE", "Event", id);
 
         Event existing = eventOrm.getEventById(id);
         if (existing == null) {
@@ -258,6 +264,8 @@ public class EventResource {
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
         }
+        AuditLogger.crud(log, user.getUserName(), user.getId(), "ATTEND", "Event",
+                eventId, "status=" + attendanceInput.getStatus());
 
         Event event = eventOrm.getEventById(eventId);
         if (event == null) {

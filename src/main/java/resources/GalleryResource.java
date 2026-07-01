@@ -20,6 +20,7 @@ import model.Gallery;
 import model.User;
 import orm.GalleryOrm;
 import tools.HtmlSanitizer;
+import tools.AuditLogger;
 
 import java.util.List;
 import java.util.logging.Logger;
@@ -58,6 +59,8 @@ public class GalleryResource {
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
         }
+        AuditLogger.crud(log, user.getUserName(), user.getId(), "CREATE", "Gallery",
+                gallery.getTitle());
 
         // Sanitize user inputs
         gallery.setTitle(htmlSanitizer.sanitizeTitle(gallery.getTitle()));
@@ -88,6 +91,7 @@ public class GalleryResource {
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
         }
+        AuditLogger.crud(log, user.getUserName(), user.getId(), "UPDATE", "Gallery", id);
 
         Gallery existing = galleryOrm.getGalleryById(id);
         if (existing == null) {
@@ -124,6 +128,7 @@ public class GalleryResource {
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
         }
+        AuditLogger.crud(log, user.getUserName(), user.getId(), "DELETE", "Gallery", id);
 
         Gallery existing = galleryOrm.getGalleryById(id);
         if (existing == null) {

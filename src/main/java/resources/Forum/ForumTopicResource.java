@@ -27,6 +27,7 @@ import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
 import model.Forum.ForumTopic;
 import orm.Forum.ForumTopicOrm;
+import tools.AuditLogger;
 
 @Path("/forum/topic")
 @ApplicationScoped
@@ -104,6 +105,8 @@ public class ForumTopicResource {
         if (Roles.VSISITOR.equals(user.getRole()) && !user.getCanCreateCategory()) {
             return Response.status(403).entity("Besucher dürfen keine Themen erstellen/verwalten.").build();
         }
+        AuditLogger.crud(log, user.getUserName(), user.getId(), "CREATE", "Topic",
+                forumTopic.getTopic());
         return forumTopicOrm.addTopic(forumTopic, categoryId, user.getId());
     }
 
@@ -121,6 +124,7 @@ public class ForumTopicResource {
         if (Roles.VSISITOR.equals(user.getRole()) && !user.getCanCreateCategory()) {
             return Response.status(403).entity("Besucher dürfen keine Themen erstellen/verwalten.").build();
         }
+        AuditLogger.crud(log, user.getUserName(), user.getId(), "UPDATE", "Topic", ft.getId());
         String result = forumTopicOrm.updateTopic(ft, user.getId());
         return Response.ok(result).build();
     }
@@ -139,6 +143,7 @@ public class ForumTopicResource {
         if (Roles.VSISITOR.equals(user.getRole()) && !user.getCanCreateCategory()) {
             return Response.status(403).entity("Besucher dürfen keine Themen erstellen/verwalten.").build();
         }
+        AuditLogger.crud(log, user.getUserName(), user.getId(), "DELETE", "Topic", ft.getId());
         String result = forumTopicOrm.deleteTopic(ft, user.getId());
         return Response.ok(result).build();
     }

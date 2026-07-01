@@ -23,6 +23,7 @@ import jakarta.ws.rs.QueryParam;
 
 import model.Forum.ForumAnswer;
 import orm.Forum.ForumAnswerOrm;
+import tools.AuditLogger;
 
 import jakarta.ws.rs.core.Response;
 import model.Users.Roles;
@@ -109,6 +110,9 @@ public class ForumAnswerResource{
         }
         else
         {
+            model.User user = userPrincipalResolver.resolveUser();
+            AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+                    "CREATE", "Answer", postId);
             return forumAnswerOrm.addAnswer(forumAnswer, postId, userId);
         }
     }
@@ -123,6 +127,9 @@ public class ForumAnswerResource{
         if(userId == null || forumAnswer == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
         }
+        model.User user = userPrincipalResolver.resolveUser();
+        AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+                "UPDATE", "Answer", forumAnswer.getId());
         String result = forumAnswerOrm.updateAnswer(forumAnswer,userId);
         return Response.ok(result).build();
     }
@@ -137,6 +144,9 @@ public class ForumAnswerResource{
         if(userId == null || forumAnswer == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
         }
+        model.User user = userPrincipalResolver.resolveUser();
+        AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+                "DELETE", "Answer", forumAnswer.getId());
         String result = forumAnswerOrm.deleteAnswer(forumAnswer,userId);
         return Response.ok(result).build();
     }

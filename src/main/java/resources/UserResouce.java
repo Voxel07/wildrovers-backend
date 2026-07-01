@@ -26,6 +26,7 @@ import model.User;
 import orm.UserOrm;
 import orm.Forum.ForumPostOrm;
 import tools.SignupSettings;
+import tools.AuditLogger;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.DefaultValue;
 
@@ -116,6 +117,10 @@ public class UserResouce {
     @Consumes(MediaType.APPLICATION_JSON)
     public String updateUser(User user) {
         log.info("UserResource/updateUser");
+        User admin = userPrincipalResolver.resolveUser();
+        AuditLogger.crud(log, admin != null ? admin.getUserName() : "unknown",
+                admin != null ? admin.getId() : null,
+                "UPDATE", "User", user.getId(), "userName=" + user.getUserName());
         return userOrm.updateUser(user);
     }
 
@@ -150,6 +155,8 @@ public class UserResouce {
                     .entity("Die Registrierung ist derzeit deaktiviert.")
                     .build();
         }
+        AuditLogger.crud(log, usr.getUserName(), null, "REGISTER", "User",
+                usr.getUserName());
         return userOrm.addUser(usr);
     }
 
@@ -198,6 +205,10 @@ public class UserResouce {
     @Produces(MediaType.APPLICATION_JSON)
     public Response setSignupEnabled(@QueryParam("enabled") boolean enabled) {
         log.info("UserResource/setSignupEnabled: " + enabled);
+        User admin = userPrincipalResolver.resolveUser();
+        AuditLogger.crud(log, admin != null ? admin.getUserName() : "unknown",
+                admin != null ? admin.getId() : null,
+                "TOGGLE", "SignupSettings", null, "enabled=" + enabled);
         signupSettings.setSignupEnabled(enabled);
         jakarta.json.JsonObject result = jakarta.json.Json.createObjectBuilder()
                 .add("signupEnabled", signupSettings.isSignupEnabled())
@@ -222,6 +233,11 @@ public class UserResouce {
             + ", posts=" + deletePosts
             + ", gallery=" + deleteGallery
             + ", hardDelete=" + hardDelete + ")");
+        User admin = userPrincipalResolver.resolveUser();
+        AuditLogger.crud(log, admin != null ? admin.getUserName() : "unknown",
+                admin != null ? admin.getId() : null,
+                "DELETE", "User", userId,
+                "hardDelete=" + hardDelete + " events=" + deleteEvents + " posts=" + deletePosts + " gallery=" + deleteGallery);
         return userOrm.deleteUserWithOptions(userId, deleteAccount, deleteEvents, deletePosts, deleteGallery, hardDelete);
     }
 
@@ -236,6 +252,8 @@ public class UserResouce {
         if (user == null) {
             return Response.status(401).entity("Benutzer nicht eingeloggt").build();
         }
+        AuditLogger.crud(log, user.getUserName(), user.getId(), "UPDATE", "Profile",
+                user.getId());
         String phrase = null;
         if (profileData.getPhrase() != null) {
             phrase = htmlSanitizer.sanitizeTitle(profileData.getPhrase());
