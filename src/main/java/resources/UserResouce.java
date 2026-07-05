@@ -278,7 +278,7 @@ public class UserResouce {
         }
         try {
             userOrm.updateUserProfile(user.getId(), phrase, profileData.getBirthday(), profileData.getFirstName(),
-                    profileData.getLastName(), profileData.getEmail());
+                    profileData.getLastName(), profileData.getEmail(), profileData.getUserName());
             return Response.ok(userOrm.getUserById(user.getId()).get(0)).build();
         } catch (IllegalArgumentException e) {
             return Response.status(400).entity(e.getMessage()).build();

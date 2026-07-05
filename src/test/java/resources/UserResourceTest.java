@@ -27,7 +27,8 @@ class UserResourceTest {
             em.flush();
 
             em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (100,'besucher@test.local','testBesucher','test1234','Besucher','Test','Besucher',true,0,false,false),(101,'frischling@test.local','testFrischling','test1234','Frischling','Test','Frischling',true,0,true,false),(102,'mitglied@test.local','testMitglied','test1234','Mitglied','Test','Mitglied',true,0,true,false),(103,'vorstand@test.local','testVorstand','test1234','Vorstand','Test','Vorstand',true,0,true,false),(104,'admin@test.local','testAdmin','test1234','Admin','Test','Admin',true,0,true,false)").executeUpdate();
-            em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (100,'test1234',true,'v-b',100),(101,'test1234',true,'v-f',101),(102,'test1234',true,'v-m',102),(103,'test1234',true,'v-v',103),(104,'test1234',true,'v-a',104)").executeUpdate();
+            String hash = io.quarkus.elytron.security.common.BcryptUtil.bcryptHash("test1234");
+            em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (100,'" + hash + "',true,'v-b',100),(101,'" + hash + "',true,'v-f',101),(102,'" + hash + "',true,'v-m',102),(103,'" + hash + "',true,'v-v',103),(104,'" + hash + "',true,'v-a',104)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"FORUM_CATEGORY\" (id,category,creationDate,topicCount,position,visibility,user_id) VALUES (100,'Testkategorie',0,0,0,'Besucher',104)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"FORUM_TOPIC\" (id,topic,creationDate,postCount,views,user_id,category_id) VALUES (100,'Testthema',0,0,0,104,100)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"FORUM_POSTS\" (id,title,content,creationDate,likes,dislikes,answerCount,user_id,topic_id) VALUES (100,'Testbeitrag','<p>Inhalt</p>',0,0,0,0,104,100)").executeUpdate();
@@ -74,6 +75,35 @@ class UserResourceTest {
     // Profile update
     @Test @TestSecurity(user="testBesucher",roles={"Besucher"}) void updateProfile() { given().contentType(ContentType.JSON).body("{\"phrase\":\"Hi\"}").post("/user/me/profile").then().statusCode(anyOf(is(200),is(401),is(500))); }
     @Test void updateProfile_unauth() { given().contentType(ContentType.JSON).body("{}").post("/user/me/profile").then().statusCode(anyOf(is(401),is(500))); }
+
+    @Test void testUsernameChangeAndLogin() {
+        // 1. Login to get cookie
+        io.restassured.response.Response loginResp = given().contentType(ContentType.JSON)
+                .body("{\"userName\":\"testBesucher\",\"password\":\"test1234\"}")
+                .post("/user/login");
+        loginResp.then().statusCode(200);
+        String cookie = loginResp.getCookie("jwt");
+
+        // 2. Change username to an existing one (should fail)
+        given().contentType(ContentType.JSON).cookie("jwt", cookie)
+                .body("{\"userName\":\"testAdmin\",\"firstName\":\"Besucher\",\"lastName\":\"Test\"}")
+                .post("/user/me/profile").then().statusCode(400);
+
+        // 3. Change username to a new unique one
+        given().contentType(ContentType.JSON).cookie("jwt", cookie)
+                .body("{\"userName\":\"newBesucher\",\"firstName\":\"Besucher\",\"lastName\":\"Test\"}")
+                .post("/user/me/profile").then().statusCode(200);
+
+        // 4. Try to login with old username (should fail)
+        given().contentType(ContentType.JSON)
+                .body("{\"userName\":\"testBesucher\",\"password\":\"test1234\"}")
+                .post("/user/login").then().statusCode(401);
+
+        // 5. Try to login with new username (should succeed)
+        given().contentType(ContentType.JSON)
+                .body("{\"userName\":\"newBesucher\",\"password\":\"test1234\"}")
+                .post("/user/login").then().statusCode(200);
+    }
 
     // Misc
     @Test void teamMembers() { given().get("/user/members").then().statusCode(200); }

@@ -262,18 +262,13 @@ public class ForumCategoryOrm {
         query.setParameter("val", position);
         return query.executeUpdate();
     }
-    @Transactional
     @CacheInvalidateAll.List({
         @CacheInvalidateAll(cacheName = "forum-categories"),
         @CacheInvalidateAll(cacheName = "forum-categories-by-name"),
         @CacheInvalidateAll(cacheName = "forum-categories-by-id"),
         @CacheInvalidateAll(cacheName = "forum-category-count")
     })
-    public int updateCategoryUserName(String newUserName, String oldUserName){
-        log.info("ForumCategoryOrm/updateCategoryUserName");
-        Query query = em.createNativeQuery("UPDATE FORUM_CATEGORY SET userName =:newUserName WHERE userName =:oldUserName", ForumCategory.class);
-        query.setParameter("newUserName", newUserName);
-        query.setParameter("oldUserName", oldUserName);
-        return query.executeUpdate();
+    public void invalidateCategoryCaches(){
+        log.info("ForumCategoryOrm/invalidateCategoryCaches");
     }
 }

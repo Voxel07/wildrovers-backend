@@ -387,7 +387,10 @@ public class UserOrm {
     }
 
     @Transactional
-    @CacheInvalidateAll(cacheName = "team-members")
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "team-members"),
+        @CacheInvalidateAll(cacheName = "resolved-users")
+    })
     public String updateUser(User u) {
         log.info("UserOrm/updateUser");
 
@@ -441,10 +444,10 @@ public class UserOrm {
         // be the correct one.
         if (!u.getUserName().equals(dbUser.getUserName())) {
             try {
-                forumCategoryOrm.updateCategoryUserName(u.getUserName(), dbUser.getUserName());
+                forumCategoryOrm.invalidateCategoryCaches();
             } catch (Exception e) {
 
-                return "Fehler beim Updaten der Kategorien" + e.toString();
+                return "Fehler beim Invalidate der Kategorien-Caches" + e.toString();
             }
             // Topics, Posts, and Answers reference the User entity via JPA FK relations,
             // so they automatically reflect the updated username — no manual update needed.
@@ -604,12 +607,30 @@ public class UserOrm {
     }
 
     @Transactional
-    @CacheInvalidateAll(cacheName = "team-members")
+    @CacheInvalidateAll.List({
+        @CacheInvalidateAll(cacheName = "team-members"),
+        @CacheInvalidateAll(cacheName = "resolved-users")
+    })
     public User updateUserProfile(Long userId, String phrase, java.time.LocalDate birthday, String firstName,
-            String lastName, String email) {
+            String lastName, String email, String userName) {
         log.info("UserOrm/updateUserProfile");
         User user = em.find(User.class, userId);
         if (user != null) {
+            if (userName != null && !userName.isBlank()) {
+                User existing = findByUsername(userName);
+                if (existing != null && !existing.getId().equals(userId)) {
+                    throw new IllegalArgumentException(
+                            "Dieser Benutzername wird bereits verwendet.");
+                }
+                if (!userName.equals(user.getUserName())) {
+                    try {
+                        forumCategoryOrm.invalidateCategoryCaches();
+                    } catch (Exception e) {
+                        throw new IllegalArgumentException("Fehler beim Invalidate der Kategorien-Caches.");
+                    }
+                }
+                user.setUserName(userName);
+            }
             if (firstName != null && !firstName.isBlank()) {
                 user.setFirstName(firstName);
             }
