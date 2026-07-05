@@ -163,6 +163,10 @@ public class ForumPost {
         return creator != null ? creator.getUserName() : "deleted";
     }
 
+    public String getCreatorPhotoUrl() {
+        return creator != null ? creator.getPhotoUrl() : null;
+    }
+
     public void setCreator(User creator) {
         this.creator = creator;
     }
