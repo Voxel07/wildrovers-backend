@@ -38,7 +38,6 @@ public class RateLimitTest {
     void setup() {
         try {
             em.createNativeQuery("DELETE FROM \"SECRET\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"ACTVITY_FORUM\"").executeUpdate();
             em.createNativeQuery("DELETE FROM \"FORUM_CATEGORY\"").executeUpdate();
             em.createNativeQuery("DELETE FROM \"EVENT\"").executeUpdate();
             em.createNativeQuery("DELETE FROM \"GALLERY\"").executeUpdate();
@@ -48,7 +47,6 @@ public class RateLimitTest {
             // Insert test users
             em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (100,'besucher@test.local','testBesucher','test1234','Besucher','Test','Besucher',true,0,false,false),(104,'admin@test.local','testAdmin','test1234','Admin','Test','Admin',true,0,true,false)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (100,'test1234',true,'v-b',100),(104,'test1234',true,'v-a',104)").executeUpdate();
-            em.createNativeQuery("INSERT INTO \"ACTVITY_FORUM\" (id,categoryCount,topicCount,postCount,answerCount,user_id) VALUES (100,0,0,0,0,100),(104,0,0,0,0,104)").executeUpdate();
             em.flush();
         } catch (Exception ignored) {}
     }

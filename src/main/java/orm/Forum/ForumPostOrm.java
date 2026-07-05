@@ -195,7 +195,6 @@ public class ForumPostOrm {
 
         forumPost.setCreationDate(Time.currentTimeInMillis());
 
-        user.getActivityForum().incPostCount();
         topic.incPostCount();
         forumPost.setTopic(topic);
         forumPost.setCreator(user);
@@ -373,11 +372,7 @@ public class ForumPostOrm {
             return "Nur der Ersteller oder Mods dürfen das";
 
         try {
-            // 1. Update stats (decrement post count on creator/topic)
-            if (creator != null && creator.getActivityForum() != null) {
-                creator.getActivityForum().decPostCount();
-                em.merge(creator);
-            }
+            // 1. Update stats (decrement post count on topic)
             if (forumPostAusDB.getTopic() != null) {
                 forumPostAusDB.getTopic().decPostCount();
                 em.merge(forumPostAusDB.getTopic());
@@ -456,9 +451,6 @@ public class ForumPostOrm {
             return "Fehler beim Löschen der Posts";
         }
 
-        // Maybe set count to 0
-        // User user = em.find(User.class, userId);
-        // user.getActivityForum().setAnswerCount(0L);
         return "Posts erfolgreich gelöscht";
     }
 
@@ -470,17 +462,9 @@ public class ForumPostOrm {
     public String deleteAllPostsFromTopic(Long topicId) {
         log.info("ForumPostOrm/deleteAllPostsFromTopic");
 
-        // Get all answers that will be affected to Update the affected user.
+        // Get all posts to clean up associated data
         List<ForumPost> allPosts = getPostsByTopic(topicId);
-        HashMap<User, Long> map = new HashMap<User, Long>();
-        // Loop all answers to count the number of deleted answers per user.
         for (ForumPost forumPost : allPosts) {
-            User u = forumPost.getCreatorObj();
-            if (map.containsKey(u)) {
-                map.put(u, map.get(u) + 1);
-            } else {
-                map.put(u, 1L);
-            }
             forumAnswerOrm.deleteAllAnswersFromTopic(forumPost.getId());
 
             // Delete votes and views
@@ -509,11 +493,6 @@ public class ForumPostOrm {
             return "Fehler beim Löschen der Antworten";
         }
 
-        for (Entry<User, Long> entry : map.entrySet()) {
-            User k = entry.getKey();
-            Long v = entry.getValue();
-            k.getActivityForum().setPostCount(k.getActivityForum().getPostCount() - v);
-        }
         return "Posts erfolgreich gelöscht:";
     }
 

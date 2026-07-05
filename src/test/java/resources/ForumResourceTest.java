@@ -20,7 +20,6 @@ class ForumResourceTest {
         try {
             em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (400,'forum@t.l','forumTest','test1234','Forum','Test','Frischling',true,0,true,false)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (400,'test1234',true,'v-fo',400)").executeUpdate();
-            em.createNativeQuery("INSERT INTO \"ACTVITY_FORUM\" (id,categoryCount,topicCount,postCount,answerCount,user_id) VALUES (400,0,0,0,0,400)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"FORUM_CATEGORY\" (id,category,creationDate,topicCount,position,visibility,user_id) VALUES (400,'TestCat',0,0,0,'Besucher',400)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"FORUM_TOPIC\" (id,topic,creationDate,postCount,views,user_id,category_id) VALUES (400,'TestTopic',0,0,0,400,400)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"FORUM_POSTS\" (id,title,content,creationDate,likes,dislikes,answerCount,user_id,topic_id) VALUES (400,'TestPost','<p>C</p>',0,0,0,0,400,400)").executeUpdate();

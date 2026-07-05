@@ -91,6 +91,10 @@ public class UserResouce {
             return Response.status(403).entity("Dein Account wurde gesperrt.").build();
         }
         user.setEventsAttended(userOrm.getEventsAttendedCount(user.getId()));
+        user.setForumPostCount(userOrm.getForumPostCount(user.getId()));
+        user.setForumAnswerCount(userOrm.getForumAnswerCount(user.getId()));
+        user.setForumTopicCount(userOrm.getForumTopicCount(user.getId()));
+        user.setForumCategoryCount(userOrm.getForumCategoryCount(user.getId()));
         return Response.ok(user).build();
     }
 

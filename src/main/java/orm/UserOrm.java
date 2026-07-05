@@ -25,7 +25,6 @@ import model.Gallery;
 import model.YearlyFee;
 import orm.Forum.ForumCategoryOrm;
 import orm.Secrets.SecretOrm;
-import orm.UserStuff.ActivityForumOrm;
 import tools.Email;
 import tools.GeoIPService;
 import helper.RequestIpCapture;
@@ -47,9 +46,6 @@ public class UserOrm {
 
     @Inject
     EntityManager em;
-
-    @Inject
-    ActivityForumOrm activityForumOrm;
 
     @Inject
     SecretOrm secretOrm;
@@ -76,6 +72,119 @@ public class UserOrm {
                     .getSingleResult();
         } catch (Exception e) {
             return 0L;
+        }
+    }
+
+    public Long getForumPostCount(Long userId) {
+        try {
+            return em.createQuery("SELECT COUNT(fp) FROM ForumPost fp WHERE fp.creator.id = :userId", Long.class)
+                    .setParameter("userId", userId).getSingleResult();
+        } catch (Exception e) { return 0L; }
+    }
+
+    public Long getForumAnswerCount(Long userId) {
+        try {
+            return em.createQuery("SELECT COUNT(fa) FROM ForumAnswer fa WHERE fa.creator.id = :userId", Long.class)
+                    .setParameter("userId", userId).getSingleResult();
+        } catch (Exception e) { return 0L; }
+    }
+
+    public Long getForumTopicCount(Long userId) {
+        try {
+            return em.createQuery("SELECT COUNT(ft) FROM ForumTopic ft WHERE ft.creator.id = :userId", Long.class)
+                    .setParameter("userId", userId).getSingleResult();
+        } catch (Exception e) { return 0L; }
+    }
+
+    public Long getForumCategoryCount(Long userId) {
+        try {
+            return em.createQuery("SELECT COUNT(fc) FROM ForumCategory fc WHERE fc.creator.id = :userId", Long.class)
+                    .setParameter("userId", userId).getSingleResult();
+        } catch (Exception e) { return 0L; }
+    }
+
+    private void populateForumActivity(List<User> users) {
+        if (users == null || users.isEmpty()) return;
+        List<Long> userIds = users.stream().map(User::getId).toList();
+
+        // Forum posts (not deleted)
+        try {
+            List<Object[]> counts = em.createQuery(
+                    "SELECT fp.creator.id, COUNT(fp) FROM ForumPost fp WHERE fp.creator.id IN :userIds GROUP BY fp.creator.id",
+                    Object[].class)
+                    .setParameter("userIds", userIds)
+                    .getResultList();
+            java.util.Map<Long, Long> map = new java.util.HashMap<>();
+            for (Object[] row : counts) map.put((Long) row[0], (Long) row[1]);
+            for (User u : users) u.setForumPostCount(map.getOrDefault(u.getId(), 0L));
+        } catch (Exception e) {
+            log.warning("Failed to populate forum post counts: " + e.getMessage());
+        }
+
+        // Forum answers (not deleted)
+        try {
+            List<Object[]> counts = em.createQuery(
+                    "SELECT fa.creator.id, COUNT(fa) FROM ForumAnswer fa WHERE fa.creator.id IN :userIds GROUP BY fa.creator.id",
+                    Object[].class)
+                    .setParameter("userIds", userIds)
+                    .getResultList();
+            java.util.Map<Long, Long> map = new java.util.HashMap<>();
+            for (Object[] row : counts) map.put((Long) row[0], (Long) row[1]);
+            for (User u : users) u.setForumAnswerCount(map.getOrDefault(u.getId(), 0L));
+        } catch (Exception e) {
+            log.warning("Failed to populate forum answer counts: " + e.getMessage());
+        }
+
+        // Forum topics (not deleted)
+        try {
+            List<Object[]> counts = em.createQuery(
+                    "SELECT ft.creator.id, COUNT(ft) FROM ForumTopic ft WHERE ft.creator.id IN :userIds GROUP BY ft.creator.id",
+                    Object[].class)
+                    .setParameter("userIds", userIds)
+                    .getResultList();
+            java.util.Map<Long, Long> map = new java.util.HashMap<>();
+            for (Object[] row : counts) map.put((Long) row[0], (Long) row[1]);
+            for (User u : users) u.setForumTopicCount(map.getOrDefault(u.getId(), 0L));
+        } catch (Exception e) {
+            log.warning("Failed to populate forum topic counts: " + e.getMessage());
+        }
+
+        // Forum categories (not deleted)
+        try {
+            List<Object[]> counts = em.createQuery(
+                    "SELECT fc.creator.id, COUNT(fc) FROM ForumCategory fc WHERE fc.creator.id IN :userIds GROUP BY fc.creator.id",
+                    Object[].class)
+                    .setParameter("userIds", userIds)
+                    .getResultList();
+            java.util.Map<Long, Long> map = new java.util.HashMap<>();
+            for (Object[] row : counts) map.put((Long) row[0], (Long) row[1]);
+            for (User u : users) u.setForumCategoryCount(map.getOrDefault(u.getId(), 0L));
+        } catch (Exception e) {
+            log.warning("Failed to populate forum category counts: " + e.getMessage());
+        }
+
+        // Last forum activity (most recent post or answer creationDate)
+        try {
+            java.util.Map<Long, Long> lastActivity = new java.util.HashMap<>();
+            List<Object[]> postMax = em.createQuery(
+                    "SELECT fp.creator.id, MAX(fp.creationDate) FROM ForumPost fp WHERE fp.creator.id IN :userIds GROUP BY fp.creator.id",
+                    Object[].class).setParameter("userIds", userIds).getResultList();
+            for (Object[] row : postMax) {
+                Long uid = (Long) row[0];
+                Long ts = (Long) row[1];
+                lastActivity.merge(uid, ts, Math::max);
+            }
+            List<Object[]> answerMax = em.createQuery(
+                    "SELECT fa.creator.id, MAX(fa.creationDate) FROM ForumAnswer fa WHERE fa.creator.id IN :userIds GROUP BY fa.creator.id",
+                    Object[].class).setParameter("userIds", userIds).getResultList();
+            for (Object[] row : answerMax) {
+                Long uid = (Long) row[0];
+                Long ts = (Long) row[1];
+                lastActivity.merge(uid, ts, Math::max);
+            }
+            for (User u : users) u.setLastForumActivity(lastActivity.get(u.getId()));
+        } catch (Exception e) {
+            log.warning("Failed to populate last forum activity: " + e.getMessage());
         }
     }
 
@@ -143,6 +252,7 @@ public class UserOrm {
         List<User> users = query.getResultList();
         populateEventsAttended(users);
         populateYearlyFees(users);
+        populateForumActivity(users);
         return users;
     }
 
@@ -154,6 +264,7 @@ public class UserOrm {
         List<User> users = query.getResultList();
         populateEventsAttended(users);
         populateYearlyFees(users);
+        populateForumActivity(users);
         return users;
     }
 
@@ -203,7 +314,6 @@ public class UserOrm {
 
         try {
             em.persist(usr);
-            activityForumOrm.addActivityForum(usr.getId());
 
             // Register secret for user, marked verified since they authenticated via OIDC
             String verificationId = secretOrm.generateVerificationId();
@@ -250,13 +360,10 @@ public class UserOrm {
          * Needs to be after the User has been persisted to the Database so we can get
          * the ID;
          */
-        // create Activity logs
-        Long userId = usr.getId();
-        activityForumOrm.addActivityForum(userId);
-
         /*
          * Generate secrets
          */
+        Long userId = usr.getId();
         String verificationId = secretOrm.generateVerificationId();
         secretOrm.addSecret(userId, false, verificationId, passwordHash);
         // Id zurückgeben
@@ -702,11 +809,6 @@ public class UserOrm {
                 // 4. Categories: never delete, only nullify creator
                 em.createQuery("UPDATE ForumCategory c SET c.creator = null WHERE c.creator.id = :uid")
                         .setParameter("uid", userId).executeUpdate();
-
-                if (user.getActivityForum() != null) {
-                    user.getActivityForum().setPostCount(0L);
-                    user.getActivityForum().setAnswerCount(0L);
-                }
             }
 
             if (deleteAccount) {

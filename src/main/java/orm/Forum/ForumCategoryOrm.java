@@ -115,7 +115,6 @@ public class ForumCategoryOrm {
         }
 
         //Update User
-        user.getActivityForum().incCategoryCount();
         category.setCreator(user);
         category.setTopicCount(0L);
         return Response.status(201).entity("Kategorie erfolgreich erstellt").build();
@@ -239,9 +238,6 @@ public class ForumCategoryOrm {
 
         try {
             forumTopicOrm.deleteAllTopicsFromCategory(categoryId);
-            if (creator != null && creator.getActivityForum() != null) {
-                creator.getActivityForum().decCategoryCount();
-            }
             em.remove(forumCategoryAusDB);
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());

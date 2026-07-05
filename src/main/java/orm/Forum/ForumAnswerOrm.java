@@ -87,7 +87,6 @@ public class ForumAnswerOrm {
         forumAnswer.setDislikes(0L);
         forumAnswer.setLikes(0L);
         forumPost.incAnswerCount();
-        user.getActivityForum().incAnswerCount();
         try {
             em.persist(forumAnswer);
         } catch (Exception e) {
@@ -146,9 +145,6 @@ public class ForumAnswerOrm {
 
         try {
             em.remove(forumAnswerAusDB);
-            if (creator != null && creator.getActivityForum() != null) {
-                creator.getActivityForum().decAnswerCount();
-            }
             if (forumAnswerAusDB.getPost() != null) {
                 forumAnswerAusDB.getPost().decAnswerCount();
             }
@@ -175,9 +171,6 @@ public class ForumAnswerOrm {
             return "Fehler beim Löschen der Antworten";
         }
 
-        //Maybe set count to 0
-        // User user = em.find(User.class, userId);
-        // user.getActivityForum().setAnswerCount(0L);
         return "Antworten erfolgreich gelöscht";
     }
 
@@ -189,20 +182,6 @@ public class ForumAnswerOrm {
     public String deleteAllAnswersFromTopic(Long postId){
         log.info("ForumAnswerOrm/deleteAllAnswersFromTopic");
 
-        //Get all answers that will be affected to Update the affected user.
-        List<ForumAnswer> allAnswers = getAnswersByPost(postId);
-        HashMap<User, Long> map = new HashMap<User,Long>();
-        //Loop all answers to count the number of deleted answers per user.
-        for (ForumAnswer forumAnswer : allAnswers) {
-           User u = forumAnswer.getCreatorObj();
-           if(map.containsKey(u))
-           {
-                map.put(u, map.get(u) + 1);
-           }
-           else{
-               map.put(u, 1L);
-           }
-        }
         try {
             em.createQuery("DELETE FROM ForumPicture fp WHERE fp.answer.id IN (SELECT fa.id FROM ForumAnswer fa WHERE fa.post.id = :postId)").setParameter("postId", postId).executeUpdate();
             em.createQuery("DELETE FROM ForumAnswer fa WHERE fa.post.id = :val").setParameter("val", postId).executeUpdate();
@@ -211,11 +190,6 @@ public class ForumAnswerOrm {
             return "Fehler beim Löschen der Antworten";
         }
 
-        for (Entry<User, Long> entry : map.entrySet()) {
-            User k = entry.getKey();
-            Long v = entry.getValue();
-            k.getActivityForum().setAnswerCount(k.getActivityForum().getAnswerCount() - v);
-        }
         return "Antworten erfolgreich gelöscht:";
     }
 }

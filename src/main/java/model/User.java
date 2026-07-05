@@ -32,7 +32,6 @@ import model.Forum.ForumAnswer;
 import model.Forum.ForumCategory;
 import model.Forum.ForumPost;
 import model.Forum.ForumTopic;
-import model.Users.ActivityForum;
 import model.Users.Secret;
 
 //Validator
@@ -95,8 +94,6 @@ public class User {
     @OneToOne(cascade = CascadeType.ALL, mappedBy = "userAddress")
     private Address address;
 
-    @OneToOne(cascade = CascadeType.ALL, mappedBy = "user")
-    private ActivityForum activityForum;
 
     @JsonIgnore
     @JsonbTransient
@@ -141,6 +138,21 @@ public class User {
 
     @jakarta.persistence.Transient
     private Long eventsAttended = 0L;
+
+    @jakarta.persistence.Transient
+    private Long forumPostCount = 0L;
+
+    @jakarta.persistence.Transient
+    private Long forumAnswerCount = 0L;
+
+    @jakarta.persistence.Transient
+    private Long forumTopicCount = 0L;
+
+    @jakarta.persistence.Transient
+    private Long forumCategoryCount = 0L;
+
+    @jakarta.persistence.Transient
+    private Long lastForumActivity = null;
 
     @JsonIgnore
     @JsonbTransient
@@ -357,13 +369,44 @@ public class User {
         this.editedAnswers = editedAnswers;
     }
 
-    @JsonbTransient
-    public ActivityForum getActivityForum() {
-        return activityForum;
+    public Long getForumPostCount() {
+        return forumPostCount;
     }
 
-    public void setActivityForum(ActivityForum activityForum) {
-        this.activityForum = activityForum;
+    public void setForumPostCount(Long forumPostCount) {
+        this.forumPostCount = forumPostCount;
+    }
+
+    public Long getForumAnswerCount() {
+        return forumAnswerCount;
+    }
+
+    public void setForumAnswerCount(Long forumAnswerCount) {
+        this.forumAnswerCount = forumAnswerCount;
+    }
+
+    public Long getForumTopicCount() {
+        return forumTopicCount;
+    }
+
+    public void setForumTopicCount(Long forumTopicCount) {
+        this.forumTopicCount = forumTopicCount;
+    }
+
+    public Long getForumCategoryCount() {
+        return forumCategoryCount;
+    }
+
+    public void setForumCategoryCount(Long forumCategoryCount) {
+        this.forumCategoryCount = forumCategoryCount;
+    }
+
+    public Long getLastForumActivity() {
+        return lastForumActivity;
+    }
+
+    public void setLastForumActivity(Long lastForumActivity) {
+        this.lastForumActivity = lastForumActivity;
     }
 
     @JsonbTransient
@@ -540,7 +583,7 @@ public class User {
 
     @Override
     public String toString() {
-        return "User [activityForum=" + activityForum + ", address=" + address + ", answers=" + answers
+        return "User [address=" + address + ", forumPostCount=" + forumPostCount + ", forumAnswerCount=" + forumAnswerCount + ", answers=" + answers
                 + ", categories=" + categories + ", editedAnswers=" + editedAnswers + ", editedPosts=" + editedPosts
                 + ", email=" + email + ", firstName=" + firstName + ", id=" + id + ", isActive=" + isActive
                 + ", lastLogin=" + lastLogin + ", lastName=" + lastName + ", password=" + password + ", phones="

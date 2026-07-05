@@ -20,11 +20,9 @@ class GalleryResourceTest {
         try {
             em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (300,'gal@t.l','galTest','test1234','Gal','Test','Frischling',true,0,false,false)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (300,'test1234',true,'v-ga',300)").executeUpdate();
-            em.createNativeQuery("INSERT INTO \"ACTVITY_FORUM\" (id,categoryCount,topicCount,postCount,answerCount,user_id) VALUES (300,0,0,0,0,300)").executeUpdate();
 
             em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (301,'visitor@t.l','visitorTest','test1234','Visitor','Test','Besucher',true,0,false,false)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (301,'test1234',true,'v-vis',301)").executeUpdate();
-            em.createNativeQuery("INSERT INTO \"ACTVITY_FORUM\" (id,categoryCount,topicCount,postCount,answerCount,user_id) VALUES (301,0,0,0,0,301)").executeUpdate();
             
             em.flush();
         } catch (Exception ignored) {}

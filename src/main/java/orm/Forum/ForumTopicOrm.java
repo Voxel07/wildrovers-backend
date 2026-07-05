@@ -126,7 +126,6 @@ public class ForumTopicOrm {
             return Response.status(403).entity("Du hast keine Berechtigung, in dieser Kategorie ein Thema zu erstellen.").build();
         }
 
-        u.getActivityForum().incTopicCount();
         topic.setCreator(u);
         topic.setPostCount(0L);
         topic.setViews(0L);
@@ -189,9 +188,6 @@ public class ForumTopicOrm {
         try {
             forumPostOrm.deleteAllPostsFromTopic(topicId);
 
-            if (creator != null && creator.getActivityForum() != null) {
-                creator.getActivityForum().decTopicCount();
-            }
             if (forumTopicAusDB.getCategory() != null) {
                 forumTopicAusDB.getCategory().decTopicCount();
             }
@@ -253,11 +249,6 @@ public class ForumTopicOrm {
             return "Fehler beim Löschen der Antworten";
         }
 
-        for (Entry<User, Long> entry : map.entrySet()) {
-            User k = entry.getKey();
-            Long v = entry.getValue();
-            k.getActivityForum().setTopicCount(k.getActivityForum().getTopicCount() - v);
-        }
         return "Topics erfolgreich gelöscht:";
     }
 

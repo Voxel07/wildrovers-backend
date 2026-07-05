@@ -35,14 +35,12 @@ class UserDeletionTest {
             em.createNativeQuery("DELETE FROM \"EVENT\"").executeUpdate();
             em.createNativeQuery("DELETE FROM \"GALLERY\"").executeUpdate();
             em.createNativeQuery("DELETE FROM \"SECRET\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"ACTVITY_FORUM\"").executeUpdate();
             em.createNativeQuery("DELETE FROM \"USER\"").executeUpdate();
             em.flush();
 
             // Admin user + full forum data
             em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (500,'del@t.l','delTest','test1234','Del','Test','Admin',true,0,true,false)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (500,'test1234',true,'v-del',500)").executeUpdate();
-            em.createNativeQuery("INSERT INTO \"ACTVITY_FORUM\" (id,categoryCount,topicCount,postCount,answerCount,user_id) VALUES (500,0,0,0,0,500)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"FORUM_CATEGORY\" (id,category,creationDate,topicCount,position,visibility,user_id) VALUES (500,'DelCat',0,0,0,'Besucher',500)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"FORUM_TOPIC\" (id,topic,creationDate,postCount,views,user_id,category_id) VALUES (500,'DelTopic',0,0,0,500,500)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"FORUM_POSTS\" (id,title,content,creationDate,likes,dislikes,answerCount,user_id,topic_id) VALUES (500,'DelPost','<p>Keep me</p>',0,0,0,0,500,500)").executeUpdate();
@@ -58,10 +56,6 @@ class UserDeletionTest {
             .setParameter("id",id).setParameter("em",username+"@t.l").setParameter("un",username).setParameter("role",role).setParameter("cc",!"Besucher".equals(role)).executeUpdate();
         Long sid = ((Number) em.createNativeQuery("SELECT NEXT VALUE FOR ZSEQ_KEYS_ID").getSingleResult()).longValue();
         em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (:id,'test1234',true,:vid,:uid)").setParameter("id",sid).setParameter("vid","v-"+username).setParameter("uid",id).executeUpdate();
-        // Create sequence if missing (entity has @SequenceGenerator/@GeneratedValue mismatch)
-        try { em.createNativeQuery("CREATE SEQUENCE IF NOT EXISTS ZSEQ_AF_ID START WITH 1000").executeUpdate(); } catch (Exception ignored) {}
-        Long aid = ((Number) em.createNativeQuery("SELECT NEXT VALUE FOR ZSEQ_AF_ID").getSingleResult()).longValue();
-        em.createNativeQuery("INSERT INTO \"ACTVITY_FORUM\" (id,categoryCount,topicCount,postCount,answerCount,user_id) VALUES (:id,0,0,0,0,:uid)").setParameter("id",aid).setParameter("uid",id).executeUpdate();
         em.flush();
         return id;
     }
