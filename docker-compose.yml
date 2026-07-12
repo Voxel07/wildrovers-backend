@@ -82,6 +82,7 @@ services:
       VITE_OPENOBSERVE_ORG: "${VITE_OPENOBSERVE_ORG}"
       VITE_OPENOBSERVE_INSECURE_HTTP: "${VITE_OPENOBSERVE_INSECURE_HTTP}"
       VITE_OPENOBSERVE_ENABLED: "${VITE_OPENOBSERVE_ENABLED:-true}"
+      CSP_FRAME_SOURCES: "${CSP_FRAME_SOURCES:-https://kiosk.wild-rovers.de https://fotos.wild-rovers.de}"
 
   openobserve:
     image: public.ecr.aws/zinclabs/openobserve:v0.90.3
