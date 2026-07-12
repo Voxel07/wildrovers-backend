@@ -295,7 +295,8 @@ public class EventResource {
         log.info("EventResource/getEventByPost: " + postId);
         Event event = eventOrm.getEventByForumPostId(postId);
         if (event == null) {
-            return Response.status(404).entity("Kein zugehöriges Event gefunden").build();
+            // Most forum posts are not event announcements, so this is optional.
+            return Response.noContent().build();
         }
         populateNonRespondents(java.util.Collections.singletonList(event));
         return Response.ok(event).build();

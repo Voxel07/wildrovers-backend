@@ -30,6 +30,9 @@ class EventResourceTest {
 
     @Test void getAll() { given().get("/event").then().statusCode(200); }
     @Test void upcoming() { given().get("/event/upcoming").then().statusCode(200); }
+    @Test void missingEventByPostIsEmpty() {
+        given().get("/event/by-post/99999").then().statusCode(204);
+    }
 
     @Test @TestSecurity(user="evTest",roles={"Frischling"})
     void createEvent() {
