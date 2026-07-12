@@ -16,6 +16,7 @@ import io.smallrye.jwt.auth.principal.JWTParser;
 import io.smallrye.mutiny.Uni;
 import io.vertx.ext.web.RoutingContext;
 import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,6 +29,9 @@ import java.util.Set;
 import java.util.logging.Logger;
 
 import org.eclipse.microprofile.jwt.JsonWebToken;
+import jakarta.inject.Inject;
+import model.User;
+import orm.UserOrm;
 
 /**
  * Handles locally-signed JWTs (username/password login) before OIDC gets involved.
@@ -40,7 +44,11 @@ public class LocalJwtAuthMechanism implements HttpAuthenticationMechanism {
     private static final Logger log = Logger.getLogger(LocalJwtAuthMechanism.class.getName());
 
     private volatile JWTParser jwtParser;
-    private final String publicKeyPath = System.getenv().getOrDefault("JWT_PUBLIC_KEY_PATH", "publicKey.pem");
+    @ConfigProperty(name = "local.jwt.public-key.location")
+    String publicKeyPath;
+
+    @Inject
+    UserOrm userOrm;
 
     @Override
     public int getPriority() {
@@ -70,8 +78,14 @@ public class LocalJwtAuthMechanism implements HttpAuthenticationMechanism {
         try {
             JsonWebToken jwt = getParser().parse(token);
             String username = jwt.getName();
-            Set<String> groups = jwt.getGroups();
-            if (groups == null) groups = Set.of();
+            User user = userOrm.findByUsername(username);
+            if (user == null || user.getIsBlocked() || user.getRole() == null) {
+                log.warning("LocalJwtAuth: rejecting disabled or unknown user '" + username + "'");
+                return Uni.createFrom().nullItem();
+            }
+            // Never authorize from client-held claims. The signed username identifies
+            // the account; current privileges always come from the database.
+            Set<String> groups = Set.of(user.getRole());
             String email = jwt.getClaim("email"); // embedded at login time by JWT.generator()
 
             var identityBuilder = QuarkusSecurityIdentity.builder()
@@ -146,6 +160,9 @@ public class LocalJwtAuthMechanism implements HttpAuthenticationMechanism {
 
         JWTAuthContextInfo info = new JWTAuthContextInfo(key, "wildrovers");
         info.setSignatureAlgorithm(Set.of(SignatureAlgorithm.RS256));
+        info.setExpectedAudience(Set.of("wildrovers-backend"));
+        info.setRequiredClaims(Set.of("exp", "iat", "upn"));
+        info.setMaxTimeToLiveSecs(12L * 60L * 60L);
         return new DefaultJWTParser(info);
     }
 

@@ -123,13 +123,21 @@ public class UserResouce {
     public Response updateUser(User user) {
         log.info("UserResource/updateUser");
         User admin = userPrincipalResolver.resolveUser();
+        if (user == null || user.getId() == null) {
+            return Response.status(400).entity("Benutzer-ID fehlt.").build();
+        }
         AuditLogger.crud(log, admin != null ? admin.getUserName() : "unknown",
                 admin != null ? admin.getId() : null,
                 "UPDATE", "User", user.getId(), "userName=" + user.getUserName());
-        // Block Vorstand from modifying Admin users
-        if (admin != null && "Vorstand".equals(admin.getRole()) && "Admin".equals(user.getRole())) {
-            log.warning("Vorstand attempted to modify Admin user: " + user.getId());
-            return Response.status(403).entity("Vorstand darf keine Admin-Benutzer bearbeiten.").build();
+        if (admin != null && Roles.ALDERMEN.equals(admin.getRole())) {
+            List<User> targets = userOrm.getUserById(user.getId());
+            if (targets.isEmpty()) {
+                return Response.status(404).entity("Benutzer nicht gefunden.").build();
+            }
+            if (Roles.ADMIN.equals(targets.get(0).getRole()) || Roles.ADMIN.equals(user.getRole())) {
+                log.warning("Vorstand attempted a forbidden Admin account change: " + user.getId());
+                return Response.status(403).entity("Vorstand darf Admin-Benutzer weder bearbeiten noch ernennen.").build();
+            }
         }
         String result = userOrm.updateUser(user);
         return Response.ok(result).build();
@@ -305,7 +313,7 @@ public class UserResouce {
 
         try {
             File uploadedFile = form.file.uploadedFile().toFile();
-            BufferedImage original = ImageIO.read(uploadedFile);
+            BufferedImage original = tools.SafeImageReader.read(uploadedFile, 25_000_000L);
             if (original == null) {
                 return Response.status(400).entity("Ungültiges Bildformat").build();
             }
@@ -352,7 +360,7 @@ public class UserResouce {
 
         try {
             File uploadedFile = form.file.uploadedFile().toFile();
-            BufferedImage original = ImageIO.read(uploadedFile);
+            BufferedImage original = tools.SafeImageReader.read(uploadedFile, 25_000_000L);
             if (original == null) {
                 return Response.status(400).entity("Ungültiges Bildformat").build();
             }
@@ -482,30 +490,19 @@ public class UserResouce {
         if (!isTeamMember) {
             // Strip real names for non-team members — work on copies to avoid
             // Hibernate validation failures on managed entities
-            List<User> stripped = new java.util.ArrayList<>();
+            List<PublicMember> stripped = new java.util.ArrayList<>();
             for (User u : members) {
-                User copy = new User();
-                copy.setId(u.getId());
-                copy.setUserName(u.getUserName());
-                copy.setEmail(u.getEmail());
-                copy.setRole(u.getRole());
-                copy.setPhotoUrl(u.getPhotoUrl());
-                copy.setBackgroundUrl(u.getBackgroundUrl());
-                copy.setPhrase(u.getPhrase());
-                copy.setBirthday(u.getBirthday());
-                copy.setRegDate(u.getRegDate());
-                copy.setRibbon(u.getRibbon());
-                copy.setVisitedOps(u.getVisitedOps());
-                copy.setHasPaidCurrentYear(u.getHasPaidCurrentYear());
-                copy.setPaidYears(u.getPaidYears());
-                copy.setEventsAttended(u.getEventsAttended());
-                // firstName and lastName intentionally left null
-                stripped.add(copy);
+                stripped.add(new PublicMember(u.getId(), u.getUserName(), u.getRole(),
+                        u.getPhotoUrl(), u.getBackgroundUrl(), u.getPhrase(), u.getRibbon()));
             }
             return Response.ok(stripped).build();
         }
         return Response.ok(members).build();
     }
+
+    /** Explicit public projection: adding a field to User can never leak it here. */
+    public record PublicMember(Long id, String userName, String role, String photoUrl,
+            String backgroundUrl, String phrase, String ribbon) { }
 
     private BufferedImage scaleImage(BufferedImage src, int maxDim) {
         int w = src.getWidth();

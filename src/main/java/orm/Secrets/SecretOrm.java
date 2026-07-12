@@ -11,10 +11,16 @@ import orm.UserOrm;
 //Logging
 import java.util.logging.Logger;
 import java.util.logging.Level;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.util.HexFormat;
 
 @ApplicationScoped
 public class SecretOrm {
     private static final Logger log = Logger.getLogger(SecretOrm.class.getName());
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Inject
     UserOrm userOrm;
@@ -48,8 +54,7 @@ public class SecretOrm {
 
     public String generateVerificationId()
     {
-        java.util.Random rand = new java.util.Random();
-        int code = 100000 + rand.nextInt(900000);
+        int code = 100000 + SECURE_RANDOM.nextInt(900000);
         return String.valueOf(code);
     }
 
@@ -96,11 +101,21 @@ public class SecretOrm {
     public Secret findByResetToken(String token) {
         try {
             return em.createQuery("SELECT s FROM Secret s WHERE s.resetToken = :val", Secret.class)
-                    .setParameter("val", token)
+                    .setParameter("val", hashResetToken(token))
                     .getSingleResult();
         } catch (Exception e) {
-            log.log(Level.WARNING, "Failed to find secret by resetToken: " + token, e);
+            log.log(Level.FINE, "Reset token was not found", e);
             return null;
+        }
+    }
+
+    public static String hashResetToken(String token) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is unavailable", e);
         }
     }
 }

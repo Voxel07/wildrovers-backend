@@ -5,16 +5,17 @@ services:
     restart: unless-stopped
     # Ports can be omitted if you only expose them via the Nginx proxy network,
     # but kept here if you need direct access for testing.
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     networks:
       - mariadb_network
       - proxy_network
     environment:
       # Use the hostname of your external MariaDB container here (e.g. wildrovers-db-external)
-      SQL_URL: "jdbc:mariadb://<YOUR_EXTERNAL_DB_CONTAINER_NAME>:3306/wildrovers"
+      SQL_URL: "${SQL_URL}"
       SQL_USER: "${SQL_USER}"
-      SQL_PASSOWRD: "${SQL_PASSOWRD}"
+      SQL_PASSWORD: "${SQL_PASSWORD}"
+      QUARKUS_PROFILE: "prod"
       AUTHENTIK_AUTH_SERVER_URL: "${AUTHENTIK_AUTH_SERVER_URL}"
       AUTHENTIK_CLIENT_ID: "${AUTHENTIK_CLIENT_ID}"
       AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET}"
@@ -22,8 +23,9 @@ services:
       GOOGLE_CALENDAR_ID: "${GOOGLE_CALENDAR_ID}"
       FORUM_IMAGES_UPLOAD_DIR: "/work/uploads/forum"
       USER_PHOTOS_UPLOAD_DIR: "/work/uploads/user-photos"
+      USER_BACKGROUNDS_UPLOAD_DIR: "/work/uploads/profile-backgrounds"
       # The public URL of the frontend browser client (CORS configuration)
-      CORS_ORIGINS: "https://your-domain.de" # Replace with your production domain
+      CORS_ORIGINS: "${CORS_ORIGINS}"
       OPENOBSERVE_ENDPOINT: "${OPENOBSERVE_ENDPOINT:-http://openobserve:5080/api/default}"
       OPENOBSERVE_TOKEN: "${OPENOBSERVE_TOKEN}"
       MAILER_MOCK: "${MAILER_MOCK:-true}"
@@ -35,7 +37,14 @@ services:
       MAILER_USERNAME: "${MAILER_USERNAME}"
       MAILER_PASSWORD: "${MAILER_PASSWORD}"
       MAILER_AUTH_METHODS: "${MAILER_AUTH_METHODS}"
-      APP_BASE_URL: "${APP_BASE_URL:-http://localhost:8080}"
+      APP_BASE_URL: "${APP_BASE_URL}"
+      APP_FRONTEND_URL: "${APP_FRONTEND_URL}"
+      LOG_FILE_PATH: "/work/logs/trace.log"
+      OTEL_DISABLED: "${OTEL_DISABLED:-false}"
+      OTEL_LOG_LEVEL: "${OTEL_LOG_LEVEL:-WARN}"
+      TRUSTED_PROXIES: "${TRUSTED_PROXIES}"
+      RATE_LIMITER_ENABLED: "${RATE_LIMITER_ENABLED:-true}"
+      AUTHENTIK_PRINCIPAL_CLAIM: "${AUTHENTIK_PRINCIPAL_CLAIM:-preferred_username}"
       EMAIL_GOOGLE_USERNAME: "${EMAIL_GOOGLE_USERNAME}"
       EMAIL_GOOGLE_PASSWORD: "${EMAIL_GOOGLE_PASSWORD}"
       # JWT key paths (override in .env for custom locations)
@@ -44,20 +53,23 @@ services:
     volumes:
       - backend_uploads:/work/uploads
       - ./service_account.json:/work/service_account.json:ro
-      # Mount JWT key files directory (read-write to allow generation/rotation)
-      - ${JWT_KEYS_DIR:-./src/main/resources}:/work/keys
+      # Production never generates keys; mount externally managed keys read-only.
+      - ${JWT_KEYS_DIR}:/work/keys:ro
+      - backend_logs:/work/logs
+    security_opt:
+      - no-new-privileges:true
 
   frontend:
     image: ghcr.io/voxel07/wildrovers-frontend:latest
     container_name: wildrovers-frontend
     restart: unless-stopped
-    ports:
-      - "80:80"
+    expose:
+      - "80"
     networks:
       - proxy_network
     environment:
       # The public URL of the backend API as seen by the user's browser
-      VITE_API_URL: "https://api.wildrovers.wtf" # Or "https://wildrovers.wtf/api" depending on Nginx routing
+      VITE_API_URL: "${VITE_API_URL}"
       VITE_OIDC_AUTHORITY: "${VITE_OIDC_AUTHORITY}"
       VITE_OIDC_CLIENT_ID: "${VITE_OIDC_CLIENT_ID}"
       VITE_OIDC_REDIRECT_URI: "${VITE_OIDC_REDIRECT_URI}"
@@ -69,18 +81,19 @@ services:
       VITE_OPENOBSERVE_APP_ID: "${VITE_OPENOBSERVE_APP_ID}"
       VITE_OPENOBSERVE_ORG: "${VITE_OPENOBSERVE_ORG}"
       VITE_OPENOBSERVE_INSECURE_HTTP: "${VITE_OPENOBSERVE_INSECURE_HTTP}"
+      VITE_OPENOBSERVE_ENABLED: "${VITE_OPENOBSERVE_ENABLED:-true}"
 
   openobserve:
     image: public.ecr.aws/zinclabs/openobserve:v0.90.3
     container_name: openobserve
     restart: unless-stopped
-    ports:
-      - "5080:5080"
+    expose:
+      - "5080"
     environment:
-      - ZO_ROOT_USER_EMAIL=admin@example.com
-      - ZO_ROOT_USER_PASSWORD=YourSecurePassword123
-      - ZO_RUM_ENABLED=true
-      - ZO_RUM_CLIENT_TOKEN=iwY3aGIUpzCNn3Sv
+      - ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}
+      - ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}
+      - ZO_RUM_ENABLED=${ZO_RUM_ENABLED:-true}
+      - ZO_RUM_CLIENT_TOKEN=${ZO_RUM_CLIENT_TOKEN}
     volumes:
       - openobserve_data:/data
     networks:
@@ -88,6 +101,7 @@ services:
 
 volumes:
   backend_uploads:
+  backend_logs:
   openobserve_data:
 
 networks:

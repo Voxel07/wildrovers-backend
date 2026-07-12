@@ -37,6 +37,8 @@ build/
 settings.gradle
 
 #security stuff
+src/main/resources/privateKey.pem
+src/main/resources/publicKey.pem
 src/main/resources/META-INF/resources/privateKey.pem
 src/main/resources/META-INF/resources/publicKey.pem
 src/main/resources/META-INF/resources/rsaPrivateKey.pem

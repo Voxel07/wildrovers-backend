@@ -36,7 +36,6 @@ import java.util.logging.Logger;
 import java.util.logging.Level;
 
 //Coockie
-import jakarta.ws.rs.core.NewCookie;
 import jakarta.ws.rs.core.Response;
 
 @ApplicationScoped
@@ -567,13 +566,11 @@ public class UserOrm {
         /* For now there is no refresh token */
         String token = JWT.generator(user);
         JsonObject reactAuthObject = JWT.createReactAuthObject(token, user);
-        NewCookie cookie = JWT.generateCookie(token);
-
-        return Response.status(200).entity(reactAuthObject).cookie(cookie).build();
+        return Response.status(200).entity(reactAuthObject).build();
     }
 
     public Response logoutUser() {
-        return Response.ok(JWT.removeCookie()).build();
+        return Response.noContent().build();
     }
 
     public static boolean verifyBCryptPassword(String bCryptPasswordHash, String passwordToVerify)

@@ -15,8 +15,8 @@ class SecretResourceTest {
     @Test void verifyInvalid() {
         given().contentType(ContentType.JSON).body("{\"email\":\"x@x.com\",\"code\":\"bad\"}").post("/secrets/verify").then().statusCode(400);
     }
-    @Test void autoVerifyFound() {
-        given().queryParam("username","nonexistent").get("/secrets/auto-verify").then().statusCode(200).body(containsString("User not found"));
+    @Test void autoVerifyRequiresAdmin() {
+        given().queryParam("username","nonexistent").get("/secrets/auto-verify").then().statusCode(401);
     }
     @Test void resetMissing() {
         given().contentType(ContentType.JSON).body("{}").post("/secrets/reset-request").then().statusCode(400);

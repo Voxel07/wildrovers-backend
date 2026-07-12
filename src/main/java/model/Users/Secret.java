@@ -11,6 +11,8 @@ import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 
 import model.User;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.json.bind.annotation.JsonbTransient;
 
 @Entity
 @Table(name = "SECRET")
@@ -49,6 +51,8 @@ public class Secret {
 
     }
 
+    @JsonIgnore
+    @JsonbTransient
     public String getPassword() {
         return password;
     }
@@ -78,6 +82,8 @@ public class Secret {
         this.isVerifyed = isVerifyed;
     }
 
+    @JsonIgnore
+    @JsonbTransient
     public String getVerificationId() {
         return verificationId;
     }
@@ -102,6 +108,8 @@ public class Secret {
         this.verificationTimestamp = verificationTimestamp;
     }
 
+    @JsonIgnore
+    @JsonbTransient
     public String getResetToken() {
         return resetToken;
     }

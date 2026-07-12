@@ -22,10 +22,11 @@ import jakarta.ws.rs.core.NewCookie;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.UriInfo;
 import io.vertx.core.http.HttpServerRequest;
+import jakarta.annotation.security.RolesAllowed;
 
 @Path("/tests")
-
 @ApplicationScoped
+@RolesAllowed("Admin")
 public class Functiontest {
 
         private static final Logger log = Logger.getLogger(Functiontest.class.getName());

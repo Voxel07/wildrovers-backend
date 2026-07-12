@@ -66,6 +66,10 @@ public class ForumImageUploadResource {
             return Response.status(400).entity("Kein Bild übermittelt").build();
         }
 
+        if (form.file.size() > 10L * 1024L * 1024L) {
+            return Response.status(400).entity("Bild ist zu gross (max. 10 MB)").build();
+        }
+
         // Temp ID before we know the real postId
         String tempId = "tmp_" + userId + "_" + System.currentTimeMillis();
         String base = uploadDir.replace("${user.home}", System.getProperty("user.home"));
@@ -83,7 +87,7 @@ public class ForumImageUploadResource {
                 ? originalName.substring(originalName.lastIndexOf('.') + 1).toLowerCase()
                 : "jpg";
 
-            BufferedImage original = ImageIO.read(uploaded);
+            BufferedImage original = tools.SafeImageReader.read(uploaded, 40_000_000L);
             if (original == null) {
                 return Response.status(400).entity("Ungültiges Bildformat").build();
             }

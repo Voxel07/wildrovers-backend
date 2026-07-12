@@ -18,6 +18,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.annotation.security.PermitAll;
+import jakarta.annotation.security.RolesAllowed;
 
 //Eigene Imports
 import orm.Secrets.SecretOrm;
@@ -63,7 +64,7 @@ public class SecretRecource {
 
     @GET
     @Path("/auto-verify")
-    @PermitAll
+    @RolesAllowed("Admin")
     @Produces(MediaType.APPLICATION_JSON)
     @jakarta.transaction.Transactional
     public String autoVerify(@QueryParam("username") String username) {
@@ -108,7 +109,7 @@ public class SecretRecource {
         model.User user = userOrm.findByEmail(request.email.trim());
         if (user != null && user.getSecret() != null) {
             String token = java.util.UUID.randomUUID().toString();
-            user.getSecret().setResetToken(token);
+            user.getSecret().setResetToken(SecretOrm.hashResetToken(token));
             user.getSecret().setResetTokenTimestamp(tools.Time.currentTimeInMillis());
             em.merge(user.getSecret());
             try {
@@ -132,7 +133,8 @@ public class SecretRecource {
     public Response resetPassword(ResetPasswordRequest request) {
         log.info("SecretResource/resetPassword");
 
-        if (request == null || request.token == null || request.token.isBlank() || request.password == null || request.password.isBlank()) {
+        if (request == null || request.token == null || request.token.isBlank() || request.password == null
+                || request.password.length() < 8 || request.password.length() > 256) {
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity("{\"status\":\"error\", \"message\":\"Token und neues Passwort müssen ausgefüllt sein\"}")
                     .build();

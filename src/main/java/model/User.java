@@ -230,6 +230,7 @@ public class User {
     }
 
     @JsonIgnore
+    @JsonbTransient
     public String getPassword() {
         return password;
     }
@@ -586,7 +587,7 @@ public class User {
         return "User [address=" + address + ", forumPostCount=" + forumPostCount + ", forumAnswerCount=" + forumAnswerCount + ", answers=" + answers
                 + ", categories=" + categories + ", editedAnswers=" + editedAnswers + ", editedPosts=" + editedPosts
                 + ", email=" + email + ", firstName=" + firstName + ", id=" + id + ", isActive=" + isActive
-                + ", lastLogin=" + lastLogin + ", lastName=" + lastName + ", password=" + password + ", phones="
+                + ", lastLogin=" + lastLogin + ", lastName=" + lastName + ", password=[REDACTED], phones="
                 + phones + ", posts=" + posts + ", regDate=" + regDate + ", role=" + role + ", topics=" + topics
                 + ", userName=" + userName + "]";
     }

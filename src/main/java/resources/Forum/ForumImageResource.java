@@ -42,6 +42,10 @@ public class ForumImageResource {
         log.info("ForumImageResource/getImage postId=" + postId
                  + " variant=" + variant + " filename=" + filename);
 
+        // Both directory components are attacker-controlled path parameters.
+        if (postId == null || !postId.matches("(?:[0-9]+|tmp_[0-9]+_[0-9]+)")) {
+            return Response.status(400).entity("UngÃ¼ltige Beitrags-ID").build();
+        }
         // Validate variant to prevent path traversal
         if (!"full".equals(variant) && !"thumb".equals(variant)) {
             return Response.status(400).entity("Ungültige Variante").build();
@@ -52,7 +56,12 @@ public class ForumImageResource {
         }
 
         String base = uploadDir.replace("${user.home}", System.getProperty("user.home"));
-        File file = Paths.get(base, "posts", String.valueOf(postId), variant, filename).toFile();
+        java.nio.file.Path postsRoot = Paths.get(base, "posts").toAbsolutePath().normalize();
+        java.nio.file.Path requested = postsRoot.resolve(postId).resolve(variant).resolve(filename).normalize();
+        if (!requested.startsWith(postsRoot)) {
+            return Response.status(400).entity("UngÃ¼ltiger Pfad").build();
+        }
+        File file = requested.toFile();
 
         if (!file.exists() || !file.isFile()) {
             return Response.status(404).entity("Bild nicht gefunden").build();
