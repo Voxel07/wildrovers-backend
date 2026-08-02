@@ -21,7 +21,7 @@ public class NotificationScheduler {
     @ConfigProperty(name = "app.frontend-url", defaultValue = "http://localhost:5173") String frontendUrl;
 
     @Scheduled(every = "${notification.mail.delivery-interval:90s}", concurrentExecution = SKIP)
-    void deliverImmediateEvents() {
+    void deliverEmails() {
         java.util.List<NotificationService.DeliveryBatch> emailEvents = notifications.dueEventBatches("EMAIL");
         if (!emailEvents.isEmpty()) {
             deliver(emailEvents.subList(0, 1), "EMAIL", "Wild Rovers - Event-Benachrichtigung", "event.notification");
@@ -29,8 +29,12 @@ public class NotificationScheduler {
             java.util.List<NotificationService.DeliveryBatch> digests = notifications.dueDigestBatches("EMAIL");
             if (!digests.isEmpty()) deliver(digests.subList(0, 1), "EMAIL", "Wild Rovers - Verpasste Neuigkeiten", "notification.digest");
         }
+    }
+
+    @Scheduled(every = "${notification.webhook.delivery-interval:5s}", concurrentExecution = SKIP)
+    void deliverWebhooks() {
         deliver(notifications.dueEventBatches("WEBHOOK"), "WEBHOOK", null, "event.notification");
-        deliver(notifications.dueDigestBatches("WEBHOOK"), "WEBHOOK", null, "notification.digest");
+        deliver(notifications.dueDigestBatches("WEBHOOK"), "WEBHOOK", null, "notification.immediate");
     }
 
     @Scheduled(cron = "${notification.digest.cron:0 0 6 * * ?}", timeZone = "${notification.time-zone:Europe/Berlin}", concurrentExecution = SKIP)

@@ -8,8 +8,12 @@ import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.time.LocalDateTime;
+
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @QuarkusTest
 class EventResourceTest {
@@ -72,5 +76,15 @@ class EventResourceTest {
     @Test @TestSecurity(user="visitorTest",roles={"Besucher"})
     void deleteAsBesucherForbidden() {
         given().delete("/event/1").then().statusCode(403);
+    }
+
+    @Test
+    void forumPostTitleContainsEventDateAndTime() {
+        model.Event event = new model.Event();
+        event.setTitle("Test Event");
+        event.setEventDate(LocalDateTime.of(2026, 12, 25, 18, 0));
+
+        assertEquals("Event: Test Event (25.12.2026, 18:00 Uhr)",
+                EventResource.formatEventTitleForPost(event));
     }
 }

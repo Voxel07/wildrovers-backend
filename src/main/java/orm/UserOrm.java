@@ -27,9 +27,11 @@ import orm.Forum.ForumCategoryOrm;
 import orm.Secrets.SecretOrm;
 import tools.Email;
 import tools.GeoIPService;
+import tools.NotificationService;
 import helper.RequestIpCapture;
 import resources.JWT;
 import tools.Time;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 //Logging
 import java.util.logging.Logger;
@@ -60,6 +62,12 @@ public class UserOrm {
 
     @Inject
     GeoIPService geoIPService;
+
+    @Inject
+    NotificationService notificationService;
+
+    @ConfigProperty(name = "app.frontend-url", defaultValue = "http://localhost:5173")
+    String frontendUrl;
 
     public Long getEventsAttendedCount(Long userId) {
         try {
@@ -319,6 +327,8 @@ public class UserOrm {
             String dummyHash = BcryptUtil.bcryptHash(java.util.UUID.randomUUID().toString());
             secretOrm.addSecret(usr.getId(), true, verificationId, dummyHash);
 
+            recordSignupNotification(usr);
+
             return usr;
         } catch (Exception e) {
             log.log(Level.SEVERE, "Failed to create JIT user from OIDC", e);
@@ -365,6 +375,7 @@ public class UserOrm {
         Long userId = usr.getId();
         String verificationId = secretOrm.generateVerificationId();
         secretOrm.addSecret(userId, false, verificationId, passwordHash);
+        recordSignupNotification(usr);
         // Id zurückgeben
 
         /**
@@ -383,6 +394,14 @@ public class UserOrm {
 
         return Response.status(201).entity("Nutzer erfolgreich erstellt").build();
 
+    }
+
+    private void recordSignupNotification(User user) {
+        try {
+            notificationService.recordSignup(user, frontendUrl);
+        } catch (Exception e) {
+            log.log(Level.WARNING, "Could not record signup notification for user " + user.getId(), e);
+        }
     }
 
     @Transactional

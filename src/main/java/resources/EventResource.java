@@ -39,6 +39,8 @@ import java.util.logging.Logger;
 public class EventResource {
 
     private static final Logger log = Logger.getLogger(EventResource.class.getName());
+    private static final DateTimeFormatter EVENT_FORUM_TITLE_DATE_FORMAT =
+            DateTimeFormatter.ofPattern("dd.MM.yyyy, HH:mm 'Uhr'");
 
     @Inject
     EventOrm eventOrm;
@@ -115,7 +117,7 @@ public class EventResource {
         Long postId = null;
         try {
             ForumPost post = new ForumPost();
-            post.setTitle("Event: " + event.getTitle());
+            post.setTitle(formatEventTitleForPost(event));
             String postContent = "<p><strong>Termin:</strong> " + formatEventDateForPost(event.getEventDate(), event.getEventEndDate()) + "</p>"
                     + "<p><strong>Ort:</strong> " + event.getLocation() + "</p>"
                     + "<hr/>"
@@ -126,6 +128,9 @@ public class EventResource {
                 postId = (Long) postResponse.getEntity();
                 String forumUrl = frontendUrl + "/Forum/Post/" + postId;
                 event.setForumPostUrl(forumUrl);
+            } else {
+                log.warning("Forum post creation failed for event '" + event.getTitle()
+                        + "' with status " + postResponse.getStatus() + ": " + postResponse.getEntity());
             }
         } catch (Exception e) {
             log.log(Level.SEVERE, "Failed to create forum post for event", e);
@@ -151,6 +156,14 @@ public class EventResource {
             }
             return Response.status(500).entity("Fehler beim Erstellen des Events").build();
         }
+    }
+
+    static String formatEventTitleForPost(Event event) {
+        String title = "Event: " + event.getTitle();
+        if (event.getEventDate() == null) {
+            return title;
+        }
+        return title + " (" + event.getEventDate().format(EVENT_FORUM_TITLE_DATE_FORMAT) + ")";
     }
 
     private String formatEventDateForPost(java.time.LocalDateTime dateTime, java.time.LocalDateTime endDateTime) {

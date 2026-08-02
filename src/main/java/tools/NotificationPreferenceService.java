@@ -5,6 +5,7 @@ import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import model.User;
+import model.Users.Roles;
 import model.notifications.NotificationPreference;
 import model.notifications.UserWebhook;
 
@@ -14,7 +15,7 @@ import java.util.Map;
 
 @ApplicationScoped
 public class NotificationPreferenceService {
-    public static final List<String> RESOURCE_TYPES = List.of("EVENT", "FORUM", "GALLERY");
+    public static final List<String> RESOURCE_TYPES = List.of("EVENT", "FORUM", "GALLERY", "SIGNUP");
     @Inject EntityManager em;
     @Inject WebhookCrypto crypto;
     @Inject WebhookSender webhookSender;
@@ -34,7 +35,10 @@ public class NotificationPreferenceService {
     public String save(Long userId, Map<String, ChannelSelection> selections, String webhookUrl) {
         User user = em.find(User.class, userId);
         if (user == null) throw new IllegalArgumentException("Benutzer nicht gefunden");
-        boolean wantsWebhook = selections.values().stream().anyMatch(ChannelSelection::webhook);
+        List<String> allowedTypes = resourceTypesFor(user);
+        boolean wantsWebhook = allowedTypes.stream()
+                .map(type -> selections.getOrDefault(type, new ChannelSelection(false, false)))
+                .anyMatch(ChannelSelection::webhook);
         UserWebhook webhook = getWebhook(userId);
         String newSecret = null;
         if (webhookUrl != null && !webhookUrl.isBlank()) {
@@ -58,7 +62,9 @@ public class NotificationPreferenceService {
         Map<String, NotificationPreference> existing = new HashMap<>();
         getPreferences(userId).forEach(p -> existing.put(p.getResourceType(), p));
         for (String type : RESOURCE_TYPES) {
-            ChannelSelection selected = selections.getOrDefault(type, new ChannelSelection(false, false));
+            ChannelSelection selected = allowedTypes.contains(type)
+                    ? selections.getOrDefault(type, new ChannelSelection(false, false))
+                    : new ChannelSelection(false, false);
             NotificationPreference preference = existing.get(type);
             if (preference == null) {
                 preference = new NotificationPreference();
@@ -71,6 +77,13 @@ public class NotificationPreferenceService {
             preference.setUpdatedAt(now);
         }
         return newSecret;
+    }
+
+    public List<String> resourceTypesFor(User user) {
+        if (Roles.ADMIN.equals(user.getRole()) || Roles.ALDERMEN.equals(user.getRole())) {
+            return RESOURCE_TYPES;
+        }
+        return RESOURCE_TYPES.stream().filter(type -> !"SIGNUP".equals(type)).toList();
     }
 
     @Transactional

@@ -39,7 +39,7 @@ public class NotificationPreferenceResource {
     @GET
     public Response get() {
         User user = resolver.resolveUser();
-        return user == null ? Response.status(401).build() : Response.ok(response(user.getId(), null)).build();
+        return user == null ? Response.status(401).build() : Response.ok(response(user, null)).build();
     }
 
     @PUT
@@ -54,7 +54,7 @@ public class NotificationPreferenceResource {
                 selections.put(type, new NotificationPreferenceService.ChannelSelection(channel != null && channel.email, channel != null && channel.webhook));
             }
             String secret = service.save(user.getId(), selections, request == null ? null : request.webhookUrl);
-            return Response.ok(response(user.getId(), secret)).build();
+            return Response.ok(response(user, secret)).build();
         } catch (IllegalArgumentException e) {
             return Response.status(400).entity(Map.of("message", e.getMessage())).build();
         }
@@ -103,14 +103,14 @@ public class NotificationPreferenceResource {
         return Response.noContent().build();
     }
 
-    private PreferenceResponse response(Long userId, String secret) {
+    private PreferenceResponse response(User user, String secret) {
         PreferenceResponse result = new PreferenceResponse();
-        for (String type : NotificationPreferenceService.RESOURCE_TYPES) result.resources.put(type, new ChannelResponse());
-        for (NotificationPreference preference : service.getPreferences(userId)) {
+        for (String type : service.resourceTypesFor(user)) result.resources.put(type, new ChannelResponse());
+        for (NotificationPreference preference : service.getPreferences(user.getId())) {
             ChannelResponse channel = result.resources.get(preference.getResourceType());
             if (channel != null) { channel.email = preference.isEmailEnabled(); channel.webhook = preference.isWebhookEnabled(); }
         }
-        UserWebhook webhook = service.getWebhook(userId);
+        UserWebhook webhook = service.getWebhook(user.getId());
         if (webhook != null) {
             result.webhook.configured = true;
             result.webhook.enabled = webhook.isEnabled();
