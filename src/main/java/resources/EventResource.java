@@ -26,6 +26,7 @@ import model.Forum.ForumPost;
 import orm.Forum.ForumPostOrm;
 import model.EventAttendance;
 import tools.AuditLogger;
+import tools.NotificationService;
 import java.time.format.DateTimeFormatter;
 import java.util.logging.Level;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -56,6 +57,9 @@ public class EventResource {
 
     @Inject
     ForumPostOrm forumPostOrm;
+
+    @Inject
+    NotificationService notificationService;
 
     @Inject
     @ConfigProperty(name = "app.frontend-url", defaultValue = "http://localhost:5173")
@@ -136,6 +140,7 @@ public class EventResource {
         // 2. Save in Database
         try {
             Event created = eventOrm.addEvent(event, user.getId());
+            notificationService.recordEvent(created, "CREATED", user.getId(), frontendUrl);
             populateNonRespondents(java.util.Collections.singletonList(created));
             return Response.status(201).entity(created).build();
         } catch (Exception e) {
@@ -207,6 +212,7 @@ public class EventResource {
         // 2. Update Database
         try {
             Event updated = eventOrm.updateEvent(existing);
+            notificationService.recordEvent(updated, "UPDATED", user.getId(), frontendUrl);
             populateNonRespondents(java.util.Collections.singletonList(updated));
             return Response.ok(updated).build();
         } catch (Exception e) {
@@ -246,6 +252,7 @@ public class EventResource {
         // 2. Delete from Database
         try {
             eventOrm.deleteEvent(id);
+            notificationService.recordEvent(existing, "DELETED", user.getId(), frontendUrl);
             return Response.ok().entity("Event gelöscht").build();
         } catch (Exception e) {
             log.log(java.util.logging.Level.SEVERE, "EventResource/deleteEvent failed for id " + id, e);
@@ -282,6 +289,8 @@ public class EventResource {
         if (updatedEvent == null) {
             return Response.status(500).entity("Fehler beim Speichern der Teilnahme").build();
         }
+
+        notificationService.acknowledgeEvent(user.getId(), eventId);
 
         populateNonRespondents(java.util.Collections.singletonList(updatedEvent));
         return Response.ok(updatedEvent).build();

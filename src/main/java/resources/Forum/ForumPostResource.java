@@ -28,6 +28,8 @@ import model.Forum.ForumPost;
 import orm.Forum.ForumPostOrm;
 import model.Forum.Pictures;
 import tools.AuditLogger;
+import tools.NotificationService;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import model.Users.Roles;
 
@@ -41,6 +43,13 @@ public class ForumPostResource {
 
     @Inject
     helper.UserPrincipalResolver userPrincipalResolver;
+
+    @Inject
+    NotificationService notificationService;
+
+    @Inject
+    @ConfigProperty(name = "app.frontend-url", defaultValue = "http://localhost:5173")
+    String frontendUrl;
 
     @GET
     @PermitAll
@@ -176,7 +185,12 @@ public class ForumPostResource {
             model.User user = userPrincipalResolver.resolveUser();
             AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
                     "CREATE", "Post", forumPost.getTitle());
-            return forumPostOrm.addPost(forumPost, topicId, userId);
+            Response response = forumPostOrm.addPost(forumPost, topicId, userId);
+            if (response.getStatus() == 201 && response.getEntity() instanceof Long postId) {
+                notificationService.record("FORUM", "CREATED", postId, forumPost.getTitle(),
+                        frontendUrl + "/Forum/Post/" + postId, null, false, userId);
+            }
+            return response;
         }
     }
     @POST
@@ -212,6 +226,10 @@ public class ForumPostResource {
             AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
                     "UPDATE", "Post", forumPost.getId());
             String result = forumPostOrm.updatePost(forumPost, userId);
+            if (result != null && result.toLowerCase().contains("erfolgreich")) {
+                notificationService.record("FORUM", "UPDATED", forumPost.getId(), forumPost.getTitle(),
+                        frontendUrl + "/Forum/Post/" + forumPost.getId(), null, false, userId);
+            }
             return Response.ok(result).build();
         }
     }
@@ -230,6 +248,10 @@ public class ForumPostResource {
             AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
                     "DELETE", "Post", forumPost.getId());
             String result = forumPostOrm.deletePost(forumPost, userId);
+            if (result != null && result.toLowerCase().contains("erfolgreich")) {
+                notificationService.record("FORUM", "DELETED", forumPost.getId(), forumPost.getTitle(),
+                        frontendUrl + "/Forum", null, false, userId);
+            }
             return Response.ok(result).build();
         }
     }

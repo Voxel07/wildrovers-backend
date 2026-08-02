@@ -15,6 +15,9 @@ public class Email {
     @Inject
     Mailer mailer;
 
+    @Inject
+    EmailQuotaService quotaService;
+
     @org.eclipse.microprofile.config.inject.ConfigProperty(name = "app.base-url", defaultValue = "http://localhost:8080")
     String baseUrl;
 
@@ -53,7 +56,7 @@ public class Email {
             "</body>" +
             "</html>";
 
-        mailer.send(Mail.withHtml(email, "Wild Rovers - E-Mail verifizieren", htmlBody));
+        sendLimited(email, "VERIFICATION", "Wild Rovers - E-Mail verifizieren", htmlBody);
         return Response.accepted().build();
     }
 
@@ -94,8 +97,35 @@ public class Email {
             "</body>" +
             "</html>";
 
-        mailer.send(Mail.withHtml(email, "Wild Rovers - Passwort zurücksetzen", htmlBody));
+        sendLimited(email, "PASSWORD_RESET", "Wild Rovers - Passwort zurücksetzen", htmlBody);
         return Response.accepted().build();
+    }
+
+    public boolean trySendNotificationMail(String recipient, String subject, String htmlBody) {
+        Long reservation = quotaService.reserve(recipient, "NOTIFICATION");
+        if (reservation == null) return false;
+        try {
+            mailer.send(Mail.withHtml(recipient, subject, htmlBody));
+            quotaService.complete(reservation, true);
+            return true;
+        } catch (RuntimeException e) {
+            quotaService.complete(reservation, false);
+            throw e;
+        }
+    }
+
+    private void sendLimited(String recipient, String type, String subject, String htmlBody) {
+        Long reservation = quotaService.reserve(recipient, type);
+        if (reservation == null) {
+            throw new jakarta.ws.rs.WebApplicationException("E-Mail-Limit erreicht. Bitte später erneut versuchen.", 429);
+        }
+        try {
+            mailer.send(Mail.withHtml(recipient, subject, htmlBody));
+            quotaService.complete(reservation, true);
+        } catch (RuntimeException e) {
+            quotaService.complete(reservation, false);
+            throw e;
+        }
     }
 
 

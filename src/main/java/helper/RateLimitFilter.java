@@ -80,15 +80,9 @@ public class RateLimitFilter implements ContainerRequestFilter {
      */
     private String resolveClientIp() {
         if (httpRequest != null) {
-            // Try X-Forwarded-For first (leftmost IP is the original client)
-            String xff = httpRequest.getHeader("X-Forwarded-For");
-            if (xff != null && !xff.isBlank()) {
-                String firstIp = xff.split(",")[0].trim();
-                if (!firstIp.isEmpty()) {
-                    return firstIp;
-                }
-            }
-            // Fall back to the direct remote address
+            // Quarkus rewrites remoteAddress only for configured trusted proxies.
+            // Reading X-Forwarded-For directly would let a client rotate a spoofed
+            // header and bypass the rate limiter.
             try {
                 var addr = httpRequest.remoteAddress();
                 if (addr != null) {

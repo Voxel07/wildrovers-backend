@@ -55,6 +55,7 @@ public class RateLimiter {
         GALLERY_WRITE("/gallery", "POST|PUT|DELETE", 15, 60),
 
         // ── User profile (photo/background uploads) ──
+        NOTIFICATION_PREFERENCES("/user/me/notifications", "GET|POST|PUT|DELETE", 10, 600),
         USER_PROFILE_WRITE("/user/me", "POST|PUT", 20, 60),
 
         // ── Default fallback ──
