@@ -290,8 +290,11 @@ public class UserOrm {
             return em.createQuery("SELECT u FROM User u WHERE u.userName = :val", User.class)
                     .setParameter("val", username)
                     .getSingleResult();
-        } catch (Exception e) {
+        } catch (jakarta.persistence.NoResultException e) {
             return null;
+        } catch (RuntimeException e) {
+            log.log(Level.WARNING, "User lookup failed for username " + username, e);
+            throw e;
         }
     }
 

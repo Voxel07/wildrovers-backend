@@ -1,8 +1,10 @@
 package tools;
 
 import io.quarkus.scheduler.Scheduled;
+import io.quarkus.runtime.Startup;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.annotation.PostConstruct;
 
 import java.util.UUID;
 import java.util.logging.Level;
@@ -12,6 +14,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import static io.quarkus.scheduler.Scheduled.ConcurrentExecution.SKIP;
 
 @ApplicationScoped
+@Startup
 public class NotificationScheduler {
     private static final Logger log = Logger.getLogger(NotificationScheduler.class.getName());
     @Inject NotificationService notifications;
@@ -20,7 +23,12 @@ public class NotificationScheduler {
     @Inject WebhookSender webhookSender;
     @ConfigProperty(name = "app.frontend-url", defaultValue = "http://localhost:5173") String frontendUrl;
 
-    @Scheduled(every = "${notification.mail.delivery-interval:90s}", concurrentExecution = SKIP)
+    @PostConstruct
+    void started() {
+        log.info("Notification delivery scheduler started");
+    }
+
+    @Scheduled(every = "${notification.mail.delivery-interval:15s}", concurrentExecution = SKIP)
     void deliverEmails() {
         java.util.List<NotificationService.DeliveryBatch> emailEvents = notifications.dueEventBatches("EMAIL");
         if (!emailEvents.isEmpty()) {
@@ -48,6 +56,8 @@ public class NotificationScheduler {
             try {
                 boolean sent;
                 if ("EMAIL".equals(channel)) {
+                    log.info("Attempting notification email delivery for user " + batch.userId()
+                            + " with " + batch.items().size() + " item(s)");
                     sent = email.trySendNotificationMail(batch.email(), subject, html(batch));
                 } else {
                     NotificationPreferenceService.WebhookTarget target = preferences.target(batch.userId());
@@ -57,8 +67,13 @@ public class NotificationScheduler {
                     sent = status >= 200 && status < 300;
                     preferences.recordWebhookResult(target.id(), sent, "HTTP " + status);
                 }
-                if (sent) notifications.markDelivered(batch.receiptIds(), channel);
-                else notifications.markRetry(batch.receiptIds(), channel, batch.attempts());
+                if (sent) {
+                    notifications.markDelivered(batch.receiptIds(), channel);
+                    log.info(channel + " notification delivered for user " + batch.userId());
+                } else {
+                    log.warning(channel + " notification deferred by delivery limits for user " + batch.userId());
+                    notifications.markRetry(batch.receiptIds(), channel, batch.attempts());
+                }
             } catch (Exception e) {
                 log.log(Level.WARNING, channel + " notification delivery failed for user " + batch.userId(), e);
                 notifications.markRetry(batch.receiptIds(), channel, batch.attempts());
