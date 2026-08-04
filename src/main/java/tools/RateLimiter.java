@@ -36,6 +36,7 @@ public class RateLimiter {
     public enum Config {
         // ── Auth endpoints ──
         LOGIN("/user/login", "POST", 10, 60),           // 10 login attempts per minute
+        RESEND_VERIFICATION("/user/resend-verification", "POST", 3, 300),
         SIGNUP("/user", "PUT", 3, 60),                  // 3 signups per minute
         LOGOUT("/user/logout", "POST", 20, 60),
 

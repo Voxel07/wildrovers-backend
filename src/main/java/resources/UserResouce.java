@@ -154,6 +154,16 @@ public class UserResouce {
     }
 
     @POST
+    @Path("/resend-verification")
+    @PermitAll
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response resendVerification(User credentials) {
+        log.info("UserResource/resendVerification");
+        return userOrm.resendVerification(credentials);
+    }
+
+    @POST
     @Path("/logout")
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)

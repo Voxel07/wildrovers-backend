@@ -533,7 +533,7 @@ public class UserOrm {
     @Transactional
     public Response loginUser(User usr) {
         log.info("UserOrm/loginUser");
-        if (usr.getUserName() == null && usr.getEmail() == null)
+        if (usr == null || (usr.getUserName() == null && usr.getEmail() == null))
             return Response.status(401).entity("Gib was an").build();
         if (usr.getPassword() == null)
             return Response.status(401).entity("Password nicht gesetzt").build();
@@ -551,14 +551,8 @@ public class UserOrm {
             return Response.status(401).entity("Benutzername oder Passwort falsch").build();
         }
 
-        if (!user.getSecret().getIsVerifyed().booleanValue())
-            return Response.status(401).entity("Bitte verifiziere dein Konto").build();
-
-        if (user.getIsBlocked()) {
-            return Response.status(403).entity("Dein Account wurde gesperrt.").build();
-        }
-
-        // Verify Password
+        // Always verify the password before revealing account state. This prevents
+        // login attempts from being used to enumerate registered/unverified users.
         try {
             String storedPasswordHash = user.getSecret() != null ? user.getSecret().getPassword() : null;
             if (storedPasswordHash == null || !verifyBCryptPassword(storedPasswordHash, usr.getPassword())) {
@@ -568,7 +562,19 @@ public class UserOrm {
             }
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return Response.status(401).entity("Fehler bei der Passwortprüfung").build();
+            return invalidCredentialsResponse();
+        }
+
+        if (!Boolean.TRUE.equals(user.getSecret().getIsVerifyed())) {
+            JsonObject response = jakarta.json.Json.createObjectBuilder()
+                    .add("code", "ACCOUNT_NOT_VERIFIED")
+                    .add("message", "Bitte verifiziere dein Konto")
+                    .build();
+            return Response.status(401).entity(response).build();
+        }
+
+        if (user.getIsBlocked()) {
+            return Response.status(403).entity("Dein Account wurde gesperrt.").build();
         }
 
         user.setLastLogin(Time.currentTimeInMillis());
@@ -589,6 +595,65 @@ public class UserOrm {
         String token = JWT.generator(user);
         JsonObject reactAuthObject = JWT.createReactAuthObject(token, user);
         return Response.status(200).entity(reactAuthObject).build();
+    }
+
+    @Transactional
+    public Response resendVerification(User credentials) {
+        log.info("UserOrm/resendVerification");
+        if (credentials == null || credentials.getPassword() == null
+                || (credentials.getUserName() == null && credentials.getEmail() == null)) {
+            return invalidCredentialsResponse();
+        }
+
+        String identifier = credentials.getUserName() != null
+                ? credentials.getUserName().trim()
+                : credentials.getEmail().trim();
+        if (identifier.isBlank() || credentials.getPassword().isBlank()) {
+            return invalidCredentialsResponse();
+        }
+
+        User user;
+        try {
+            user = em.createQuery(
+                    "SELECT u FROM User u WHERE u.userName = :identifier OR u.email = :identifier", User.class)
+                    .setParameter("identifier", identifier)
+                    .getSingleResult();
+        } catch (Exception e) {
+            return invalidCredentialsResponse();
+        }
+
+        try {
+            String storedPasswordHash = user.getSecret() != null ? user.getSecret().getPassword() : null;
+            if (storedPasswordHash == null
+                    || !verifyBCryptPassword(storedPasswordHash, credentials.getPassword())) {
+                return invalidCredentialsResponse();
+            }
+        } catch (Exception e) {
+            log.log(Level.FINE, "Verification resend credential check failed", e);
+            return invalidCredentialsResponse();
+        }
+
+        if (Boolean.TRUE.equals(user.getSecret().getIsVerifyed())) {
+            return Response.status(Response.Status.CONFLICT)
+                    .entity("Dieses Konto ist bereits verifiziert").build();
+        }
+
+        String verificationId = secretOrm.generateVerificationId();
+        user.getSecret().setVerificationId(verificationId);
+        user.getSecret().setVerificationTimestamp(Time.currentTimeInMillis());
+        em.merge(user.getSecret());
+
+        // The recipient always comes from the authenticated account record, never
+        // from a caller-controlled email address.
+        email.sendVerificationMail(user.getEmail(), verificationId);
+        return Response.ok(jakarta.json.Json.createObjectBuilder()
+                .add("message", "Ein neuer Verifizierungscode wurde gesendet.")
+                .build()).build();
+    }
+
+    private Response invalidCredentialsResponse() {
+        return Response.status(Response.Status.UNAUTHORIZED)
+                .entity("Benutzername oder Passwort falsch").build();
     }
 
     public Response logoutUser() {
