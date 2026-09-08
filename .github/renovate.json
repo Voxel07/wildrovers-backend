@@ -3,14 +3,15 @@
   "extends": [
     "config:recommended"
   ],
+  "labels": ["dependencies"],
+  "schedule": ["before 9am on Monday"],
+  "timezone": "Europe/Berlin",
   "packageRules": [
     {
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ],
-      "groupName": "all non-major dependencies",
-      "groupSlug": "non-major"
+      "description": "Group all dependency updates into a single weekly MR",
+      "matchPackagePatterns": ["*"],
+      "groupName": "all dependencies",
+      "groupSlug": "all-dependencies"
     }
   ]
 }
