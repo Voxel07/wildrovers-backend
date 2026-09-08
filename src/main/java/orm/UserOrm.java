@@ -308,6 +308,10 @@ public class UserOrm {
         }
     }
 
+    public User findById(Long id) {
+        return em.find(User.class, id);
+    }
+
     @Transactional
     @CacheInvalidateAll(cacheName = "team-members")
     public User createOidcUser(String username, String email, String firstName, String lastName, String role) {

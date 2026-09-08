@@ -1,6 +1,8 @@
 package resources;
 
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.security.TestSecurity;
 import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
@@ -10,13 +12,27 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @QuarkusTest
+@TestProfile(EventResourceTest.Profile.class)
 class EventResourceTest {
+
+    public static class Profile implements QuarkusTestProfile {
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            // Never write to the real Google Calendar from tests, even when
+            // GOOGLE_CALENDAR_CREDENTIALS is set in the developer environment.
+            // A non-empty value that is not valid JSON makes GoogleCalendarService
+            // skip the sync (empty strings fail Quarkus config validation).
+            return Map.of("google.calendar.credentials", "test-disabled");
+        }
+    }
+
     @Inject EntityManager em;
 
     @BeforeEach @Transactional
@@ -40,7 +56,9 @@ class EventResourceTest {
 
     @Test @TestSecurity(user="evTest",roles={"Frischling"})
     void createEvent() {
-        given().contentType(ContentType.JSON).body("{\"title\":\"Test Event\",\"eventDate\":\"2026-12-25T18:00:00\",\"location\":\"Test Loc\"}").post("/event").then().statusCode(anyOf(is(201),is(500)));
+        // Google Calendar sync is disabled in the test profile (empty credentials),
+        // so this creates the event only in the in-memory H2 database.
+        given().contentType(ContentType.JSON).body("{\"title\":\"Test Event\",\"eventDate\":\"2026-12-25T18:00:00\",\"location\":\"Test Loc\"}").post("/event").then().statusCode(201);
     }
     @Test @TestSecurity(user="evTest",roles={"Frischling"})
     void createMissing() {

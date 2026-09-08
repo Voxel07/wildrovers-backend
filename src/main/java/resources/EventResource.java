@@ -309,6 +309,44 @@ public class EventResource {
         return Response.ok(updatedEvent).build();
     }
 
+    @POST
+    @Path("/{id}/attendance/{userId}")
+    @RolesAllowed({ "Vorstand", "Admin" })
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response setAttendanceForUser(@PathParam("id") Long eventId, @PathParam("userId") Long userId,
+            EventAttendance attendanceInput) {
+        log.info("EventResource/setAttendanceForUser: event=" + eventId + " user=" + userId);
+        User actor = userPrincipalResolver.resolveUser();
+        if (actor == null) {
+            return Response.status(401).entity("Nicht eingeloggt").build();
+        }
+
+        User target = userOrm.findById(userId);
+        if (target == null) {
+            return Response.status(404).entity("Benutzer nicht gefunden").build();
+        }
+        if (!model.Users.Roles.hasRequiredRole(target.getRole(), model.Users.Roles.FRESHMAN)) {
+            return Response.status(400).entity("Nur Teammitglieder können als Teilnehmer eingetragen werden.").build();
+        }
+
+        String status = attendanceInput.getStatus() == null ? null : attendanceInput.getStatus().toUpperCase();
+        if (!"YES".equals(status) && !"NO".equals(status) && !"MAYBE".equals(status)) {
+            return Response.status(400).entity("Ungültiger Status").build();
+        }
+
+        AuditLogger.crud(log, actor.getUserName(), actor.getId(), "ATTEND", "Event", eventId,
+                "status=" + status + " user=" + target.getUserName());
+
+        Event updatedEvent = eventOrm.saveAttendance(eventId, userId, status);
+        if (updatedEvent == null) {
+            return Response.status(404).entity("Event nicht gefunden").build();
+        }
+
+        populateNonRespondents(java.util.Collections.singletonList(updatedEvent));
+        return Response.ok(updatedEvent).build();
+    }
+
     @GET
     @Path("/by-post/{postId}")
     @PermitAll
