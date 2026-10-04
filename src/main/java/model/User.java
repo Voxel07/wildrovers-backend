@@ -18,6 +18,7 @@ import jakarta.persistence.JoinColumn;
 
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -39,7 +40,8 @@ import jakarta.validation.constraints.NotBlank;
 import org.hibernate.validator.constraints.Length;
 
 @Entity
-@Table(name = "USER")
+@Table(name = "USER", uniqueConstraints = @UniqueConstraint(
+        name = "uq_user_oidc_identity", columnNames = { "oidcIssuer", "oidcSubject" }))
 @UserDefinition
 public class User {
     @Id
@@ -135,6 +137,27 @@ public class User {
 
     @Column(name = "isBlocked", columnDefinition = "boolean default false")
     private Boolean isBlocked = false;
+
+    /** Immutable OIDC identity (issuer + subject) this account is bound to. */
+    @JsonIgnore
+    @JsonbTransient
+    @Column(name = "oidcIssuer", length = 512)
+    private String oidcIssuer;
+
+    @JsonIgnore
+    @JsonbTransient
+    @Column(name = "oidcSubject", length = 255)
+    private String oidcSubject;
+
+    /**
+     * Incremented whenever all locally issued JWTs of this account must stop
+     * working (logout, password change/reset). Tokens carry the version they
+     * were issued with and are rejected once it no longer matches.
+     */
+    @JsonIgnore
+    @JsonbTransient
+    @Column(name = "tokenVersion", nullable = false, columnDefinition = "integer default 0")
+    private Integer tokenVersion = 0;
 
     @jakarta.persistence.Transient
     private Long eventsAttended = 0L;
@@ -530,6 +553,41 @@ public class User {
 
     public void setIsBlocked(Boolean isBlocked) {
         this.isBlocked = isBlocked;
+    }
+
+    @JsonIgnore
+    @JsonbTransient
+    public String getOidcIssuer() {
+        return oidcIssuer;
+    }
+
+    public void setOidcIssuer(String oidcIssuer) {
+        this.oidcIssuer = oidcIssuer;
+    }
+
+    @JsonIgnore
+    @JsonbTransient
+    public String getOidcSubject() {
+        return oidcSubject;
+    }
+
+    public void setOidcSubject(String oidcSubject) {
+        this.oidcSubject = oidcSubject;
+    }
+
+    @JsonIgnore
+    @JsonbTransient
+    public int getTokenVersion() {
+        return tokenVersion != null ? tokenVersion : 0;
+    }
+
+    public void setTokenVersion(Integer tokenVersion) {
+        this.tokenVersion = tokenVersion;
+    }
+
+    /** Invalidates every local JWT issued for this account so far. */
+    public void revokeTokens() {
+        this.tokenVersion = getTokenVersion() + 1;
     }
 
     public Long getEventsAttended() {

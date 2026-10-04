@@ -79,16 +79,13 @@ public class UserResouce {
 
     @GET
     @Path("/me")
-    @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
+    @io.quarkus.security.Authenticated // disabled accounts get no roles; resolveUser() explains the 403
     @Produces(MediaType.APPLICATION_JSON)
     public Response getMe() {
         log.info("UserResource/getMe");
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {
             return Response.status(401).entity("Benutzer nicht eingeloggt oder unbekannt").build();
-        }
-        if (user.getIsBlocked()) {
-            return Response.status(403).entity("Dein Account wurde gesperrt.").build();
         }
         user.setEventsAttended(userOrm.getEventsAttendedCount(user.getId()));
         user.setForumPostCount(userOrm.getForumPostCount(user.getId()));
@@ -170,23 +167,31 @@ public class UserResouce {
     @Consumes(MediaType.APPLICATION_JSON)
     public Response logout() {
         log.info("UserResource/logout");
-        return userOrm.logoutUser();
+        Long userId = null;
+        try {
+            userId = userPrincipalResolver.resolveUserId();
+        } catch (jakarta.ws.rs.WebApplicationException e) {
+            // Disabled accounts have nothing left to revoke.
+        }
+        return userOrm.logoutUser(userId);
     }
 
     @PUT
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response addUser(@Valid User usr) {
+    public Response addUser(@Valid model.Users.SignupRequest signup) {
         log.info("UserResource/addUser");
         if (!signupSettings.isSignupEnabled()) {
             return Response.status(Response.Status.FORBIDDEN)
                     .entity("Die Registrierung ist derzeit deaktiviert.")
                     .build();
         }
-        AuditLogger.crud(log, usr.getUserName(), null, "REGISTER", "User",
-                usr.getUserName());
-        return userOrm.addUser(usr);
+        if (signup == null) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Registrierungsdaten fehlen.").build();
+        }
+        AuditLogger.crud(log, signup.userName, null, "REGISTER", "User", signup.userName);
+        return userOrm.addUser(signup);
     }
 
     /**

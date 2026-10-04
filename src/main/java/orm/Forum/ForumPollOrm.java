@@ -155,12 +155,13 @@ public class ForumPollOrm {
 
     /**
      * Returns voter names grouped by option for a given poll.
-     * Returns empty names if the poll is anonymous.
+     * Returns empty names if the poll is anonymous, and null if the poll does not
+     * exist or its category is not visible to the given role (same rule as post reads).
      */
-    public jakarta.json.JsonArray getVoterNames(Long pollId) {
+    public jakarta.json.JsonArray getVoterNames(Long pollId, String viewerRole) {
         Polls poll = em.find(Polls.class, pollId);
-        if (poll == null) {
-            return jakarta.json.Json.createArrayBuilder().build();
+        if (poll == null || !canView(poll, viewerRole)) {
+            return null;
         }
 
         jakarta.json.JsonArrayBuilder result = jakarta.json.Json.createArrayBuilder();
@@ -186,6 +187,18 @@ public class ForumPollOrm {
         }
 
         return result.build();
+    }
+
+    private static boolean canView(Polls poll, String viewerRole) {
+        ForumPost post = poll.getPost();
+        if (post == null || post.getTopic() == null || post.getTopic().getCategory() == null) {
+            return false;
+        }
+        String visibility = post.getTopic().getCategory().getVisibility();
+        if (visibility == null || visibility.isBlank()) {
+            visibility = model.Users.Roles.VSISITOR;
+        }
+        return model.Users.Roles.hasRequiredRole(viewerRole, visibility);
     }
 
     /**

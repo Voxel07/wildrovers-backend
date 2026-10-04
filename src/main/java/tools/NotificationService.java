@@ -24,9 +24,30 @@ public class NotificationService {
     @Inject
     EntityManager em;
 
+    /** Minimum role per resource type when the caller has no finer-grained visibility. */
+    public static String defaultRequiredRole(String resourceType) {
+        return switch (resourceType) {
+            case "SIGNUP" -> Roles.ALDERMEN;
+            case "GALLERY" -> Roles.FRESHMAN; // albums are team-only
+            default -> Roles.VSISITOR;
+        };
+    }
+
     @Transactional
     public void record(String resourceType, String action, Long entityId, String title, String targetUrl,
             Long eventStartAt, boolean requiresResponse, Long actorUserId) {
+        record(resourceType, action, entityId, title, targetUrl, eventStartAt, requiresResponse, actorUserId,
+                defaultRequiredRole(resourceType));
+    }
+
+    /**
+     * Records an item and fans it out to subscribers. Only active, unblocked accounts whose
+     * role satisfies {@code requiredRole} receive a receipt; delivery re-checks this.
+     */
+    @Transactional
+    public void record(String resourceType, String action, Long entityId, String title, String targetUrl,
+            Long eventStartAt, boolean requiresResponse, Long actorUserId, String requiredRole) {
+        String audience = requiredRole == null || requiredRole.isBlank() ? Roles.VSISITOR : requiredRole;
         long now = System.currentTimeMillis();
         String key = resourceType + ":" + action + ":" + entityId + ("UPDATED".equals(action) ? ":" + now : "");
         Long existing = em
@@ -45,19 +66,17 @@ public class NotificationService {
         item.setOccurredAt(now);
         item.setEventStartAt(eventStartAt);
         item.setRequiresResponse(requiresResponse);
+        item.setRequiredRole(audience);
         em.persist(item);
 
-        String subscriberQuery = "SELECT p FROM NotificationPreference p JOIN FETCH p.user "
-                + "WHERE p.resourceType = :type AND (p.emailEnabled = true OR p.webhookEnabled = true)";
-        if ("SIGNUP".equals(resourceType)) {
-            subscriberQuery += " AND p.user.role IN :roles";
-        }
-        var query = em.createQuery(subscriberQuery, NotificationPreference.class)
-                .setParameter("type", resourceType);
-        if ("SIGNUP".equals(resourceType)) {
-            query.setParameter("roles", List.of(Roles.ALDERMEN, Roles.ADMIN));
-        }
-        List<NotificationPreference> subscribers = query.getResultList();
+        List<NotificationPreference> subscribers = em.createQuery(
+                "SELECT p FROM NotificationPreference p JOIN FETCH p.user u "
+                        + "WHERE p.resourceType = :type AND (p.emailEnabled = true OR p.webhookEnabled = true) "
+                        + "AND u.role IN :roles AND u.isActive = true AND (u.isBlocked IS NULL OR u.isBlocked = false)",
+                NotificationPreference.class)
+                .setParameter("type", resourceType)
+                .setParameter("roles", rolesAtLeast(audience))
+                .getResultList();
         for (NotificationPreference preference : subscribers) {
             if (actorUserId != null && actorUserId.equals(preference.getUser().getId()))
                 continue;
@@ -118,6 +137,10 @@ public class NotificationService {
                 .setParameter("now", now).setParameter("weekly", now - WEEK).setMaxResults(20).getResultList();
         List<DeliveryBatch> result = new ArrayList<>();
         for (NotificationReceipt receipt : receipts) {
+            if (!mayReceive(receipt)) {
+                retire(receipt, channel);
+                continue;
+            }
             if (currentlyEnabled(receipt.getUser().getId(), "EVENT", channel))
                 result.add(batch(receipt.getUser(), List.of(receipt)));
         }
@@ -143,7 +166,13 @@ public class NotificationService {
                             + requested + " = true AND (" + lastField + " IS NOT NULL OR " + nextField
                             + " <= :now) ORDER BY i.occurredAt",
                     NotificationReceipt.class).setParameter("userId", userId).setParameter("now", now).getResultList();
-            receipts.removeIf(r -> !currentlyEnabled(userId, r.getItem().getResourceType(), channel));
+            receipts.removeIf(r -> {
+                if (!mayReceive(r)) {
+                    retire(r, channel);
+                    return true;
+                }
+                return !currentlyEnabled(userId, r.getItem().getResourceType(), channel);
+            });
             if (!receipts.isEmpty())
                 result.add(batch(receipts.get(0).getUser(), receipts));
         }
@@ -181,6 +210,26 @@ public class NotificationService {
                     "UPDATE NotificationReceipt r SET r.webhookAttempts = r.webhookAttempts + 1 WHERE r.id IN :ids")
                     .setParameter("ids", receiptIds).executeUpdate();
         }
+    }
+
+    /** Account status and permissions are re-checked at delivery time (they may have changed). */
+    private static boolean mayReceive(NotificationReceipt receipt) {
+        User user = receipt.getUser();
+        return helper.AccountStatus.isUsable(user)
+                && Roles.hasRequiredRole(user.getRole(), receipt.getItem().getRequiredRole());
+    }
+
+    /** Stops delivering a receipt on a channel so it no longer occupies the delivery queue. */
+    private static void retire(NotificationReceipt receipt, String channel) {
+        if ("EMAIL".equals(channel)) {
+            receipt.setEmailRequested(false);
+        } else {
+            receipt.setWebhookRequested(false);
+        }
+    }
+
+    private static List<String> rolesAtLeast(String requiredRole) {
+        return Roles.getRoles().stream().filter(role -> Roles.hasRequiredRole(role, requiredRole)).toList();
     }
 
     private boolean currentlyEnabled(Long userId, String resource, String channel) {

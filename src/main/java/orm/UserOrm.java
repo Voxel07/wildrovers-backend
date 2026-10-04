@@ -69,6 +69,10 @@ public class UserOrm {
     @ConfigProperty(name = "app.frontend-url", defaultValue = "http://localhost:5173")
     String frontendUrl;
 
+    @Inject
+    @io.quarkus.cache.CacheName("team-members")
+    io.quarkus.cache.Cache teamMembersCache;
+
     public Long getEventsAttendedCount(Long userId) {
         try {
             return em
@@ -312,57 +316,150 @@ public class UserOrm {
         return em.find(User.class, id);
     }
 
+    public User findByOidcIdentity(String issuer, String subject) {
+        List<User> users = em.createQuery(
+                "SELECT u FROM User u WHERE u.oidcIssuer = :issuer AND u.oidcSubject = :subject", User.class)
+                .setParameter("issuer", issuer)
+                .setParameter("subject", subject)
+                .getResultList();
+        return users.isEmpty() ? null : users.get(0);
+    }
+
+    /** Claims of an OIDC access token relevant for account binding. */
+    public record OidcProfile(String issuer, String subject, String preferredUsername, String email,
+            boolean emailVerified, String firstName, String lastName) { }
+
+    /** Either the bound account or the reason why no account may be used. */
+    public record OidcResolution(User user, String problem) { }
+
+    /**
+     * Resolves the account bound to an OIDC identity (issuer + subject).
+     * <ul>
+     *   <li>A bound account is selected only by issuer + subject, never by mutable claims.</li>
+     *   <li>An unbound account with the same e-mail is linked only if the identity provider
+     *       asserts {@code email_verified} and the account is not bound to another subject.</li>
+     *   <li>Otherwise a new account is provisioned with a unique username; an existing
+     *       username is never taken over.</li>
+     * </ul>
+     * The application role is synchronised from the identity provider's group mapping.
+     */
     @Transactional
-    @CacheInvalidateAll(cacheName = "team-members")
-    public User createOidcUser(String username, String email, String firstName, String lastName, String role) {
-        log.info("UserOrm/createOidcUser: " + username + " (" + email + ")");
+    public OidcResolution resolveOidcUser(OidcProfile profile, String mappedRole) {
+        String role = mappedRole != null ? mappedRole : model.Users.Roles.VSISITOR;
+        boolean changed = false;
+        User user = findByOidcIdentity(profile.issuer(), profile.subject());
+
+        if (user == null) {
+            String email = profile.email() != null ? profile.email().trim() : null;
+            if (email == null || email.isBlank()) {
+                return new OidcResolution(null,
+                        "Dein Anmeldekonto liefert keine E-Mail-Adresse. Bitte wende dich an den Vorstand.");
+            }
+            User existing = findByEmail(email);
+            if (existing != null) {
+                if (existing.getOidcSubject() != null || !profile.emailVerified()) {
+                    log.warning("OIDC identity " + profile.subject() + " cannot be linked to account " + existing.getId()
+                            + " (already bound or e-mail not verified)");
+                    return new OidcResolution(null,
+                            "Dieses Anmeldekonto kann keinem Benutzer zugeordnet werden. Bitte wende dich an den Vorstand.");
+                }
+                existing.setOidcIssuer(profile.issuer());
+                existing.setOidcSubject(profile.subject());
+                user = existing;
+                log.info("Linked OIDC identity to existing account " + existing.getId());
+            } else {
+                user = createOidcUser(profile, email, role);
+                changed = true;
+            }
+        }
+
+        if (!role.equals(user.getRole())) {
+            log.info("User role changed in identity provider. Syncing role of account " + user.getId()
+                    + ": " + user.getRole() + " -> " + role);
+            user.setRole(role);
+            changed = true;
+        }
+        if (changed) {
+            teamMembersCache.invalidateAll().await().indefinitely();
+        }
+        return new OidcResolution(user, null);
+    }
+
+    private User createOidcUser(OidcProfile profile, String email, String role) {
+        String username = uniqueUsername(profile.preferredUsername(), profile.subject());
+        log.info("UserOrm/createOidcUser: " + username);
         User usr = new User();
         usr.setUserName(username);
         usr.setEmail(email);
-        usr.setFirstName((firstName != null && !firstName.isBlank()) ? firstName : "OIDC");
-        usr.setLastName((lastName != null && !lastName.isBlank()) ? lastName : "User");
-        usr.setRole(role != null ? role : "Besucher");
+        usr.setFirstName(profile.firstName() != null && !profile.firstName().isBlank() ? profile.firstName() : "OIDC");
+        usr.setLastName(profile.lastName() != null && !profile.lastName().isBlank() ? profile.lastName() : "User");
+        usr.setRole(role);
         usr.setActive(true);
-        usr.setPassword("OIDC_DUMMY"); // Set dummy value for transient validation
+        usr.setOidcIssuer(profile.issuer());
+        usr.setOidcSubject(profile.subject());
+        // Local password login stays impossible until the user explicitly resets a password.
+        usr.setPassword(BcryptUtil.bcryptHash(java.util.UUID.randomUUID().toString()));
         usr.setRegDate(Time.currentTimeInMillis());
+        em.persist(usr);
 
-        try {
-            em.persist(usr);
+        // Register secret for user, marked verified since they authenticated via OIDC
+        String verificationId = secretOrm.generateVerificationId();
+        String dummyHash = BcryptUtil.bcryptHash(java.util.UUID.randomUUID().toString());
+        secretOrm.addSecret(usr.getId(), true, verificationId, dummyHash);
 
-            // Register secret for user, marked verified since they authenticated via OIDC
-            String verificationId = secretOrm.generateVerificationId();
-            String dummyHash = BcryptUtil.bcryptHash(java.util.UUID.randomUUID().toString());
-            secretOrm.addSecret(usr.getId(), true, verificationId, dummyHash);
+        recordSignupNotification(usr);
+        return usr;
+    }
 
-            recordSignupNotification(usr);
-
-            return usr;
-        } catch (Exception e) {
-            log.log(Level.SEVERE, "Failed to create JIT user from OIDC", e);
-            return null;
+    private String uniqueUsername(String preferred, String subject) {
+        String base = preferred != null ? preferred.trim() : "";
+        if (base.isBlank()) {
+            base = "oidc-" + Integer.toHexString(subject.hashCode());
         }
+        if (base.length() > 40) {
+            base = base.substring(0, 40);
+        }
+        String candidate = base;
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        for (int attempt = 0; attempt < 20 && findByUsername(candidate) != null; attempt++) {
+            candidate = base + "-" + (1000 + random.nextInt(9000));
+        }
+        if (findByUsername(candidate) != null) {
+            candidate = base + "-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+        }
+        return candidate;
     }
 
     @Transactional
     @CacheInvalidateAll(cacheName = "team-members")
-    public Response addUser(User usr) {
+    public Response addUser(model.Users.SignupRequest signup) {
         log.info("UserOrm/addUser");
+        String userName = signup.userName.trim();
+        String mail = signup.email.trim();
 
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val2",
                 User.class);
-        query.setParameter("val1", usr.getUserName());
-        query.setParameter("val2", usr.getEmail());
+        query.setParameter("val1", userName);
+        query.setParameter("val2", mail);
 
         if (!query.getResultList().isEmpty()) {
             return Response.status(406).entity("Nutzer bereits bekannt").build();
         }
 
-        String plainPassword = usr.getPassword();
-        String passwordHash = BcryptUtil.bcryptHash(plainPassword);
-        usr.setPassword(passwordHash); // Set dummy value for transient validation
+        // Build the entity from the allowlisted signup fields only. Role,
+        // permissions and status are never taken from the request.
+        String passwordHash = BcryptUtil.bcryptHash(signup.password);
+        User usr = new User();
+        usr.setUserName(userName);
+        usr.setEmail(mail);
+        usr.setFirstName(signup.firstName.trim());
+        usr.setLastName(signup.lastName.trim());
+        usr.setPassword(passwordHash);
         usr.setRegDate(Time.currentTimeInMillis());
         usr.setActive(true);
-        usr.setRole("Besucher"); // Default role is Guest for now
+        usr.setIsBlocked(false);
+        usr.setCanCreateCategory(false);
+        usr.setRole(model.Users.Roles.VSISITOR);
 
         try {
             em.persist(usr);
@@ -412,10 +509,7 @@ public class UserOrm {
     }
 
     @Transactional
-    @CacheInvalidateAll.List({
-        @CacheInvalidateAll(cacheName = "team-members"),
-        @CacheInvalidateAll(cacheName = "resolved-users")
-    })
+    @CacheInvalidateAll(cacheName = "team-members")
     public String updateUser(User u) {
         log.info("UserOrm/updateUser");
 
@@ -521,6 +615,7 @@ public class UserOrm {
             if (!incoming.startsWith("$2")) {
                 if (dbUser.getSecret() != null) {
                     dbUser.getSecret().setPassword(BcryptUtil.bcryptHash(incoming));
+                    dbUser.revokeTokens();
                 }
             }
         }
@@ -577,8 +672,8 @@ public class UserOrm {
             return Response.status(401).entity(response).build();
         }
 
-        if (user.getIsBlocked()) {
-            return Response.status(403).entity("Dein Account wurde gesperrt.").build();
+        if (!helper.AccountStatus.isUsable(user)) {
+            return Response.status(403).entity(helper.AccountStatus.BLOCKED_MESSAGE).build();
         }
 
         user.setLastLogin(Time.currentTimeInMillis());
@@ -660,7 +755,18 @@ public class UserOrm {
                 .entity("Benutzername oder Passwort falsch").build();
     }
 
-    public Response logoutUser() {
+    /**
+     * Ends all sessions of a locally authenticated account by invalidating every
+     * JWT issued for it so far. OIDC sessions are ended at the identity provider.
+     */
+    @Transactional
+    public Response logoutUser(Long userId) {
+        if (userId != null) {
+            User user = em.find(User.class, userId);
+            if (user != null) {
+                user.revokeTokens();
+            }
+        }
         return Response.noContent().build();
     }
 
@@ -695,10 +801,7 @@ public class UserOrm {
     }
 
     @Transactional
-    @CacheInvalidateAll.List({
-        @CacheInvalidateAll(cacheName = "team-members"),
-        @CacheInvalidateAll(cacheName = "resolved-users")
-    })
+    @CacheInvalidateAll(cacheName = "team-members")
     public User updateUserProfile(Long userId, String phrase, java.time.LocalDate birthday, String firstName,
             String lastName, String email, String userName) {
         log.info("UserOrm/updateUserProfile");

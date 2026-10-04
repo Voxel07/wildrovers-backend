@@ -13,15 +13,20 @@ import java.time.Duration;
 import java.time.Instant;
 
 public class JWT {
+    /** Claim carrying {@link User#getTokenVersion()} at issuance; checked on every request. */
+    public static final String TOKEN_VERSION_CLAIM = "ver";
+
     /**
-     * Generate JWT token
+     * Generate JWT token. The subject is the immutable user id; username and
+     * email are never used to resolve the account behind a token.
      */
     public static String generator(User user) {
       return Jwt
             .issuer("wildrovers") //needs to match application properties
             .audience("wildrovers-backend")
+            .subject(String.valueOf(user.getId()))
             .upn(user.getUserName())
-            .claim("email", user.getEmail())
+            .claim(TOKEN_VERSION_CLAIM, user.getTokenVersion())
             .groups(new HashSet<>(Arrays.asList(user.getRole())))
             .issuedAt(Instant.now())
             .expiresAt(Instant.now().plus(Duration.ofHours(12)))

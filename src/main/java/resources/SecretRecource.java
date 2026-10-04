@@ -165,6 +165,10 @@ public class SecretRecource {
         secret.setPassword(passwordHash);
         secret.setResetToken(null);
         secret.setResetTokenTimestamp(null);
+        if (secret.getUser() != null) {
+            // A reset proves the old credentials may be compromised: end every session.
+            secret.getUser().revokeTokens();
+        }
         em.merge(secret);
 
         return Response.ok("{\"status\":\"success\", \"message\":\"Passwort erfolgreich geändert.\"}")

@@ -26,7 +26,6 @@ import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
 import model.Forum.ForumPost;
 import orm.Forum.ForumPostOrm;
-import model.Forum.Pictures;
 import tools.AuditLogger;
 import tools.NotificationService;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -135,6 +134,13 @@ public class ForumPostResource {
         return mutablePosts;
     }
 
+    /** Forum notifications only reach subscribers who may read the post's category. */
+    private void notifyForum(String action, Long postId, ForumPostOrm.NotificationInfo info, String url, Long actorId) {
+        if (info == null) return;
+        notificationService.record("FORUM", action, postId, info.title(), url, null, false, actorId,
+                info.requiredRole());
+    }
+
     @GET
     @Path("/latest")
     @PermitAll
@@ -187,30 +193,12 @@ public class ForumPostResource {
                     "CREATE", "Post", forumPost.getTitle());
             Response response = forumPostOrm.addPost(forumPost, topicId, userId);
             if (response.getStatus() == 201 && response.getEntity() instanceof Long postId) {
-                notificationService.record("FORUM", "CREATED", postId, forumPost.getTitle(),
-                        frontendUrl + "/Forum/Post/" + postId, null, false, userId);
+                notifyForum("CREATED", postId, forumPostOrm.notificationInfo(postId),
+                        frontendUrl + "/Forum/Post/" + postId, userId);
             }
             return response;
         }
     }
-    @POST
-    @Path("/img")
-    @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
-    @Produces(MediaType.APPLICATION_JSON)
-    @Consumes(MediaType.APPLICATION_JSON)
-    public Response saveImages(Pictures pic){
-        Long userId = userPrincipalResolver.resolveUserId();
-        log.info("ID:"+ pic.getPostId());
-        if(userId == null || pic.getFiles().isEmpty())
-        {
-            return Response.status(401).entity("Fehlender oder falscher Parameter").build();
-        }
-        else
-        {
-            return forumPostOrm.saveImages(pic, userId);
-        }
-    }
-
     @POST
     @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
     @Produces(MediaType.APPLICATION_JSON)
@@ -227,8 +215,8 @@ public class ForumPostResource {
                     "UPDATE", "Post", forumPost.getId());
             String result = forumPostOrm.updatePost(forumPost, userId);
             if (result != null && result.toLowerCase().contains("erfolgreich")) {
-                notificationService.record("FORUM", "UPDATED", forumPost.getId(), forumPost.getTitle(),
-                        frontendUrl + "/Forum/Post/" + forumPost.getId(), null, false, userId);
+                notifyForum("UPDATED", forumPost.getId(), forumPostOrm.notificationInfo(forumPost.getId()),
+                        frontendUrl + "/Forum/Post/" + forumPost.getId(), userId);
             }
             return Response.ok(result).build();
         }
@@ -247,10 +235,11 @@ public class ForumPostResource {
             model.User user = userPrincipalResolver.resolveUser();
             AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
                     "DELETE", "Post", forumPost.getId());
+            // Title and audience must come from the stored post, before it is deleted.
+            ForumPostOrm.NotificationInfo info = forumPostOrm.notificationInfo(forumPost.getId());
             String result = forumPostOrm.deletePost(forumPost, userId);
             if (result != null && result.toLowerCase().contains("erfolgreich")) {
-                notificationService.record("FORUM", "DELETED", forumPost.getId(), forumPost.getTitle(),
-                        frontendUrl + "/Forum", null, false, userId);
+                notifyForum("DELETED", forumPost.getId(), info, frontendUrl + "/Forum", userId);
             }
             return Response.ok(result).build();
         }

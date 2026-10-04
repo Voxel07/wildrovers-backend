@@ -15,6 +15,7 @@ import model.User;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import orm.UserOrm;
+import resources.JWT;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -42,30 +43,50 @@ public class LocalJwtIdentityService {
     public SecurityIdentity authenticate(String token) {
         try {
             JsonWebToken jwt = getParser().parse(token);
-            String username = jwt.getName();
-            User user = userOrm.findByUsername(username);
-            if (user == null || !user.isActive() || user.getIsBlocked() || user.getRole() == null) {
-                log.warning("LocalJwtAuth: rejecting disabled or unknown user '" + username + "'");
+            Long userId = parseUserId(jwt.getSubject());
+            User user = userId != null ? userOrm.findById(userId) : null;
+            if (!AccountStatus.isUsable(user)) {
+                log.warning("LocalJwtAuth: rejecting token of disabled or unknown account " + userId);
+                throw new AuthenticationFailedException();
+            }
+            Integer tokenVersion = asInteger(jwt.getClaim(JWT.TOKEN_VERSION_CLAIM));
+            if (tokenVersion == null || tokenVersion != user.getTokenVersion()) {
+                log.info("LocalJwtAuth: rejecting revoked token of account " + userId);
                 throw new AuthenticationFailedException();
             }
 
-            QuarkusSecurityIdentity.Builder identityBuilder = QuarkusSecurityIdentity.builder()
+            return QuarkusSecurityIdentity.builder()
                     .setPrincipal(jwt)
                     .addRoles(Set.of(user.getRole()))
                     .addCredential(new TokenCredential(token, "Bearer"))
-                    .addAttribute("local-jwt", Boolean.TRUE);
-            String email = jwt.getClaim("email");
-            if (email != null) {
-                identityBuilder.addAttribute("email", email);
-            }
-
-            log.info("LocalJwtAuth: authenticated '" + username + "' via local JWT");
-            return identityBuilder.build();
+                    .addAttribute("local-jwt", Boolean.TRUE)
+                    .addAttribute(AccountStatus.USER_ID_ATTRIBUTE, user.getId())
+                    .build();
         } catch (AuthenticationFailedException e) {
             throw e;
         } catch (Exception e) {
             log.log(Level.WARNING, "LocalJwtAuth: validation failed", e);
             throw new AuthenticationFailedException(e);
+        }
+    }
+
+    private static Long parseUserId(String subject) {
+        if (subject == null || subject.isBlank()) return null;
+        try {
+            return Long.valueOf(subject);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static Integer asInteger(Object claim) {
+        if (claim == null) return null;
+        if (claim instanceof jakarta.json.JsonNumber number) return number.intValue();
+        if (claim instanceof Number number) return number.intValue();
+        try {
+            return Integer.valueOf(claim.toString());
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 
@@ -102,7 +123,7 @@ public class LocalJwtIdentityService {
         JWTAuthContextInfo info = new JWTAuthContextInfo(key, "wildrovers");
         info.setSignatureAlgorithm(Set.of(SignatureAlgorithm.RS256));
         info.setExpectedAudience(Set.of("wildrovers-backend"));
-        info.setRequiredClaims(Set.of("exp", "iat", "upn"));
+        info.setRequiredClaims(Set.of("exp", "iat", "sub", JWT.TOKEN_VERSION_CLAIM));
         info.setMaxTimeToLiveSecs(12L * 60L * 60L);
         return new DefaultJWTParser(info);
     }

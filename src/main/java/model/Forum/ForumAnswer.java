@@ -86,6 +86,7 @@ public class ForumAnswer {
         this.id = id;
     }
 
+    @jakarta.json.bind.annotation.JsonbTypeSerializer(tools.ForumContentSerializer.class)
     public String getContent() {
         return content;
     }

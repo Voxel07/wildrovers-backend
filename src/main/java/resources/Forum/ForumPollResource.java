@@ -88,8 +88,13 @@ public class ForumPollResource {
         if (pollId == null) {
             return Response.status(Response.Status.BAD_REQUEST).entity("poll parameter required").build();
         }
-        // Returns voter names per option (empty for anonymous polls)
-        jakarta.json.JsonArray result = forumPollOrm.getVoterNames(pollId);
+        model.User viewer = userPrincipalResolver.resolveUser();
+        String viewerRole = viewer != null ? viewer.getRole() : Roles.VSISITOR;
+        // Returns voter names per option (empty for anonymous polls); hidden polls look missing
+        jakarta.json.JsonArray result = forumPollOrm.getVoterNames(pollId, viewerRole);
+        if (result == null) {
+            return Response.status(Response.Status.NOT_FOUND).entity("Umfrage nicht gefunden").build();
+        }
         return Response.ok(result).build();
     }
 

@@ -28,7 +28,7 @@ services:
       CORS_ORIGINS: "${CORS_ORIGINS}"
       OPENOBSERVE_ENDPOINT: "${OPENOBSERVE_ENDPOINT:-http://openobserve:5080/api/default}"
       OPENOBSERVE_TOKEN: "${OPENOBSERVE_TOKEN}"
-      MAILER_MOCK: "${MAILER_MOCK:-true}"
+      MAILER_MOCK: "${MAILER_MOCK:-false}"
       MAILER_FROM: "${MAILER_FROM}"
       MAILER_HOST: "${MAILER_HOST}"
       MAILER_PORT: "${MAILER_PORT}"
@@ -44,6 +44,15 @@ services:
       OTEL_LOG_LEVEL: "${OTEL_LOG_LEVEL:-WARN}"
       TRUSTED_PROXIES: "${TRUSTED_PROXIES}"
       RATE_LIMITER_ENABLED: "${RATE_LIMITER_ENABLED:-true}"
+      # Required: AES key material for stored webhook URLs/secrets (prod has no default).
+      NOTIFICATION_WEBHOOK_ENCRYPTION_KEY: "${NOTIFICATION_WEBHOOK_ENCRYPTION_KEY:?Set NOTIFICATION_WEBHOOK_ENCRYPTION_KEY in .env}"
+      # Optional: stable key for signed forum image URLs (random per start when unset).
+      FORUM_IMAGE_SIGNING_KEY: "${FORUM_IMAGE_SIGNING_KEY:-}"
+      # Optional: Authentik group names (comma-separated) mapped to application roles.
+      APP_OIDC_GROUPS_ADMIN: "${APP_OIDC_GROUPS_ADMIN:-Admin}"
+      APP_OIDC_GROUPS_VORSTAND: "${APP_OIDC_GROUPS_VORSTAND:-Vorstand}"
+      APP_OIDC_GROUPS_MITGLIED: "${APP_OIDC_GROUPS_MITGLIED:-Mitglied}"
+      APP_OIDC_GROUPS_FRISCHLING: "${APP_OIDC_GROUPS_FRISCHLING:-Frischling}"
       AUTHENTIK_PRINCIPAL_CLAIM: "${AUTHENTIK_PRINCIPAL_CLAIM:-preferred_username}"
       EMAIL_GOOGLE_USERNAME: "${EMAIL_GOOGLE_USERNAME}"
       EMAIL_GOOGLE_PASSWORD: "${EMAIL_GOOGLE_PASSWORD}"

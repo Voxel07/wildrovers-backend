@@ -200,7 +200,8 @@ public class EventResource {
         }
 
         // Authorization check: creator or Admin
-        if (!existing.getCreator().getId().equals(user.getId()) && !user.getRole().equals("Admin")) {
+        boolean isCreator = existing.getCreator() != null && existing.getCreator().getId().equals(user.getId());
+        if (!isCreator && !user.getRole().equals("Admin")) {
             return Response.status(403).entity("Nur der Ersteller oder ein Administrator darf dieses Event bearbeiten.")
                     .build();
         }
@@ -252,7 +253,8 @@ public class EventResource {
         }
 
         // Authorization check: creator or Admin
-        if (!existing.getCreator().getId().equals(user.getId()) && !user.getRole().equals("Admin")) {
+        boolean isCreator = existing.getCreator() != null && existing.getCreator().getId().equals(user.getId());
+        if (!isCreator && !user.getRole().equals("Admin")) {
             return Response.status(403).entity("Nur der Ersteller oder ein Administrator darf dieses Event löschen.")
                     .build();
         }

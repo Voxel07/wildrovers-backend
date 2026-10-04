@@ -35,6 +35,9 @@ public class ForumAnswerOrm {
     @Inject
     HtmlSanitizer htmlSanitizer;
 
+    @Inject
+    tools.ForumImageStore imageStore;
+
 
     public List<ForumAnswer>getAllAnswers(){
         log.info("ForumOrm/getAnswers");
@@ -78,8 +81,8 @@ public class ForumAnswerOrm {
             return Response.status(403).entity("Du hast keine Berechtigung, in dieser Kategorie eine Antwort zu erstellen.").build();
         }
 
-        // Sanitize content before persisting
-        forumAnswer.setContent(htmlSanitizer.sanitize(forumAnswer.getContent()));
+        // Sanitize content and attach the author's editor uploads to the parent post
+        forumAnswer.setContent(imageStore.prepareContent(forumAnswer.getContent(), forumPost.getId(), userId));
 
         forumAnswer.setCreationDate(Time.currentTimeInMillis());
         forumAnswer.setPost(forumPost);
@@ -112,8 +115,11 @@ public class ForumAnswerOrm {
 
         if (creator != null && !creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
 
-        // Sanitize content before merging
-        forumAnswerAusDB.setContent(htmlSanitizer.sanitize(forumAnswer.getContent()));
+        // Sanitize content and attach the editor's uploads to the parent post
+        if (forumAnswer.getContent() != null) {
+            Long postId = forumAnswerAusDB.getPost() != null ? forumAnswerAusDB.getPost().getId() : null;
+            forumAnswerAusDB.setContent(imageStore.prepareContent(forumAnswer.getContent(), postId, userId));
+        }
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyy HH:mm:ss");
         LocalDateTime now = LocalDateTime.now();
         forumAnswerAusDB.setEditDate(dtf.format(now));

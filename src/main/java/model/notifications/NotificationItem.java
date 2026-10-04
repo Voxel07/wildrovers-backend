@@ -33,6 +33,9 @@ public class NotificationItem {
     private Long eventStartAt;
     @Column(name = "requires_response", nullable = false)
     private boolean requiresResponse;
+    /** Minimum application role allowed to learn about this item (e.g. forum category visibility). */
+    @Column(name = "required_role", length = 20)
+    private String requiredRole;
 
     public Long getId() { return id; }
     public String getResourceType() { return resourceType; }
@@ -53,4 +56,6 @@ public class NotificationItem {
     public void setEventStartAt(Long eventStartAt) { this.eventStartAt = eventStartAt; }
     public boolean isRequiresResponse() { return requiresResponse; }
     public void setRequiresResponse(boolean requiresResponse) { this.requiresResponse = requiresResponse; }
+    public String getRequiredRole() { return requiredRole == null || requiredRole.isBlank() ? model.Users.Roles.VSISITOR : requiredRole; }
+    public void setRequiredRole(String requiredRole) { this.requiredRole = requiredRole; }
 }

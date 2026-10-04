@@ -16,29 +16,18 @@ import java.util.logging.Logger;
 import java.util.logging.Level;
 
 import model.User;
-import model.Forum.ForumPicture;
 import model.Forum.ForumPost;
 import model.Forum.ForumTopic;
 import model.Forum.ForumPostView;
-import model.Forum.Pictures;
 import orm.UserOrm;
 import jakarta.ws.rs.core.Response;
 
 //Time
 import tools.Time;
 import tools.HtmlSanitizer;
-import tools.ImageExtractor;
+import tools.ForumImageStore;
 
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-//img
-import java.awt.image.BufferedImage;
-import org.apache.commons.io.FileUtils;
-import java.util.ArrayList;
-import javax.imageio.ImageIO;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.IOException;
 
 @ApplicationScoped
 public class ForumPostOrm {
@@ -56,17 +45,7 @@ public class ForumPostOrm {
     HtmlSanitizer htmlSanitizer;
 
     @Inject
-    ImageExtractor imageExtractor;
-
-    @ConfigProperty(name = "forum.images.upload-dir", defaultValue = "${user.home}/wildrovers-uploads/forum")
-    String uploadDir;
-
-    // Base URL for image references — configurable for production
-    @ConfigProperty(name = "quarkus.http.host", defaultValue = "localhost")
-    String serverHost;
-
-    @ConfigProperty(name = "quarkus.http.port", defaultValue = "8080")
-    int serverPort;
+    ForumImageStore imageStore;
 
     public List<ForumPost> getAllPosts() {
         log.info("ForumOrm/getPosts");
@@ -146,6 +125,22 @@ public class ForumPostOrm {
         return fp;
     }
 
+    /** Title and audience of a post, read from the database for notifications. */
+    public record NotificationInfo(String title, String requiredRole) { }
+
+    public NotificationInfo notificationInfo(Long postId) {
+        if (postId == null) return null;
+        List<Object[]> rows = em.createQuery(
+                "SELECT p.title, c.visibility FROM ForumPost p JOIN p.topic t JOIN t.category c WHERE p.id = :id",
+                Object[].class)
+                .setParameter("id", postId)
+                .getResultList();
+        if (rows.isEmpty()) return null;
+        String visibility = (String) rows.get(0)[1];
+        return new NotificationInfo((String) rows.get(0)[0],
+                visibility == null || visibility.isBlank() ? model.Users.Roles.VSISITOR : visibility);
+    }
+
     // Crud operations for ForumPosts
     /**
      * NOTE: addPost
@@ -210,12 +205,9 @@ public class ForumPostOrm {
             return Response.status(401).entity("Fehler beim erstellen des Posts").build();
         }
 
-        // Extract base64 images from ORIGINAL content first (before sanitization
-        // strips data: URIs), THEN sanitize the result (now with safe HTTP URLs).
-        String baseUrl = "http://" + serverHost + ":" + serverPort;
-        String contentWithImages = imageExtractor.extractAndSaveImages(
-                forumPost.getContent(), forumPost.getId(), baseUrl);
-        forumPost.setContent(htmlSanitizer.sanitize(contentWithImages));
+        // Extract base64 images from the ORIGINAL content (before sanitization strips
+        // data: URIs), sanitize, and attach the author's editor uploads to this post.
+        forumPost.setContent(imageStore.prepareContent(forumPost.getContent(), forumPost.getId(), userId));
         try {
             em.merge(forumPost);
         } catch (Exception e) {
@@ -224,76 +216,6 @@ public class ForumPostOrm {
         }
 
         return Response.status(201).entity(forumPost.getId()).build();
-    }
-
-    @Transactional
-    public Response saveImages(Pictures pic, Long userId) {
-
-        ForumPost post = getPostsById(pic.getPostId()).get(0);
-        ForumPicture picture;
-        // post.setPictures(pictures);
-
-        int start = 0;
-        int end = 0;
-        String typeString; // data:image/png
-        String type; // png
-        List<String> types = new ArrayList<>();
-        String base64Image;
-        byte[] imageBytes;
-        List<BufferedImage> imagList = new ArrayList<>();
-
-        for (String elm : pic.getFiles()) {
-            start = elm.indexOf("data:");
-            end = elm.indexOf(";");
-            typeString = elm.substring(start, end);
-
-            if (typeString.contains("image")) {
-                type = typeString.substring(11, typeString.length());
-                types.add(type);
-                base64Image = elm.split(",")[1];
-                imageBytes = jakarta.xml.bind.DatatypeConverter.parseBase64Binary(base64Image);
-                try {
-                    imagList.add(ImageIO.read(new ByteArrayInputStream(imageBytes)));
-                } catch (IOException e) {
-                    return Response.status(500).entity("Fehler beim Konvertieren der Bilder").build();
-                }
-            }
-        }
-
-        // Ordnerstruktur erstellen
-        File folder = new File("Forum/Posts/" + pic.getPostId() + "/images");
-        if (!folder.exists()) {
-            if (!folder.mkdirs())
-                return Response.status(500).entity("Fehler beim erstellen der Ordnerstruktur").build();
-        } else {
-            try {
-                FileUtils.cleanDirectory(folder);
-            } catch (IOException e) {
-                return Response.status(500).entity("Fehler beim Löschen des Ordnerinhalts").build();
-            }
-        }
-
-        File outputfile;
-        int i = 0;
-        String path;
-
-        for (BufferedImage img : imagList) {
-            path = folder.getAbsolutePath() + "/img_" + i + "." + types.get(i);
-            picture = new ForumPicture(path);
-            post.getPictures().add(picture);
-            picture.setPost(post);
-            em.persist(picture);
-
-            outputfile = new File(path);
-            try {
-                ImageIO.write(img, types.get(i), outputfile);
-            } catch (IOException e) {
-                return Response.status(500).entity("Fehler beim speichern der Bilder").build();
-            }
-            i++;
-        }
-        em.merge(post);
-        return Response.ok("Beitragsbilder erfolgreich gespeichert").build();
     }
 
     /**
@@ -329,10 +251,10 @@ public class ForumPostOrm {
         if (forumPost.getTitle() != null && !forumPost.getTitle().isBlank()) {
             forumPostAusDB.setTitle(htmlSanitizer.sanitizeTitle(forumPost.getTitle()));
         }
-        String baseUrl = "http://" + serverHost + ":" + serverPort;
-        String contentWithImages = imageExtractor.extractAndSaveImages(
-                forumPost.getContent(), forumPost.getId(), baseUrl);
-        forumPostAusDB.setContent(htmlSanitizer.sanitize(contentWithImages));
+        if (forumPost.getContent() != null) {
+            forumPostAusDB.setContent(
+                    imageStore.prepareContent(forumPost.getContent(), forumPostAusDB.getId(), userId));
+        }
 
         forumPostAusDB.setEditDate(Time.currentTimeInMillis());
         forumPostAusDB.setEditor(user);
@@ -372,61 +294,7 @@ public class ForumPostOrm {
             return "Nur der Ersteller oder Mods dürfen das";
 
         try {
-            // 1. Update stats (decrement post count on topic)
-            if (forumPostAusDB.getTopic() != null) {
-                forumPostAusDB.getTopic().decPostCount();
-                em.merge(forumPostAusDB.getTopic());
-            }
-
-            // Decrement answer counts of all users who answered the post
-            forumAnswerOrm.deleteAllAnswersFromTopic(postId);
-
-            // Flush stats updates to the DB before clearing the session!
-            em.flush();
-
-            // 2. Run manual native SQL delete queries to delete all linked resources
-            // A. Delete answer pictures
-            em.createNativeQuery("DELETE FROM FORUM_PICTURE WHERE answer_id IN (SELECT id FROM FORUM_ANSWERS WHERE post_id = :postId)")
-                    .setParameter("postId", postId).executeUpdate();
-
-            // B. Delete post pictures
-            em.createNativeQuery("DELETE FROM FORUM_PICTURE WHERE post_id = :postId")
-                    .setParameter("postId", postId).executeUpdate();
-
-            // C. Delete answers
-            em.createNativeQuery("DELETE FROM FORUM_ANSWERS WHERE post_id = :postId")
-                    .setParameter("postId", postId).executeUpdate();
-
-            // D. Delete poll option votes
-            em.createNativeQuery("DELETE FROM FORUM_POLL_OPTION_VOTES WHERE option_id IN (SELECT id FROM FORUM_POLL_OPTIONS WHERE poll_id IN (SELECT id FROM FORUM_POLLS WHERE post_id = :postId))")
-                    .setParameter("postId", postId).executeUpdate();
-
-            // E. Delete poll votes
-            em.createNativeQuery("DELETE FROM FORUM_POLL_VOTES WHERE poll_id IN (SELECT id FROM FORUM_POLLS WHERE post_id = :postId)")
-                    .setParameter("postId", postId).executeUpdate();
-
-            // F. Delete poll options
-            em.createNativeQuery("DELETE FROM FORUM_POLL_OPTIONS WHERE poll_id IN (SELECT id FROM FORUM_POLLS WHERE post_id = :postId)")
-                    .setParameter("postId", postId).executeUpdate();
-
-            // G. Delete polls
-            em.createNativeQuery("DELETE FROM FORUM_POLLS WHERE post_id = :postId")
-                    .setParameter("postId", postId).executeUpdate();
-
-            // H. Delete post votes
-            em.createNativeQuery("DELETE FROM FORUM_POST_VOTES WHERE post_id = :postId")
-                    .setParameter("postId", postId).executeUpdate();
-
-            // I. Delete post views
-            em.createNativeQuery("DELETE FROM FORUM_POST_VIEWS WHERE post_id = :postId")
-                    .setParameter("postId", postId).executeUpdate();
-
-            // J. Delete the post itself
-            em.createNativeQuery("DELETE FROM FORUM_POSTS WHERE id = :postId")
-                    .setParameter("postId", postId).executeUpdate();
-
-            // 3. Clear the persistence context so Hibernate forgets about the deleted objects in memory
-            em.clear();
+            removePostCascade(forumPostAusDB);
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
             return "Fehler beim Löschen des Posts";
@@ -436,22 +304,86 @@ public class ForumPostOrm {
     }
 
     /**
-     * No checks, because this function does not have a public endpoint
-     * gets Called when a Topic is deleted so no need to update answer count
+     * Deletes a post with everything that references it (answers, pictures, polls, votes, views)
+     * and keeps the topic statistics in sync. Callers must have checked permissions.
+     */
+    private void removePostCascade(ForumPost post) {
+        Long postId = post.getId();
+        // 1. Update stats (decrement post count on topic)
+        if (post.getTopic() != null) {
+            post.getTopic().decPostCount();
+            em.merge(post.getTopic());
+        }
+
+        // Decrement answer counts of all users who answered the post
+        forumAnswerOrm.deleteAllAnswersFromTopic(postId);
+
+        // Flush stats updates to the DB before clearing the session!
+        em.flush();
+
+        // 2. Run manual native SQL delete queries to delete all linked resources
+        // A. Delete answer pictures
+        em.createNativeQuery("DELETE FROM FORUM_PICTURE WHERE answer_id IN (SELECT id FROM FORUM_ANSWERS WHERE post_id = :postId)")
+                .setParameter("postId", postId).executeUpdate();
+
+        // B. Delete post pictures
+        em.createNativeQuery("DELETE FROM FORUM_PICTURE WHERE post_id = :postId")
+                .setParameter("postId", postId).executeUpdate();
+
+        // C. Delete answers
+        em.createNativeQuery("DELETE FROM FORUM_ANSWERS WHERE post_id = :postId")
+                .setParameter("postId", postId).executeUpdate();
+
+        // D. Delete poll option votes
+        em.createNativeQuery("DELETE FROM FORUM_POLL_OPTION_VOTES WHERE option_id IN (SELECT id FROM FORUM_POLL_OPTIONS WHERE poll_id IN (SELECT id FROM FORUM_POLLS WHERE post_id = :postId))")
+                .setParameter("postId", postId).executeUpdate();
+
+        // E. Delete poll votes
+        em.createNativeQuery("DELETE FROM FORUM_POLL_VOTES WHERE poll_id IN (SELECT id FROM FORUM_POLLS WHERE post_id = :postId)")
+                .setParameter("postId", postId).executeUpdate();
+
+        // F. Delete poll options
+        em.createNativeQuery("DELETE FROM FORUM_POLL_OPTIONS WHERE poll_id IN (SELECT id FROM FORUM_POLLS WHERE post_id = :postId)")
+                .setParameter("postId", postId).executeUpdate();
+
+        // G. Delete polls
+        em.createNativeQuery("DELETE FROM FORUM_POLLS WHERE post_id = :postId")
+                .setParameter("postId", postId).executeUpdate();
+
+        // H. Delete post votes
+        em.createNativeQuery("DELETE FROM FORUM_POST_VOTES WHERE post_id = :postId")
+                .setParameter("postId", postId).executeUpdate();
+
+        // I. Delete post views
+        em.createNativeQuery("DELETE FROM FORUM_POST_VIEWS WHERE post_id = :postId")
+                .setParameter("postId", postId).executeUpdate();
+
+        // J. Delete the post itself
+        em.createNativeQuery("DELETE FROM FORUM_POSTS WHERE id = :postId")
+                .setParameter("postId", postId).executeUpdate();
+
+        // 3. Clear the persistence context so Hibernate forgets about the deleted objects in memory
+        em.clear();
+    }
+
+    /**
+     * Moderation: deletes every post of a user including dependent data. A bulk JPQL
+     * delete would violate the foreign keys of answers, votes, views, polls and pictures.
      */
     @Transactional
     public String deleteAllPostsFromUser(Long userId) {
-        log.info("ForumAnswerOrm/deleteAllPostsFromUser");
+        log.info("ForumPostOrm/deleteAllPostsFromUser");
 
-        try {
-            em.createQuery("DELETE FROM ForumPost fp WHERE fp.creator.id = :val").setParameter("val", userId)
-                    .executeUpdate();
-        } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return "Fehler beim Löschen der Posts";
+        List<Long> postIds = em.createQuery("SELECT fp.id FROM ForumPost fp WHERE fp.creator.id = :val", Long.class)
+                .setParameter("val", userId)
+                .getResultList();
+        for (Long postId : postIds) {
+            ForumPost post = em.find(ForumPost.class, postId);
+            if (post != null) {
+                removePostCascade(post);
+            }
         }
-
-        return "Posts erfolgreich gelöscht";
+        return postIds.size() + " Posts erfolgreich gelöscht";
     }
 
     /**

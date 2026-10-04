@@ -24,9 +24,14 @@ import jakarta.ws.rs.core.UriInfo;
 import io.vertx.core.http.HttpServerRequest;
 import jakarta.annotation.security.RolesAllowed;
 
+/**
+ * Developer playground (creates/deletes data via GET, runs git, dumps tables).
+ * Only built into `quarkus:dev`; never part of test or production builds.
+ */
 @Path("/tests")
 @ApplicationScoped
 @RolesAllowed("Admin")
+@io.quarkus.arc.profile.IfBuildProfile("dev")
 public class Functiontest {
 
         private static final Logger log = Logger.getLogger(Functiontest.class.getName());

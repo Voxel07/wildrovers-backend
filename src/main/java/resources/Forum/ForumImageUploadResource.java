@@ -12,29 +12,24 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import model.Users.Roles;
 
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.resteasy.reactive.RestForm;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
+import tools.ForumImageStore;
+import tools.SafeImageReader;
 
-import javax.imageio.ImageIO;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.IOException;
-// Use fully-qualified java.nio.file.Path in signatures to avoid clash with @Path annotation
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Accepts image uploads from the Quill editor toolbar.
- * Saves full-res + thumbnail, returns the thumbnail URL for immediate display.
+ * Saves full-res + thumbnail into a temporary directory owned by the uploader and
+ * returns signed, absolute URLs for immediate display in the editor. The upload is
+ * moved to the post when the post/answer that references it is saved.
  *
  * POST /forum/img/upload   multipart/form-data, field: file
- * Returns: { "url": "/forum/img/tmp_{userId}_{ts}/thumb/img_0.jpg" }
+ * Returns: { "url": "https://api…/forum/img/tmp_{userId}_{ts}/thumb/img_0.jpg?exp=…&sig=…" }
  */
 @Path("/forum/img")
 @ApplicationScoped
@@ -43,9 +38,8 @@ public class ForumImageUploadResource {
     private static final Logger log = Logger.getLogger(ForumImageUploadResource.class.getName());
     private static final int THUMB_MAX_WIDTH = 400;
 
-    @ConfigProperty(name = "forum.images.upload-dir",
-                    defaultValue = "${user.home}/wildrovers-uploads/forum")
-    String uploadDir;
+    @Inject
+    ForumImageStore imageStore;
 
     @Inject
     helper.UserPrincipalResolver userPrincipalResolver;
@@ -72,42 +66,31 @@ public class ForumImageUploadResource {
 
         // Temp ID before we know the real postId
         String tempId = "tmp_" + userId + "_" + System.currentTimeMillis();
-        String base = uploadDir.replace("${user.home}", System.getProperty("user.home"));
-
-        java.nio.file.Path fullDir  = createDir(base, tempId, "full");
-        java.nio.file.Path thumbDir = createDir(base, tempId, "thumb");
-        if (fullDir == null || thumbDir == null) {
-            return Response.status(500).entity("Fehler beim Erstellen des Upload-Verzeichnisses").build();
-        }
 
         try {
             File uploaded = form.file.uploadedFile().toFile();
             String originalName = form.file.fileName();
-            String ext = (originalName != null && originalName.contains("."))
-                ? originalName.substring(originalName.lastIndexOf('.') + 1).toLowerCase()
-                : "jpg";
+            String requestedExt = (originalName != null && originalName.contains("."))
+                ? originalName.substring(originalName.lastIndexOf('.') + 1)
+                : null;
+            // Re-encode to a format ImageIO can always write; never trust the client's extension.
+            String format = SafeImageReader.outputFormat(requestedExt);
 
-            BufferedImage original = tools.SafeImageReader.read(uploaded, 40_000_000L);
+            BufferedImage original = SafeImageReader.read(uploaded, 40_000_000L);
             if (original == null) {
                 return Response.status(400).entity("Ungültiges Bildformat").build();
             }
 
-            String filename = "img_0." + ext;
-
-            // Save full-res
-            java.nio.file.Path fullPath = fullDir.resolve(filename);
-            writeWithPermissions(original, ext, fullPath);
-
-            // Save thumbnail
-            BufferedImage thumb = scaleTo(original, THUMB_MAX_WIDTH);
-            java.nio.file.Path thumbPath = thumbDir.resolve(filename);
-            writeWithPermissions(thumb, ext, thumbPath);
-
-            String thumbUrl = "/forum/img/" + tempId + "/thumb/" + filename;
+            String filename = "img_0." + format;
+            java.nio.file.Path fullDir = imageStore.createDir(tempId, "full");
+            java.nio.file.Path thumbDir = imageStore.createDir(tempId, "thumb");
+            SafeImageReader.write(original, format, fullDir.resolve(filename));
+            SafeImageReader.write(SafeImageReader.scaleToWidth(original, THUMB_MAX_WIDTH, format), format,
+                    thumbDir.resolve(filename));
 
             jakarta.json.JsonObject result = jakarta.json.Json.createObjectBuilder()
-                .add("url", thumbUrl)
-                .add("fullUrl", "/forum/img/" + tempId + "/full/" + filename)
+                .add("url", imageStore.signedUrl(tempId, "thumb", filename))
+                .add("fullUrl", imageStore.signedUrl(tempId, "full", filename))
                 .add("tempId", tempId)
                 .build();
 
@@ -117,42 +100,6 @@ public class ForumImageUploadResource {
             log.log(Level.SEVERE, "Image upload failed", e);
             return Response.status(500).entity("Fehler beim Verarbeiten des Bildes").build();
         }
-    }
-
-    private java.nio.file.Path createDir(String base, String id, String variant) {
-        java.nio.file.Path dir = Paths.get(base, "posts", id, variant);
-        try {
-            Files.createDirectories(dir);
-            try {
-                Files.setPosixFilePermissions(dir,
-                    PosixFilePermissions.fromString("rwxr-xr-x"));
-            } catch (UnsupportedOperationException ignored) { /* Windows */ }
-            return dir;
-        } catch (IOException e) {
-            log.log(Level.SEVERE, "Cannot create upload dir " + dir, e);
-            return null;
-        }
-    }
-
-    private void writeWithPermissions(BufferedImage img, String format, java.nio.file.Path path) throws IOException {
-        ImageIO.write(img, format, path.toFile());
-        try {
-            Files.setPosixFilePermissions(path,
-                PosixFilePermissions.fromString("rw-r--r--"));
-        } catch (UnsupportedOperationException ignored) { /* Windows */ }
-    }
-
-    private BufferedImage scaleTo(BufferedImage src, int maxWidth) {
-        if (src.getWidth() <= maxWidth) return src;
-        double ratio  = (double) maxWidth / src.getWidth();
-        int newHeight = (int) Math.round(src.getHeight() * ratio);
-        BufferedImage scaled = new BufferedImage(maxWidth, newHeight, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g = scaled.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-        g.drawImage(src, 0, 0, maxWidth, newHeight, null);
-        g.dispose();
-        return scaled;
     }
 
     public static class UploadForm {
