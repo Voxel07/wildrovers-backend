@@ -4,6 +4,14 @@ This project uses Quarkus, the Supersonic Subatomic Java Framework.
 
 If you want to learn more about Quarkus, please visit its website: https://quarkus.io/ .
 
+## Build requirements
+
+Use JDK 25 and the checked-in Maven wrapper (`./mvnw` or `mvnw.cmd` on Windows).
+The wrapper pins Maven 3.9.16, whose bundled libraries avoid the deprecated
+`sun.misc.Unsafe` calls made by Maven 3.9.9 on this JDK. `.mvn/jvm.config`
+enables native access for Maven's Jansi console library, including when Quarkus
+launches the wrapper as a subprocess in dev mode.
+
 ## Running the application in dev mode
 
 You can run your application in dev mode that enables live coding using:
