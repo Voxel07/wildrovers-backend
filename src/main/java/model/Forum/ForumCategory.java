@@ -32,6 +32,8 @@ import model.User;
 
 //Security
 @Entity
+// Only changed columns are written, so edits never overwrite counters updated atomically in SQL.
+@org.hibernate.annotations.DynamicUpdate
 @Table(name = "FORUM_CATEGORY")
 public class ForumCategory {
 

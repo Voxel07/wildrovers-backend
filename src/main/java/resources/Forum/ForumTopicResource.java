@@ -26,6 +26,8 @@ import java.util.logging.Logger;
 import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
 import model.Forum.ForumTopic;
+import orm.Forum.ForumCategoryOrm;
+import orm.Forum.ForumPage;
 import orm.Forum.ForumTopicOrm;
 import tools.AuditLogger;
 
@@ -40,55 +42,28 @@ public class ForumTopicResource {
     @Inject
     helper.UserPrincipalResolver userPrincipalResolver;
 
+    @Inject
+    ForumCategoryOrm forumCategoryOrm;
+
     @GET
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public List<ForumTopic> getTopics(  @QueryParam("topicId") Long topicId,
+    public Response getTopics(  @QueryParam("topicId") Long topicId,
                                         @QueryParam("topic") String topic,
                                         @QueryParam("user")Long userId,
-                                        @QueryParam("category")Long categoryId)
+                                        @QueryParam("category")Long categoryId,
+                                        @QueryParam("page") Integer page,
+                                        @QueryParam("size") Integer size)
     {
          log.info("ForumResource/getTopics");
-         List<ForumTopic> topics;
-         if(topicId != null){
-              log.info("ForumResource/getTopics/id");
-             topics = forumTopicOrm.getTopicById(topicId);
-         }
-         else if(topic != null){
-              log.info("ForumResource/getTopics/name");
-             topics = forumTopicOrm.getTopicsByTopic(topic);
-         }
-         else if(userId != null){
-             log.info("ForumResource/getTopics/user");
-             topics = forumTopicOrm.getTopicsByUser(userId);
-         }
-         else if(categoryId != null){
-             log.info("ForumResource/getTopics/category");
-             topics = forumTopicOrm.getTopicsByCategory(categoryId);
-         }
-         else{
-              log.info("ForumResource/getTopics/all");
-             topics = forumTopicOrm.getAllTopics();
-         }
-
-         String userRole = Roles.VSISITOR;
          model.User user = userPrincipalResolver.resolveUser();
-         if (user != null) {
-             userRole = user.getRole();
-         }
-         final String finalRole = userRole;
-         List<ForumTopic> mutableTopics = new java.util.ArrayList<>(topics);
-         mutableTopics.removeIf(t -> {
-             model.Forum.ForumCategory cat = t.getCategory();
-             if (cat == null) return false;
-             String vis = cat.getVisibility();
-             if (vis == null || vis.isBlank()) {
-                 vis = Roles.VSISITOR;
-             }
-             return !Roles.hasRequiredRole(finalRole, vis);
-         });
-         return mutableTopics;
+         String userRole = user != null ? user.getRole() : Roles.VSISITOR;
+         ForumPage<ForumTopic> result = forumTopicOrm.findTopics(topicId, topic, userId, categoryId,
+                 Roles.visibleTo(userRole), page, size);
+         List<ForumTopic> topics = new java.util.ArrayList<>(result.items());
+         forumTopicOrm.attachSummaries(topics, user != null ? user.getId() : null);
+         return Response.ok(topics).header(ForumPage.TOTAL_HEADER, result.total()).build();
     }
 
     @PUT
@@ -107,7 +82,7 @@ public class ForumTopicResource {
         }
         AuditLogger.crud(log, user.getUserName(), user.getId(), "CREATE", "Topic",
                 forumTopic.getTopic());
-        return forumTopicOrm.addTopic(forumTopic, categoryId, user.getId());
+        return invalidateCategoriesOnSuccess(forumTopicOrm.addTopic(forumTopic, categoryId, user.getId()));
     }
 
     @POST
@@ -125,8 +100,7 @@ public class ForumTopicResource {
             return Response.status(403).entity("Besucher dürfen keine Themen erstellen/verwalten.").build();
         }
         AuditLogger.crud(log, user.getUserName(), user.getId(), "UPDATE", "Topic", ft.getId());
-        String result = forumTopicOrm.updateTopic(ft, user.getId());
-        return Response.ok(result).build();
+        return forumTopicOrm.updateTopic(ft, user.getId());
     }
 
     @DELETE
@@ -144,7 +118,17 @@ public class ForumTopicResource {
             return Response.status(403).entity("Besucher dürfen keine Themen erstellen/verwalten.").build();
         }
         AuditLogger.crud(log, user.getUserName(), user.getId(), "DELETE", "Topic", ft.getId());
-        String result = forumTopicOrm.deleteTopic(ft, user.getId());
-        return Response.ok(result).build();
+        return invalidateCategoriesOnSuccess(forumTopicOrm.deleteTopic(ft, user.getId()));
+    }
+
+    /**
+     * Cached categories carry the topic count. Invalidated after the ORM transaction has
+     * committed, so a concurrent read cannot re-cache the old count.
+     */
+    private Response invalidateCategoriesOnSuccess(Response response) {
+        if (response.getStatus() / 100 == 2) {
+            forumCategoryOrm.invalidateCategoryCaches();
+        }
+        return response;
     }
 }

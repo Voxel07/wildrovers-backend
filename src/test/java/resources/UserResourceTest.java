@@ -21,29 +21,24 @@ class UserResourceTest {
     @BeforeEach @Transactional
     void setup() {
         mailbox.clear();
-        try {
-            em.createNativeQuery("DELETE FROM \"FORUM_ANSWERS\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"FORUM_POSTS\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"FORUM_TOPIC\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"FORUM_CATEGORY\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"EMAIL_SEND_LOG\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"SECRET\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"USER\"").executeUpdate();
-            em.flush();
+        ForumTestData.clear(em);
+        em.createNativeQuery("DELETE FROM \"EMAIL_SEND_LOG\"").executeUpdate();
+        em.createNativeQuery("DELETE FROM \"SECRET\"").executeUpdate();
+        em.createNativeQuery("DELETE FROM \"USER\"").executeUpdate();
+        em.flush();
 
-            em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (100,'besucher@test.local','testBesucher','test1234','Besucher','Test','Besucher',true,0,false,false),(101,'frischling@test.local','testFrischling','test1234','Frischling','Test','Frischling',true,0,true,false),(102,'mitglied@test.local','testMitglied','test1234','Mitglied','Test','Mitglied',true,0,true,false),(103,'vorstand@test.local','testVorstand','test1234','Vorstand','Test','Vorstand',true,0,true,false),(104,'admin@test.local','testAdmin','test1234','Admin','Test','Admin',true,0,true,false)").executeUpdate();
-            String hash = io.quarkus.elytron.security.common.BcryptUtil.bcryptHash("test1234");
-            em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (100,'" + hash + "',true,'v-b',100),(101,'" + hash + "',true,'v-f',101),(102,'" + hash + "',true,'v-m',102),(103,'" + hash + "',true,'v-v',103),(104,'" + hash + "',true,'v-a',104)").executeUpdate();
-            String unverifiedHash = io.quarkus.elytron.security.common.BcryptUtil.bcryptHash("correct-password");
-            em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (105,'unverified@test.local','unverifiedUser','test1234','Unverified','Test','Besucher',true,0,false,false)").executeUpdate();
-            em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,verificationTimestamp,user_id) VALUES (105,:password,false,'old-code',0,105)")
-                    .setParameter("password", unverifiedHash).executeUpdate();
-            em.createNativeQuery("INSERT INTO \"FORUM_CATEGORY\" (id,category,creationDate,topicCount,position,visibility,user_id) VALUES (100,'Testkategorie',0,0,0,'Besucher',104)").executeUpdate();
-            em.createNativeQuery("INSERT INTO \"FORUM_TOPIC\" (id,topic,creationDate,postCount,views,user_id,category_id) VALUES (100,'Testthema',0,0,0,104,100)").executeUpdate();
-            em.createNativeQuery("INSERT INTO \"FORUM_POSTS\" (id,title,content,creationDate,likes,dislikes,answerCount,user_id,topic_id) VALUES (100,'Testbeitrag','<p>Inhalt</p>',0,0,0,0,104,100)").executeUpdate();
-            em.createNativeQuery("INSERT INTO \"FORUM_ANSWERS\" (id,content,creationDate,likes,dislikes,user_id,post_id) VALUES (100,'<p>Antwort</p>',0,0,0,104,100)").executeUpdate();
-            em.flush();
-        } catch (Exception ignored) {}
+        em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (100,'besucher@test.local','testBesucher','test1234','Besucher','Test','Besucher',true,0,false,false),(101,'frischling@test.local','testFrischling','test1234','Frischling','Test','Frischling',true,0,true,false),(102,'mitglied@test.local','testMitglied','test1234','Mitglied','Test','Mitglied',true,0,true,false),(103,'vorstand@test.local','testVorstand','test1234','Vorstand','Test','Vorstand',true,0,true,false),(104,'admin@test.local','testAdmin','test1234','Admin','Test','Admin',true,0,true,false)").executeUpdate();
+        String hash = io.quarkus.elytron.security.common.BcryptUtil.bcryptHash("test1234");
+        em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (100,'" + hash + "',true,'v-b',100),(101,'" + hash + "',true,'v-f',101),(102,'" + hash + "',true,'v-m',102),(103,'" + hash + "',true,'v-v',103),(104,'" + hash + "',true,'v-a',104)").executeUpdate();
+        String unverifiedHash = io.quarkus.elytron.security.common.BcryptUtil.bcryptHash("correct-password");
+        em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (105,'unverified@test.local','unverifiedUser','test1234','Unverified','Test','Besucher',true,0,false,false)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,verificationTimestamp,user_id) VALUES (105,:password,false,'old-code',0,105)")
+                .setParameter("password", unverifiedHash).executeUpdate();
+        em.createNativeQuery("INSERT INTO \"FORUM_CATEGORY\" (id,category,creationDate,topicCount,position,visibility,user_id) VALUES (100,'Testkategorie',0,0,0,'Besucher',104)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"FORUM_TOPIC\" (id,topic,creationDate,postCount,views,user_id,category_id) VALUES (100,'Testthema',0,0,0,104,100)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"FORUM_POSTS\" (id,title,content,creationDate,likes,dislikes,answerCount,user_id,topic_id) VALUES (100,'Testbeitrag','<p>Inhalt</p>',0,0,0,0,104,100)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"FORUM_ANSWERS\" (id,content,creationDate,likes,dislikes,user_id,post_id) VALUES (100,'<p>Antwort</p>',0,0,0,104,100)").executeUpdate();
+        em.flush();
     }
 
     // Role-based access for GET /user/me
@@ -91,15 +86,15 @@ class UserResourceTest {
                 .body("{\"userName\":\"testBesucher\",\"password\":\"test1234\"}")
                 .post("/user/login");
         loginResp.then().statusCode(200);
-        String cookie = loginResp.getCookie("jwt");
+        String token = loginResp.jsonPath().getString("JWT");
 
         // 2. Change username to an existing one (should fail)
-        given().contentType(ContentType.JSON).cookie("jwt", cookie)
+        given().contentType(ContentType.JSON).header("Authorization", "Bearer " + token)
                 .body("{\"userName\":\"testAdmin\",\"firstName\":\"Besucher\",\"lastName\":\"Test\"}")
                 .post("/user/me/profile").then().statusCode(400);
 
         // 3. Change username to a new unique one
-        given().contentType(ContentType.JSON).cookie("jwt", cookie)
+        given().contentType(ContentType.JSON).header("Authorization", "Bearer " + token)
                 .body("{\"userName\":\"newBesucher\",\"firstName\":\"Besucher\",\"lastName\":\"Test\"}")
                 .post("/user/me/profile").then().statusCode(200);
 
@@ -148,7 +143,7 @@ class UserResourceTest {
         assertEquals(1, mailbox.getMailsSentTo("unverified@test.local").size());
     }
 
-    @Test void logout() { given().contentType(ContentType.JSON).post("/user/logout").then().statusCode(200); }
+    @Test void logout() { given().contentType(ContentType.JSON).post("/user/logout").then().statusCode(204); }
 
     // ── Vorstand cannot modify Admin users ─────────────────────────────────
     // Note: Under @TestSecurity (no real JWT), resolveUser() returns null,

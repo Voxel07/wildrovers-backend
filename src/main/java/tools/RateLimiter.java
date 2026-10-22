@@ -37,7 +37,7 @@ public class RateLimiter {
         // ── Auth endpoints ──
         LOGIN("/user/login", "POST", 10, 60),           // 10 login attempts per minute
         RESEND_VERIFICATION("/user/resend-verification", "POST", 3, 300),
-        SIGNUP("/user", "PUT", 3, 60),                  // 3 signups per minute
+        SIGNUP("/user", "PUT", 3, 60, true),            // 3 signups per minute (exactly PUT /user)
         LOGOUT("/user/logout", "POST", 20, 60),
 
         // ── Secret / password-reset ──
@@ -46,6 +46,8 @@ public class RateLimiter {
         VERIFY("/secrets/verify", "POST", 5, 60),
 
         // ── Forum ──
+        // Images have their own bucket: a single post can embed many pictures.
+        FORUM_IMAGES("/forum/img", "GET", 300, 60),
         FORUM_READ("/forum", "GET", 60, 60),             // 60 reads per minute
         FORUM_WRITE("/forum", "POST|PUT|DELETE", 30, 60),// 30 writes per minute
 
@@ -66,12 +68,26 @@ public class RateLimiter {
         public final String methods;   // "*" means any, or pipe-separated like "GET|POST"
         public final int limit;
         public final int windowSeconds;
+        /** Match only the path itself, not the paths below it. */
+        public final boolean exact;
 
         Config(String pathPrefix, String methods, int limit, int windowSeconds) {
+            this(pathPrefix, methods, limit, windowSeconds, false);
+        }
+
+        Config(String pathPrefix, String methods, int limit, int windowSeconds, boolean exact) {
             this.pathPrefix = pathPrefix;
             this.methods = methods;
             this.limit = limit;
             this.windowSeconds = windowSeconds;
+            this.exact = exact;
+        }
+
+        /** Prefixes match whole path segments: "/user" covers "/user/me" but not "/users". */
+        boolean matchesPath(String path) {
+            String normalized = path.length() > 1 && path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+            if (normalized.equals(pathPrefix)) return true;
+            return !exact && normalized.startsWith(pathPrefix + "/");
         }
     }
 
@@ -118,7 +134,7 @@ public class RateLimiter {
     private Config findConfig(String path, String method) {
         for (Config c : Config.values()) {
             if (c == Config.DEFAULT) continue;
-            if (path.startsWith(c.pathPrefix)) {
+            if (c.matchesPath(path)) {
                 if ("*".equals(c.methods)) return c;
                 for (String m : c.methods.split("\\|")) {
                     if (m.equalsIgnoreCase(method)) return c;

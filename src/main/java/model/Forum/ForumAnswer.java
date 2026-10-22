@@ -1,7 +1,5 @@
 package model.Forum;
 
-import java.util.List;
-import java.util.ArrayList;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
@@ -11,13 +9,11 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.GeneratedValue;
 import jakarta.json.bind.annotation.JsonbTransient;
-import jakarta.persistence.CascadeType;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.FetchType;
 
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
 
 import model.User;
 
@@ -39,7 +35,7 @@ public class ForumAnswer {
     private Long creationDate;
 
     @Column(name = "editDate")
-    private String editDate;
+    private Long editDate;
 
     @Column(name = "likes", columnDefinition = "bigint default '0'")
     private Long likes;
@@ -63,14 +59,10 @@ public class ForumAnswer {
     @JoinColumn(name = "editor_id",referencedColumnName = "id")
     private User editor;
 
-    @JsonIgnore
-    @JsonbTransient
-    @OneToMany(mappedBy ="answer", cascade = {CascadeType.ALL}, fetch = FetchType.LAZY)
-    private List<ForumPicture> pictures = new ArrayList<>();
 
     public ForumAnswer(){}
 
-    public ForumAnswer(String content, Long creationDate, String editDate, Long likes, Long dislikes) {
+    public ForumAnswer(String content, Long creationDate, Long editDate, Long likes, Long dislikes) {
         this.content = content;
         this.creationDate = creationDate;
         this.editDate = editDate;
@@ -103,11 +95,11 @@ public class ForumAnswer {
         this.creationDate = creationDate;
     }
 
-    public String getEditDate() {
+    public Long getEditDate() {
         return editDate;
     }
 
-    public void setEditDate(String editDate) {
+    public void setEditDate(Long editDate) {
         this.editDate = editDate;
     }
 
@@ -160,17 +152,6 @@ public class ForumAnswer {
     @JsonbTransient
     public void setEditor(User editor) {
         this.editor = editor;
-    }
-    @JsonIgnore
-    @JsonbTransient
-    public List<ForumPicture> getPictures() {
-        return pictures;
-    }
-
-    @JsonIgnore
-    @JsonbTransient
-    public void setPictures(List<ForumPicture> pictures) {
-        this.pictures = pictures;
     }
 
 }

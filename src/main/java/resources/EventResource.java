@@ -9,6 +9,7 @@ import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -21,12 +22,12 @@ import model.User;
 import orm.EventOrm;
 import orm.UserOrm;
 import tools.HtmlSanitizer;
-import tools.GoogleCalendarService;
 import model.Forum.ForumPost;
-import orm.Forum.ForumPostOrm;
 import model.EventAttendance;
 import tools.AuditLogger;
 import tools.NotificationService;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.logging.Level;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -55,26 +56,56 @@ public class EventResource {
     HtmlSanitizer htmlSanitizer;
 
     @Inject
-    GoogleCalendarService googleCalendarService;
-
-    @Inject
-    ForumPostOrm forumPostOrm;
-
-    @Inject
     NotificationService notificationService;
 
     @Inject
     @ConfigProperty(name = "app.frontend-url", defaultValue = "http://localhost:5173")
     String frontendUrl;
 
+    @Inject
+    tools.EventCalendarSync calendarSync;
+
+    /** Forum topic that receives the discussion post of each new event. */
+    @Inject
+    @ConfigProperty(name = "app.events.forum-topic-id", defaultValue = "1")
+    Long eventTopicId;
+
+    /**
+     * Without parameters all events are returned. {@code year} or an ISO date range
+     * ({@code from} inclusive, {@code to} exclusive) limit the list.
+     */
     @GET
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getAllEvents() {
+    public Response getAllEvents(@QueryParam("year") Integer year,
+                                 @QueryParam("from") String from,
+                                 @QueryParam("to") String to) {
         log.info("EventResource/getAllEvents");
-        List<Event> list = eventOrm.getAllEvents();
-        populateNonRespondents(list);
-        return Response.ok(list).build();
+        List<Event> list;
+        try {
+            if (year != null) {
+                if (year < 1900 || year > 9999) return Response.status(400).entity("Ungültiges Jahr").build();
+                LocalDateTime start = LocalDate.of(year, 1, 1).atStartOfDay();
+                list = eventOrm.getEventsBetween(start, start.plusYears(1));
+            } else if (from != null || to != null) {
+                LocalDateTime start = from != null ? LocalDate.parse(from).atStartOfDay() : LocalDateTime.of(1900, 1, 1, 0, 0);
+                LocalDateTime end = to != null ? LocalDate.parse(to).atStartOfDay() : LocalDateTime.of(9999, 1, 1, 0, 0);
+                list = eventOrm.getEventsBetween(start, end);
+            } else {
+                list = eventOrm.getAllEvents();
+            }
+        } catch (java.time.format.DateTimeParseException e) {
+            return Response.status(400).entity("Datum muss im Format JJJJ-MM-TT angegeben werden").build();
+        }
+        return Response.ok(forReader(list)).build();
+    }
+
+    @GET
+    @Path("/years")
+    @PermitAll
+    @Produces(MediaType.APPLICATION_JSON)
+    public List<Integer> getEventYears() {
+        return eventOrm.getEventYears();
     }
 
     @GET
@@ -84,78 +115,83 @@ public class EventResource {
     public Response getUpcomingEvents() {
         log.info("EventResource/getUpcomingEvents");
         List<Event> list = eventOrm.getUpcomingEvents(3);
-        populateNonRespondents(list);
-        return Response.ok(list).build();
+        return Response.ok(forReader(list)).build();
     }
 
+    /**
+     * Not transactional on purpose: the event and its forum post are written in one database
+     * transaction, the Google Calendar call happens after the commit (see EventCalendarSync).
+     */
     @POST
     @RolesAllowed({ "Frischling", "Mitglied", "Vorstand", "Admin" })
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    @jakarta.transaction.Transactional
-    public Response addEvent(@Valid Event event) {
+    public Response addEvent(@Valid Event input) {
         log.info("EventResource/addEvent");
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
         }
         AuditLogger.crud(log, user.getUserName(), user.getId(), "CREATE", "Event",
-                event.getTitle());
+                input.getTitle());
 
-        // Sanitize inputs
-        event.setTitle(htmlSanitizer.sanitizeTitle(event.getTitle()));
-        event.setLocation(htmlSanitizer.sanitizeTitle(event.getLocation()));
-        if (event.getDescription() != null) {
-            event.setDescription(htmlSanitizer.sanitize(event.getDescription()));
+        // Only user-editable fields; ids, links and sync state are never taken from the client.
+        Event event = new Event();
+        String error = applyUserFields(event, input);
+        if (error != null) {
+            return Response.status(400).entity(error).build();
         }
 
-        if (event.getTitle().isBlank() || event.getLocation().isBlank() || event.getEventDate() == null) {
-            return Response.status(400).entity("Alle Felder müssen ausgefüllt sein.").build();
-        }
+        ForumPost post = new ForumPost();
+        post.setTitle(formatEventTitleForPost(event));
+        post.setContent(formatEventPostContent(event));
 
-        // Create a forum post under Topic ID 2
-        Long postId = null;
+        Event created;
         try {
-            ForumPost post = new ForumPost();
-            post.setTitle(formatEventTitleForPost(event));
-            String postContent = "<p><strong>Termin:</strong> " + formatEventDateForPost(event.getEventDate(), event.getEventEndDate()) + "</p>"
-                    + "<p><strong>Ort:</strong> " + event.getLocation() + "</p>"
-                    + "<hr/>"
-                    + "<p>" + (event.getDescription() != null ? event.getDescription() : "") + "</p>";
-            post.setContent(postContent);
-            Response postResponse = forumPostOrm.addPost(post, 1L, user.getId());
-            if (postResponse.getStatus() == 201) {
-                postId = (Long) postResponse.getEntity();
-                String forumUrl = frontendUrl + "/Forum/Post/" + postId;
-                event.setForumPostUrl(forumUrl);
-            } else {
-                log.warning("Forum post creation failed for event '" + event.getTitle()
-                        + "' with status " + postResponse.getStatus() + ": " + postResponse.getEntity());
-            }
+            created = eventOrm.addEvent(event, user.getId(), post, eventTopicId, frontendUrl);
+        } catch (EventOrm.ForumPostFailedException e) {
+            log.warning("Event '" + event.getTitle() + "' not created: " + e.getMessage());
+            boolean topicMissing = e.status == 404;
+            String message = topicMissing
+                    ? "Das Forum-Thema für Events (app.events.forum-topic-id=" + eventTopicId + ") existiert nicht."
+                    : e.getMessage();
+            return Response.status(topicMissing ? 500 : e.status).entity(message).build();
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Failed to create forum post for event", e);
-        }
-
-        // 1. Sync to Google Calendar
-        String googleEventId = googleCalendarService.syncEvent(event);
-        if (googleEventId != null) {
-            event.setGoogleCalendarEventId(googleEventId);
-        }
-
-        // 2. Save in Database
-        try {
-            Event created = eventOrm.addEvent(event, user.getId());
-            notificationService.recordEvent(created, "CREATED", user.getId(), frontendUrl);
-            populateNonRespondents(java.util.Collections.singletonList(created));
-            return Response.status(201).entity(created).build();
-        } catch (Exception e) {
-            log.log(java.util.logging.Level.SEVERE, "EventResource/createEvent failed", e);
-            // Rollback calendar entry if DB save fails
-            if (googleEventId != null) {
-                googleCalendarService.deleteEvent(googleEventId);
-            }
+            log.log(Level.SEVERE, "EventResource/createEvent failed", e);
             return Response.status(500).entity("Fehler beim Erstellen des Events").build();
         }
+
+        calendarSync.sync(created.getId());
+        Event stored = eventOrm.getEventById(created.getId());
+        notificationService.recordEvent(stored, "CREATED", user.getId(), frontendUrl);
+        return Response.status(201).entity(forReader(stored)).build();
+    }
+
+    /**
+     * Copies the sanitised, user-editable fields and validates them.
+     *
+     * @return an error message for the client, or null if the input is valid
+     */
+    private String applyUserFields(Event target, Event input) {
+        target.setTitle(htmlSanitizer.sanitizeTitle(input.getTitle()));
+        target.setLocation(htmlSanitizer.sanitizeTitle(input.getLocation()));
+        target.setEventDate(input.getEventDate());
+        target.setEventEndDate(input.getEventEndDate());
+        target.setDescription(input.getDescription() != null ? htmlSanitizer.sanitize(input.getDescription()) : null);
+
+        if (target.getTitle() == null || target.getTitle().isBlank() || target.getLocation() == null
+                || target.getLocation().isBlank() || target.getEventDate() == null) {
+            return "Alle Felder müssen ausgefüllt sein.";
+        }
+        if (target.getEventEndDate() != null && target.getEventEndDate().isBefore(target.getEventDate())) {
+            return "Das Ende darf nicht vor dem Beginn liegen.";
+        }
+        // Sanitising escapes characters, so the stored text can be longer than the input.
+        if (target.getDescription() != null && target.getDescription().length() > Event.DESCRIPTION_MAX_LENGTH) {
+            return "Die Beschreibung ist zu lang (max. " + Event.DESCRIPTION_MAX_LENGTH
+                    + " Zeichen inklusive Formatierung).";
+        }
+        return null;
     }
 
     static String formatEventTitleForPost(Event event) {
@@ -164,6 +200,13 @@ public class EventResource {
             return title;
         }
         return title + " (" + event.getEventDate().format(EVENT_FORUM_TITLE_DATE_FORMAT) + ")";
+    }
+
+    private String formatEventPostContent(Event event) {
+        return "<p><strong>Termin:</strong> " + formatEventDateForPost(event.getEventDate(), event.getEventEndDate()) + "</p>"
+                + "<p><strong>Ort:</strong> " + event.getLocation() + "</p>"
+                + "<hr/>"
+                + "<p>" + (event.getDescription() != null ? event.getDescription() : "") + "</p>";
     }
 
     private String formatEventDateForPost(java.time.LocalDateTime dateTime, java.time.LocalDateTime endDateTime) {
@@ -180,11 +223,11 @@ public class EventResource {
         return startStr;
     }
 
+    /** Not transactional: see {@link #addEvent}. The forum post is updated with the event. */
     @PUT
     @RolesAllowed({ "Frischling", "Mitglied", "Vorstand", "Admin" })
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    @jakarta.transaction.Transactional
     public Response updateEvent(@Valid Event event) {
         log.info("EventResource/updateEvent: " + event.getId());
         User user = userPrincipalResolver.resolveUser();
@@ -194,47 +237,42 @@ public class EventResource {
         AuditLogger.crud(log, user.getUserName(), user.getId(), "UPDATE", "Event",
                 event.getId());
 
-        Event existing = eventOrm.getEventById(event.getId());
+        Event existing = event.getId() != null ? eventOrm.getEventById(event.getId()) : null;
         if (existing == null) {
             return Response.status(404).entity("Event nicht gefunden").build();
         }
 
-        // Authorization check: creator or Admin
+        // Authorization check: creator or moderator
         boolean isCreator = existing.getCreator() != null && existing.getCreator().getId().equals(user.getId());
-        if (!isCreator && !user.getRole().equals("Admin")) {
-            return Response.status(403).entity("Nur der Ersteller oder ein Administrator darf dieses Event bearbeiten.")
+        if (!isCreator && !model.Users.Roles.isModerator(user.getRole())) {
+            return Response.status(403).entity("Nur der Ersteller oder ein Moderator darf dieses Event bearbeiten.")
                     .build();
         }
 
-        // Sanitize and copy fields
-        existing.setTitle(htmlSanitizer.sanitizeTitle(event.getTitle()));
-        existing.setLocation(htmlSanitizer.sanitizeTitle(event.getLocation()));
-        existing.setEventDate(event.getEventDate());
-        existing.setEventEndDate(event.getEventEndDate());
-        if (event.getDescription() != null) {
-            existing.setDescription(htmlSanitizer.sanitize(event.getDescription()));
-        } else {
-            existing.setDescription(null);
+        Event changes = new Event();
+        String error = applyUserFields(changes, event);
+        if (error != null) {
+            return Response.status(400).entity(error).build();
         }
 
-        // 1. Sync to Google Calendar
-        String googleEventId = googleCalendarService.syncEvent(existing);
-        if (googleEventId != null) {
-            existing.setGoogleCalendarEventId(googleEventId);
-        }
-
-        // 2. Update Database
+        Event updated;
         try {
-            Event updated = eventOrm.updateEvent(existing);
-            notificationService.recordEvent(updated, "UPDATED", user.getId(), frontendUrl);
-            populateNonRespondents(java.util.Collections.singletonList(updated));
-            return Response.ok(updated).build();
+            updated = eventOrm.updateEvent(existing.getId(), changes, formatEventTitleForPost(changes),
+                    formatEventPostContent(changes), user.getId());
         } catch (Exception e) {
             log.log(java.util.logging.Level.SEVERE, "EventResource/updateEvent failed for event " + event.getId(), e);
             return Response.status(500).entity("Fehler beim Aktualisieren des Events").build();
         }
+        if (updated == null) {
+            return Response.status(404).entity("Event nicht gefunden").build();
+        }
+
+        calendarSync.sync(updated.getId());
+        notificationService.recordEvent(updated, "UPDATED", user.getId(), frontendUrl);
+        return Response.ok(forReader(eventOrm.getEventById(updated.getId()))).build();
     }
 
+    /** Deletes the event with its forum post; the calendar entry is removed after the commit. */
     @DELETE
     @Path("/{id}")
     @RolesAllowed({ "Frischling", "Mitglied", "Vorstand", "Admin" })
@@ -252,29 +290,26 @@ public class EventResource {
             return Response.status(404).entity("Event nicht gefunden").build();
         }
 
-        // Authorization check: creator or Admin
+        // Authorization check: creator or moderator
         boolean isCreator = existing.getCreator() != null && existing.getCreator().getId().equals(user.getId());
-        if (!isCreator && !user.getRole().equals("Admin")) {
-            return Response.status(403).entity("Nur der Ersteller oder ein Administrator darf dieses Event löschen.")
+        if (!isCreator && !model.Users.Roles.isModerator(user.getRole())) {
+            return Response.status(403).entity("Nur der Ersteller oder ein Moderator darf dieses Event löschen.")
                     .build();
         }
 
-        // 1. Delete from Google Calendar
-        if (existing.getGoogleCalendarEventId() != null) {
-            googleCalendarService.deleteEvent(existing.getGoogleCalendarEventId());
-        }
-
-        // 2. Delete from Database
+        String googleCalendarEventId;
         try {
-            eventOrm.deleteEvent(id);
-            notificationService.recordEvent(existing, "DELETED", user.getId(), frontendUrl);
-            return Response.ok().entity("Event gelöscht").build();
+            googleCalendarEventId = eventOrm.deleteEvent(id);
         } catch (Exception e) {
             log.log(java.util.logging.Level.SEVERE, "EventResource/deleteEvent failed for id " + id, e);
             return Response.status(500).entity("Fehler beim Löschen des Events").build();
         }
+        calendarSync.delete(googleCalendarEventId);
+        notificationService.recordEvent(existing, "DELETED", user.getId(), frontendUrl);
+        return Response.ok().entity("Event gelöscht").build();
     }
 
+    /** Visitors may RSVP as guests; only team members appear in the non-respondent list. */
     @POST
     @Path("/{id}/attendance")
     @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
@@ -285,6 +320,9 @@ public class EventResource {
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
+        }
+        if (attendanceInput == null || attendanceInput.getStatus() == null) {
+            return Response.status(400).entity("Ungültiger Status").build();
         }
         AuditLogger.crud(log, user.getUserName(), user.getId(), "ATTEND", "Event",
                 eventId, "status=" + attendanceInput.getStatus());
@@ -307,8 +345,7 @@ public class EventResource {
 
         notificationService.acknowledgeEvent(user.getId(), eventId);
 
-        populateNonRespondents(java.util.Collections.singletonList(updatedEvent));
-        return Response.ok(updatedEvent).build();
+        return Response.ok(forReader(updatedEvent)).build();
     }
 
     @POST
@@ -332,7 +369,8 @@ public class EventResource {
             return Response.status(400).entity("Nur Teammitglieder können als Teilnehmer eingetragen werden.").build();
         }
 
-        String status = attendanceInput.getStatus() == null ? null : attendanceInput.getStatus().toUpperCase();
+        String status = attendanceInput == null || attendanceInput.getStatus() == null
+                ? null : attendanceInput.getStatus().toUpperCase(java.util.Locale.ROOT);
         if (!"YES".equals(status) && !"NO".equals(status) && !"MAYBE".equals(status)) {
             return Response.status(400).entity("Ungültiger Status").build();
         }
@@ -345,8 +383,7 @@ public class EventResource {
             return Response.status(404).entity("Event nicht gefunden").build();
         }
 
-        populateNonRespondents(java.util.Collections.singletonList(updatedEvent));
-        return Response.ok(updatedEvent).build();
+        return Response.ok(forReader(updatedEvent)).build();
     }
 
     @GET
@@ -360,45 +397,45 @@ public class EventResource {
             // Most forum posts are not event announcements, so this is optional.
             return Response.noContent().build();
         }
-        populateNonRespondents(java.util.Collections.singletonList(event));
-        return Response.ok(event).build();
+        return Response.ok(forReader(event)).build();
     }
 
-    private void populateNonRespondents(List<Event> events) {
+    /**
+     * Returns per-request copies of the given events with the non-respondent list for the current
+     * reader. Events come from shared caches, so they must never be modified here.
+     */
+    private List<Event> forReader(List<Event> events) {
         if (events == null || events.isEmpty()) {
-            return;
+            return events;
         }
         User currentUser = userPrincipalResolver.resolveUser();
         boolean isTeam = currentUser != null && model.Users.Roles.hasRequiredRole(currentUser.getRole(), model.Users.Roles.FRESHMAN);
+        List<User> team = isTeam ? userOrm.getTeamMembers() : null;
 
-        List<User> team = null;
-        if (isTeam) {
-            team = userOrm.getTeamMembers();
-        }
-
+        List<Event> result = new java.util.ArrayList<>(events.size());
         for (Event e : events) {
-            java.util.Set<String> respondedUsernames = new java.util.HashSet<>();
-            if (e.getAttendances() != null) {
-                for (EventAttendance att : e.getAttendances()) {
-                    // Force loading the lazy User entity to prevent LazyInitializationException during serialization
-                    String uName = att.getUserName();
-                    att.getUserId();
-                    if (uName != null && !uName.equals("Anonym")) {
-                        respondedUsernames.add(uName);
+            List<String> nonResps = new java.util.ArrayList<>();
+            if (team != null) {
+                java.util.Set<String> respondedUsernames = new java.util.HashSet<>();
+                if (e.getAttendances() != null) {
+                    for (EventAttendance att : e.getAttendances()) {
+                        if (att.getUser() != null) {
+                            respondedUsernames.add(att.getUser().getUserName());
+                        }
                     }
                 }
-            }
-            if (isTeam && team != null) {
-                List<String> nonResps = new java.util.ArrayList<>();
                 for (User u : team) {
                     if (!respondedUsernames.contains(u.getUserName())) {
                         nonResps.add(u.getUserName());
                     }
                 }
-                e.setNonRespondents(nonResps);
-            } else {
-                e.setNonRespondents(new java.util.ArrayList<>());
             }
+            result.add(e.copyWithNonRespondents(nonResps));
         }
+        return result;
+    }
+
+    private Event forReader(Event event) {
+        return event == null ? null : forReader(java.util.Collections.singletonList(event)).get(0);
     }
 }

@@ -36,7 +36,6 @@ import java.util.logging.Logger;
 public class ForumImageUploadResource {
 
     private static final Logger log = Logger.getLogger(ForumImageUploadResource.class.getName());
-    private static final int THUMB_MAX_WIDTH = 400;
 
     @Inject
     ForumImageStore imageStore;
@@ -76,17 +75,14 @@ public class ForumImageUploadResource {
             // Re-encode to a format ImageIO can always write; never trust the client's extension.
             String format = SafeImageReader.outputFormat(requestedExt);
 
-            BufferedImage original = SafeImageReader.read(uploaded, 40_000_000L);
+            // Upright (EXIF orientation) and at most FULL_MAX_EDGE px, so phone photos are not stored at 40 MP.
+            BufferedImage original = SafeImageReader.readOriented(uploaded, 40_000_000L, ForumImageStore.FULL_MAX_EDGE, format);
             if (original == null) {
                 return Response.status(400).entity("Ungültiges Bildformat").build();
             }
 
-            String filename = "img_0." + format;
-            java.nio.file.Path fullDir = imageStore.createDir(tempId, "full");
-            java.nio.file.Path thumbDir = imageStore.createDir(tempId, "thumb");
-            SafeImageReader.write(original, format, fullDir.resolve(filename));
-            SafeImageReader.write(SafeImageReader.scaleToWidth(original, THUMB_MAX_WIDTH, format), format,
-                    thumbDir.resolve(filename));
+            String filename = java.util.UUID.randomUUID() + "." + format;
+            imageStore.saveImage(original, format, tempId, filename, userId);
 
             jakarta.json.JsonObject result = jakarta.json.Json.createObjectBuilder()
                 .add("url", imageStore.signedUrl(tempId, "thumb", filename))
@@ -96,6 +92,8 @@ public class ForumImageUploadResource {
 
             return Response.ok(result).build();
 
+        } catch (jakarta.ws.rs.WebApplicationException e) {
+            return e.getResponse();
         } catch (Exception e) {
             log.log(Level.SEVERE, "Image upload failed", e);
             return Response.status(500).entity("Fehler beim Verarbeiten des Bildes").build();

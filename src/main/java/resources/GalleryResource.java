@@ -49,6 +49,22 @@ public class GalleryResource {
     @ConfigProperty(name = "app.frontend-url", defaultValue = "http://localhost:5173")
     String frontendUrl;
 
+    @ConfigProperty(name = "gallery.immich.allowed-host")
+    java.util.Optional<String> allowedHost;
+
+    boolean validAlbumUrl(String value) {
+        if (value == null || value.length() > 255) return false;
+        try {
+            java.net.URI uri = new java.net.URI(value);
+            return "https".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null
+                    && uri.getRawUserInfo() == null && (uri.getPort() == -1 || uri.getPort() == 443)
+                    && allowedHost.map(String::trim).filter(h -> !h.isEmpty())
+                        .map(h -> h.equalsIgnoreCase(uri.getHost())).orElse(true);
+        } catch (java.net.URISyntaxException e) {
+            return false;
+        }
+    }
+
     @GET
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
@@ -56,6 +72,25 @@ public class GalleryResource {
         log.info("GalleryResource/getAllGalleries");
         List<Gallery> list = galleryOrm.getAllGalleries();
         return Response.ok(list).build();
+    }
+
+    @ConfigProperty(name = "gallery.immich.drop-url")
+    java.util.Optional<String> immichDropUrl;
+
+    /**
+     * Immich upload ("drop") link for team members. It is served here instead of being built
+     * into the public frontend bundle, where anyone could read it.
+     */
+    @GET
+    @Path("/upload-url")
+    @RolesAllowed({ "Frischling", "Mitglied", "Vorstand", "Admin" })
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getUploadUrl() {
+        String url = immichDropUrl.map(String::trim).filter(u -> !u.isEmpty()).orElse(null);
+        if (url == null) {
+            return Response.status(Response.Status.NOT_FOUND).entity("Kein Upload-Link konfiguriert").build();
+        }
+        return Response.ok(jakarta.json.Json.createObjectBuilder().add("url", url).build()).build();
     }
 
     @POST
@@ -74,7 +109,10 @@ public class GalleryResource {
         // Sanitize user inputs
         gallery.setTitle(htmlSanitizer.sanitizeTitle(gallery.getTitle()));
         gallery.setLocation(htmlSanitizer.sanitizeTitle(gallery.getLocation()));
-        gallery.setUrl(htmlSanitizer.sanitizeTitle(gallery.getUrl()));
+        gallery.setUrl(gallery.getUrl() == null ? null : gallery.getUrl().trim());
+        if (!validAlbumUrl(gallery.getUrl())) {
+            return Response.status(400).entity("Eine gültige HTTPS-URL des Fotoalbums ist erforderlich.").build();
+        }
 
         // Basic validation
         if (gallery.getTitle().isBlank() || gallery.getUrl().isBlank() || gallery.getLocation().isBlank() || gallery.getDate() == null) {
@@ -111,15 +149,19 @@ public class GalleryResource {
 
         // Authorization check: creator or Admin
         boolean isCreator = existing.getCreator() != null && existing.getCreator().getId().equals(user.getId());
-        if (!isCreator && !user.getRole().equals("Admin")) {
-            return Response.status(403).entity("Nur der Ersteller oder ein Administrator darf dieses Album bearbeiten.")
+        if (!isCreator && !model.Users.Roles.isModerator(user.getRole())) {
+            return Response.status(403).entity("Nur der Ersteller oder ein Moderator darf dieses Album bearbeiten.")
                     .build();
         }
 
-        // Sanitize and copy fields
+        String albumUrl = gallery.getUrl() == null ? null : gallery.getUrl().trim();
+        if (!validAlbumUrl(albumUrl)) {
+            return Response.status(400).entity("Eine gültige HTTPS-URL des Fotoalbums ist erforderlich.").build();
+        }
+        // Validate before changing the managed entity.
         existing.setTitle(htmlSanitizer.sanitizeTitle(gallery.getTitle()));
         existing.setLocation(htmlSanitizer.sanitizeTitle(gallery.getLocation()));
-        existing.setUrl(htmlSanitizer.sanitizeTitle(gallery.getUrl()));
+        existing.setUrl(albumUrl);
         existing.setDate(gallery.getDate());
 
         try {
@@ -151,8 +193,8 @@ public class GalleryResource {
 
         // Authorization check: creator or Admin
         boolean isCreator = existing.getCreator() != null && existing.getCreator().getId().equals(user.getId());
-        if (!isCreator && !user.getRole().equals("Admin")) {
-            return Response.status(403).entity("Nur der Ersteller oder ein Administrator darf dieses Album löschen.")
+        if (!isCreator && !model.Users.Roles.isModerator(user.getRole())) {
+            return Response.status(403).entity("Nur der Ersteller oder ein Moderator darf dieses Album löschen.")
                     .build();
         }
 

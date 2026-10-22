@@ -21,8 +21,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.*;
 
 /**
- * Tests for Quarkus cache (@CacheResult / @CacheInvalidateAll) behavior.
- * Verifies that caches are populated on read and invalidated on write.
+ * Scalar caches remain invalidated on writes. Entity reads must be fresh on each request.
  */
 @QuarkusTest
 public class CacheInvalidationTest {
@@ -48,30 +47,28 @@ public class CacheInvalidationTest {
     @BeforeEach
     @Transactional
     void setup() {
-        try {
-            // Clean up to ensure test isolation
-            em.createNativeQuery("DELETE FROM \"SECRET\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"FORUM_CATEGORY\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"EVENT\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"GALLERY\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"USER\"").executeUpdate();
-            em.flush();
+        ForumTestData.clear(em);
+        // Clean up to ensure test isolation
+        em.createNativeQuery("DELETE FROM \"SECRET\"").executeUpdate();
+        em.createNativeQuery("DELETE FROM \"EVENT\"").executeUpdate();
+        em.createNativeQuery("DELETE FROM \"GALLERY\"").executeUpdate();
+        em.createNativeQuery("DELETE FROM \"USER\"").executeUpdate();
+        em.flush();
 
-            // Insert test users
-            em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (100,'besucher@test.local','testBesucher','test1234','Besucher','Test','Besucher',true,0,false,false),(104,'admin@test.local','testAdmin','test1234','Admin','Test','Admin',true,0,true,false)").executeUpdate();
-            em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (100,'test1234',true,'v-b',100),(104,'test1234',true,'v-a',104)").executeUpdate();
-            
-            // Insert Category
-            em.createNativeQuery("INSERT INTO \"FORUM_CATEGORY\" (id,category,creationDate,topicCount,position,visibility,user_id) VALUES (100,'TestCat',0,0,0,'Besucher',104)").executeUpdate();
-            
-            // Insert Event (column: creator_id, event_date)
-            em.createNativeQuery("INSERT INTO \"EVENT\" (id,title,description,location,event_date,creator_id) VALUES (100,'TestEvent','Desc','Location',DATEADD('DAY', 2, CURRENT_TIMESTAMP),104)").executeUpdate();
+        // Insert test users
+        em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (100,'besucher@test.local','testBesucher','test1234','Besucher','Test','Besucher',true,0,false,false),(104,'admin@test.local','testAdmin','test1234','Admin','Test','Admin',true,0,true,false)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (100,'test1234',true,'v-b',100),(104,'test1234',true,'v-a',104)").executeUpdate();
 
-            // Insert Gallery (column: creator_id, gallery_date)
-            em.createNativeQuery("INSERT INTO \"GALLERY\" (id,title,location,url,gallery_date,creator_id) VALUES (100,'TestGallery','Location','http://url.com','2026-06-20',104)").executeUpdate();
-            
-            em.flush();
-        } catch (Exception ignored) {}
+        // Insert Category
+        em.createNativeQuery("INSERT INTO \"FORUM_CATEGORY\" (id,category,creationDate,topicCount,position,visibility,user_id) VALUES (100,'TestCat',0,0,0,'Besucher',104)").executeUpdate();
+
+        // Insert Event (column: creator_id, event_date)
+        em.createNativeQuery("INSERT INTO \"EVENT\" (id,title,description,location,event_date,creator_id) VALUES (100,'TestEvent','Desc','Location',DATEADD('DAY', 2, CURRENT_TIMESTAMP),104)").executeUpdate();
+
+        // Insert Gallery (column: creator_id, gallery_date)
+        em.createNativeQuery("INSERT INTO \"GALLERY\" (id,title,location,url,gallery_date,creator_id) VALUES (100,'TestGallery','Location','http://url.com','2026-06-20',104)").executeUpdate();
+
+        em.flush();
     }
 
     // ── Team Members cache ──
@@ -121,13 +118,13 @@ public class CacheInvalidationTest {
         // 2. Update DB directly
         dbHelper.updateEventTitleDirectly(100L, "EventModifiedDirectly");
 
-        // 3. Fetch again (should still be cached as 'TestEvent')
+        // 3. Entity reads bypass shared caches and observe the committed update.
         given()
             .get("/event")
             .then()
             .statusCode(200)
-            .body("title", hasItem("TestEvent"))
-            .body("title", not(hasItem("EventModifiedDirectly")));
+            .body("title", hasItem("EventModifiedDirectly"))
+            .body("title", not(hasItem("TestEvent")));
 
         // 4. Invalidate cache
         dbHelper.invalidateEventsCache(eventOrm, 100L);
@@ -156,13 +153,13 @@ public class CacheInvalidationTest {
         // 2. Update DB directly
         dbHelper.updateGalleryTitleDirectly(100L, "GalleryModifiedDirectly");
 
-        // 3. Fetch again (cached)
+        // 3. Entity reads observe the committed update.
         given()
             .get("/gallery")
             .then()
             .statusCode(200)
-            .body("title", hasItem("TestGallery"))
-            .body("title", not(hasItem("GalleryModifiedDirectly")));
+            .body("title", hasItem("GalleryModifiedDirectly"))
+            .body("title", not(hasItem("TestGallery")));
 
         // 4. Invalidate cache
         dbHelper.invalidateGalleriesCache(galleryOrm, 100L);
@@ -191,13 +188,13 @@ public class CacheInvalidationTest {
         // 2. Update DB directly
         dbHelper.updateCategoryNameDirectly(100L, "CategoryModifiedDirectly");
 
-        // 3. Fetch again (cached)
+        // 3. Entity reads observe the committed update.
         given()
             .get("/forum/category")
             .then()
             .statusCode(200)
-            .body("category", hasItem("TestCat"))
-            .body("category", not(hasItem("CategoryModifiedDirectly")));
+            .body("category", hasItem("CategoryModifiedDirectly"))
+            .body("category", not(hasItem("TestCat")));
 
         // 4. Invalidate cache
         dbHelper.invalidateForumCategoriesCache(forumCategoryOrm, 100L);
@@ -224,13 +221,13 @@ public class CacheInvalidationTest {
         // 2. Update DB directly
         dbHelper.updateEventTitleDirectly(100L, "UpcomingModified");
 
-        // 3. Fetch again (should be cached)
+        // 3. Entity reads observe the committed update.
         given()
             .get("/event/upcoming")
             .then()
             .statusCode(200)
-            .body("title", hasItem("TestEvent"))
-            .body("title", not(hasItem("UpcomingModified")));
+            .body("title", hasItem("UpcomingModified"))
+            .body("title", not(hasItem("TestEvent")));
 
         // 4. Invalidate via update
         dbHelper.invalidateEventsCache(eventOrm, 100L);
@@ -278,7 +275,7 @@ class TestDbHelper {
     public void invalidateEventsCache(EventOrm eventOrm, Long eventId) {
         Event event = eventOrm.getEventById(eventId);
         if (event != null) {
-            eventOrm.updateEvent(event);
+            eventOrm.updateEvent(eventId, event, null, null, null);
         }
     }
 

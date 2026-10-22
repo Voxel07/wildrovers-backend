@@ -35,21 +35,19 @@ public class ForumCategoryOrm {
     @Inject
     ForumTopicOrm forumTopicOrm;
 
+    // Entity reads are intentionally uncached: JPA objects must not be shared between requests.
     //Basic GET methods
-    @CacheResult(cacheName = "forum-categories")
     public List<ForumCategory>getAllCategories(){
        log.info("ForumCategoryOrm/getAllCategories");
-        TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c ORDER BY position ASC", ForumCategory.class);
+        TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c ORDER BY c.position ASC, c.id ASC", ForumCategory.class);
         return query.getResultList();
     }
-    @CacheResult(cacheName = "forum-categories-by-name")
     public List<ForumCategory>getCategoriesByName(String category){
         log.info("ForumCategoryOrm/getCategoriesByName");
         TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c WHERE category =: val", ForumCategory.class);
         query.setParameter("val", category);
         return query.getResultList();
     }
-    @CacheResult(cacheName = "forum-categories-by-id")
     public List<ForumCategory>getCategoriesById(Long id){
         log.info("ForumCategoryOrm/getCategoriesById");
         TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c WHERE id =: val", ForumCategory.class);
@@ -79,23 +77,23 @@ public class ForumCategoryOrm {
     })
     public Response addCategory(ForumCategory category, Long userId){
         log.info("ForumCategoryOrm/addCategory");
-        if(!getCategoriesByName(category.getCategory()).isEmpty()) return Response.status(406).entity("Kategorie existiert bereits").build(); //Check if category already exists
+        if(!getCategoriesByName(category.getCategory()).isEmpty()) return Response.status(409).entity("Kategorie existiert bereits").build(); //Check if category already exists
 
         //get corresponding user from db. Exit if not found
         User user = em.find(User.class, userId);
         if(user == null){
             log.warning("User nicht in der DB gefunden");
-            return Response.status(555).entity("User nicht gefunden").build();
+            return Response.status(401).entity("User nicht gefunden").build();
         }
 
         if(category.getVisibility() !=null){
             List<String> allowedVis = Roles.getRoles();
 
-            if(!allowedVis.contains(category.getVisibility())) return Response.status(406).entity("Die angegebene Nutzergruppe existiert nicht").build();
+            if(!allowedVis.contains(category.getVisibility())) return Response.status(400).entity("Die angegebene Nutzergruppe existiert nicht").build();
 
             // Ensure that the user's role rank is greater than or equal to the category's target visibility role
             if(!Roles.hasRequiredRole(user.getRole(), category.getVisibility())) {
-                return Response.status(406).entity("Die angegebene Nutzergruppe hat mehr Rechte als deine eigene").build();
+                return Response.status(403).entity("Die angegebene Nutzergruppe hat mehr Rechte als deine eigene").build();
             }
         }
         else{
@@ -104,14 +102,14 @@ public class ForumCategoryOrm {
 
         category.setCreationDate(Time.currentTimeInMillis());
 
-        if (!positionCategory(category)) return Response.status(406).entity("Reihenfolge konnte nicht geändert werden").build();
+        positionCategory(category, category.getPosition());
 
         //add Categroy to db
         try {
             em.persist(category);
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return Response.status(406).entity("Error while creating the new Category").build();
+            return Response.status(500).entity("Error while creating the new Category").build();
         }
 
         //Update User
@@ -120,43 +118,17 @@ public class ForumCategoryOrm {
         return Response.status(201).entity("Kategorie erfolgreich erstellt").build();
     }
 
-    /*
-     * Helper function for AddCategory
-     * This ensures that the "POSITION" value is handled correctly
-     */
-    private boolean positionCategory(ForumCategory category){
-        //Position stuff
-        long numOfExistingCat = getCategoryCnt();
-        long position;
-        boolean rearangeCategory = false;
-        //Check if a Position is set
-        if(category.getPosition() == null){
-            category.setPosition(numOfExistingCat);
-        }
-        else //Ensure that the postion is valid
-        {
-            position = category.getPosition();
-            if(numOfExistingCat < position){ //Set Number was to big, new Entry will be placed at the end
-                category.setPosition(numOfExistingCat+1);
-            }
-            else if(numOfExistingCat == position){
-                //nothing to do
-            }
-            else{
-                rearangeCategory = true;
-            }
-        }
-
-        //Update the category order if necessary
-        if(rearangeCategory){
-            try {
-                insertCategory(category.getPosition());
-            } catch (Exception e) {
-                log.log(Level.SEVERE, "Result{0}", e.getMessage());
-                return false;
-            }
-        }
-        return true;
+    /** Rebuilds a contiguous, zero-based order on insert, move and delete, repairing old gaps. */
+    private void positionCategory(ForumCategory category, Long requestedPosition) {
+        List<ForumCategory> ordered = new java.util.ArrayList<>(em.createQuery(
+                "SELECT c FROM ForumCategory c ORDER BY c.position ASC, c.id ASC", ForumCategory.class)
+                .setLockMode(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE).getResultList());
+        int oldIndex = ordered.indexOf(category);
+        ordered.remove(category);
+        int index = requestedPosition == null ? (oldIndex < 0 ? ordered.size() : oldIndex)
+                : (int) Math.max(0, Math.min(requestedPosition, ordered.size()));
+        ordered.add(index, category);
+        for (int i = 0; i < ordered.size(); i++) ordered.get(i).setPosition((long) i);
     }
 
     @Transactional
@@ -166,21 +138,20 @@ public class ForumCategoryOrm {
         @CacheInvalidateAll(cacheName = "forum-categories-by-id"),
         @CacheInvalidateAll(cacheName = "forum-category-count")
     })
-    public String updateCategory(ForumCategory forumCategory, Long userId){
+    public Response updateCategory(ForumCategory forumCategory, Long userId){
         log.info("ForumCategoryOrm/updateCategory");
 
         User user = em.find(User.class, userId);
-        if(user == null) return "User nicht gefunden";
+        if(user == null) return Response.status(401).entity("User nicht gefunden").build();
 
         ForumCategory forumCategoryAusDB = em.find(ForumCategory.class, forumCategory.getId());
-        if(forumCategoryAusDB == null) return "Kategorie nicht in der DB gefunden";
+        if(forumCategoryAusDB == null) return Response.status(404).entity("Kategorie nicht in der DB gefunden").build();
 
         User creator = forumCategoryAusDB.getCreatorObj();
-        if (creator == null && !user.getRole().equals("Admin")) return "Nur Admins dürfen verwaiste Einträge bearbeiten";
+        if (creator == null && !model.Users.Roles.isModerator(user.getRole())) return Response.status(403).entity("Nur Moderatoren dürfen verwaiste Einträge bearbeiten").build();
 
-        if (creator != null && !creator.getId().equals(userId) && !user.getRole().equals("Admin")) return "Nur der Ersteller oder Mods dürfen das";
+        if (creator != null && !creator.getId().equals(userId) && !model.Users.Roles.isModerator(user.getRole())) return Response.status(403).entity("Nur der Ersteller oder Mods dürfen das").build();
 
-        forumCategoryAusDB.setCategory(forumCategory.getCategory());
 
         // Update visibility if set
         if (forumCategory.getVisibility() != null) {
@@ -189,28 +160,23 @@ public class ForumCategoryOrm {
                 if (Roles.hasRequiredRole(user.getRole(), forumCategory.getVisibility())) {
                     forumCategoryAusDB.setVisibility(forumCategory.getVisibility());
                 } else {
-                    return "Die angegebene Nutzergruppe hat mehr Rechte als deine eigene";
+                    return Response.status(403).entity("Die angegebene Nutzergruppe hat mehr Rechte als deine eigene").build();
                 }
             } else {
-                return "Die angegebene Nutzergruppe existiert nicht";
+                return Response.status(400).entity("Die angegebene Nutzergruppe existiert nicht").build();
             }
         }
 
-        // Update position if set and changed
-        if (forumCategory.getPosition() != null && !forumCategory.getPosition().equals(forumCategoryAusDB.getPosition())) {
-            forumCategoryAusDB.setPosition(forumCategory.getPosition());
-            if (!positionCategory(forumCategoryAusDB)) {
-                return "Reihenfolge konnte nicht geändert werden";
-            }
-        }
+        forumCategoryAusDB.setCategory(forumCategory.getCategory());
+        positionCategory(forumCategoryAusDB, forumCategory.getPosition());
 
         try{
             em.merge(forumCategoryAusDB);
         }catch(Exception e){
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return "Fehler beim updaten der Kategorie";
+            return Response.status(500).entity("Fehler beim updaten der Kategorie").build();
         }
-        return "Kategorie erfolgreich aktualisert";
+        return Response.status(200).entity("Kategorie erfolgreich aktualisert").build();
     }
     /**
      * Deletes a category and all its nested topics/posts/answers.
@@ -226,42 +192,32 @@ public class ForumCategoryOrm {
     public Response deleteCategory(ForumCategory forumCategory, Long userId){
         log.info("ForumCategoryOrm/removeCategory");
         User user = em.find(User.class, userId);
-        if(user == null) return Response.status(406).entity("User nicht gefunden").build();
+        if(user == null) return Response.status(401).entity("User nicht gefunden").build();
         Long categoryId = forumCategory.getId();
         ForumCategory forumCategoryAusDB = em.find(ForumCategory.class, categoryId);
-        if(forumCategoryAusDB == null) return Response.status(406).entity("Kategorie nicht in der DB gefunden").build();
+        if(forumCategoryAusDB == null) return Response.status(404).entity("Kategorie nicht in der DB gefunden").build();
 
         User creator = forumCategoryAusDB.getCreatorObj();
-        if (creator == null && !user.getRole().equals("Admin")) return Response.status(406).entity("Nur Admins dürfen verwaiste Einträge bearbeiten").build();
+        if (creator == null && !model.Users.Roles.isModerator(user.getRole())) return Response.status(403).entity("Nur Moderatoren dürfen verwaiste Einträge bearbeiten").build();
 
-        if (creator != null && !creator.getId().equals(userId) && !user.getRole().equals("Admin")) return Response.status(406).entity("Nur der Ersteller oder Mods dürfen das").build();
+        if (creator != null && !creator.getId().equals(userId) && !model.Users.Roles.isModerator(user.getRole())) return Response.status(403).entity("Nur der Ersteller oder Mods dürfen das").build();
 
         try {
             forumTopicOrm.deleteAllTopicsFromCategory(categoryId);
             em.remove(forumCategoryAusDB);
+            em.flush();
+            List<ForumCategory> remaining = em.createQuery(
+                    "SELECT c FROM ForumCategory c ORDER BY c.position ASC, c.id ASC", ForumCategory.class)
+                    .setLockMode(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE).getResultList();
+            for (int i = 0; i < remaining.size(); i++) remaining.get(i).setPosition((long) i);
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return Response.status(406).entity("Fehler beim Löschen der Kategorie").build();
+            return Response.status(500).entity("Fehler beim Löschen der Kategorie").build();
         }
 
         return Response.status(200).entity("Kategorie erfolgreich gelöscht").build();
     }
 
-    //Custom SQL Querys
-    @Transactional
-    @CacheInvalidateAll.List({
-        @CacheInvalidateAll(cacheName = "forum-categories"),
-        @CacheInvalidateAll(cacheName = "forum-categories-by-name"),
-        @CacheInvalidateAll(cacheName = "forum-categories-by-id"),
-        @CacheInvalidateAll(cacheName = "forum-category-count")
-    })
-    public int insertCategory(long position)
-    {
-        log.info("ForumCategoryOrm/insertCategory");
-        Query query = em.createNativeQuery("UPDATE FORUM_CATEGORY SET position = position + 1 WHERE position >= :val", ForumCategory.class);
-        query.setParameter("val", position);
-        return query.executeUpdate();
-    }
     @CacheInvalidateAll.List({
         @CacheInvalidateAll(cacheName = "forum-categories"),
         @CacheInvalidateAll(cacheName = "forum-categories-by-name"),

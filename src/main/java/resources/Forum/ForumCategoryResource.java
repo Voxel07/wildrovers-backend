@@ -114,8 +114,7 @@ public class ForumCategoryResource {
         }
         AuditLogger.crud(log, user.getUserName(), user.getId(), "UPDATE", "Category",
                 forumCategory.getId());
-        String result = forumCategoryOrm.updateCategory(forumCategory, user.getId());
-        return Response.ok(result).build();
+        return forumCategoryOrm.updateCategory(forumCategory, user.getId());
     }
 
     @DELETE

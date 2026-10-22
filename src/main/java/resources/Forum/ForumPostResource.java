@@ -25,6 +25,7 @@ import java.util.logging.Level;
 import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
 import model.Forum.ForumPost;
+import orm.Forum.ForumPage;
 import orm.Forum.ForumPostOrm;
 import tools.AuditLogger;
 import tools.NotificationService;
@@ -54,67 +55,22 @@ public class ForumPostResource {
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public List<ForumPost> getPosts( @QueryParam("post") Long postId,
+    public Response getPosts( @QueryParam("post") Long postId,
                             @QueryParam("title") String title,
                             @QueryParam("user")Long userId,
                             @QueryParam("topic")Long topicId,
-                            @QueryParam("editor")Long editorId)
+                            @QueryParam("editor")Long editorId,
+                            @QueryParam("page") Integer page,
+                            @QueryParam("size") Integer size)
     {
-        log.info("ForumResource/getTopics");
-        List<ForumPost> posts;
-        if(postId != null){
-            log.info("ForumResource/getTopics/id");
-            posts = forumPostOrm.getPostsById(postId);
-            Long loggedInUserId = userPrincipalResolver.resolveUserId();
-            if (loggedInUserId != null) {
-                try {
-                    forumPostOrm.recordPostView(postId, loggedInUserId);
-                } catch (Exception e) {
-                    log.log(Level.WARNING, "Failed to record post view", e);
-                }
-            }
-        }
-        else if(topicId != null){
-            log.info("ForumResource/getTopics/name");
-            posts = forumPostOrm.getPostsByTopic(topicId);
-        }
-        else if(userId != null){
-            log.info("ForumResource/getPosts/user");
-            posts = forumPostOrm.getPostsByUser(userId);
-        }
-        else if(editorId != null){
-            log.info("ForumResource/getPosts/editor");
-            posts = forumPostOrm.getPostsByEditor(editorId);
-        }
-        else if(title != null){
-            log.info("ForumResource/getPosts/category");
-            posts = forumPostOrm.getPostByTitel(title);
-        }
-        else{
-            log.info("ForumResource/getPosts/all");
-            posts = forumPostOrm.getAllPosts();
-        }
-
-        String userRole = Roles.VSISITOR;
+        log.info("ForumResource/getPosts");
         model.User user = userPrincipalResolver.resolveUser();
-        if (user != null) {
-            userRole = user.getRole();
-        }
-        final String finalRole = userRole;
-        List<ForumPost> mutablePosts = new java.util.ArrayList<>(posts);
-        mutablePosts.removeIf(fp -> {
-            model.Forum.ForumTopic topic = fp.getTopic();
-            if (topic == null) return false;
-            model.Forum.ForumCategory cat = topic.getCategory();
-            if (cat == null) return false;
-            String vis = cat.getVisibility();
-            if (vis == null || vis.isBlank()) {
-                vis = Roles.VSISITOR;
-            }
-            return !Roles.hasRequiredRole(finalRole, vis);
-        });
+        String userRole = user != null ? user.getRole() : Roles.VSISITOR;
+        ForumPage<ForumPost> result = forumPostOrm.findPosts(postId, topicId, userId, editorId, title,
+                Roles.visibleTo(userRole), page, size);
+        List<ForumPost> mutablePosts = new java.util.ArrayList<>(result.items());
 
-        Long loggedInUserId = userPrincipalResolver.resolveUserId();
+        Long loggedInUserId = user != null ? user.getId() : null;
         if (loggedInUserId != null && !mutablePosts.isEmpty()) {
             try {
                 java.util.List<Long> postIds = new java.util.ArrayList<>();
@@ -131,7 +87,32 @@ public class ForumPostResource {
                 log.log(Level.WARNING, "Failed to set viewed state on posts", e);
             }
         }
-        return mutablePosts;
+        return Response.ok(mutablePosts).header(ForumPage.TOTAL_HEADER, result.total()).build();
+    }
+
+    /**
+     * Marks a post as read by the current user. Kept out of GET so that reloads and silent
+     * refetches neither change state nor count as new views.
+     */
+    @POST
+    @Path("/view")
+    @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response recordView(@QueryParam("post") Long postId) {
+        model.User user = userPrincipalResolver.resolveUser();
+        if (user == null) return Response.status(401).build();
+        if (postId == null) return Response.status(400).entity("Es muss ein Post angegeben werden").build();
+        if (forumPostOrm.findPosts(postId, null, null, null, null, Roles.visibleTo(user.getRole()), 0, 1)
+                .items().isEmpty()) {
+            return Response.status(404).entity("Post nicht gefunden").build();
+        }
+        try {
+            forumPostOrm.recordPostView(postId, user.getId());
+        } catch (Exception e) {
+            // A parallel request recorded the same view first (unique key); nothing to do.
+            log.log(Level.FINE, "Post view already recorded", e);
+        }
+        return Response.noContent().build();
     }
 
     /** Forum notifications only reach subscribers who may read the post's category. */
@@ -213,12 +194,12 @@ public class ForumPostResource {
             model.User user = userPrincipalResolver.resolveUser();
             AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
                     "UPDATE", "Post", forumPost.getId());
-            String result = forumPostOrm.updatePost(forumPost, userId);
-            if (result != null && result.toLowerCase().contains("erfolgreich")) {
+            Response result = forumPostOrm.updatePost(forumPost, userId);
+            if (result.getStatus() == 200) {
                 notifyForum("UPDATED", forumPost.getId(), forumPostOrm.notificationInfo(forumPost.getId()),
                         frontendUrl + "/Forum/Post/" + forumPost.getId(), userId);
             }
-            return Response.ok(result).build();
+            return result;
         }
     }
     @DELETE
@@ -237,11 +218,11 @@ public class ForumPostResource {
                     "DELETE", "Post", forumPost.getId());
             // Title and audience must come from the stored post, before it is deleted.
             ForumPostOrm.NotificationInfo info = forumPostOrm.notificationInfo(forumPost.getId());
-            String result = forumPostOrm.deletePost(forumPost, userId);
-            if (result != null && result.toLowerCase().contains("erfolgreich")) {
+            Response result = forumPostOrm.deletePost(forumPost, userId);
+            if (result.getStatus() == 200) {
                 notifyForum("DELETED", forumPost.getId(), info, frontendUrl + "/Forum", userId);
             }
-            return Response.ok(result).build();
+            return result;
         }
     }
 

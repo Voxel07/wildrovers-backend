@@ -5,7 +5,6 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Id;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Column;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.JoinColumn;
@@ -37,7 +36,8 @@ public class Polls {
     @JsonbTransient
     private ForumPost post;
 
-    @OneToMany(mappedBy = "poll", cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
+    @org.hibernate.annotations.BatchSize(size = 200)
+    @OneToMany(mappedBy = "poll", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     private List<PollOptions> options = new ArrayList<>();
 
     @ManyToMany(fetch = FetchType.LAZY)

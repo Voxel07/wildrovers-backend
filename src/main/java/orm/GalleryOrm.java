@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.logging.Logger;
 import model.Gallery;
 import model.User;
-import io.quarkus.cache.CacheResult;
 import io.quarkus.cache.CacheInvalidateAll;
 
 @ApplicationScoped
@@ -20,10 +19,9 @@ public class GalleryOrm {
     @Inject
     EntityManager em;
 
-    @CacheResult(cacheName = "galleries")
     public List<Gallery> getAllGalleries() {
         log.info("GalleryOrm/getAllGalleries");
-        TypedQuery<Gallery> query = em.createQuery("SELECT g FROM Gallery g ORDER BY g.date DESC, g.id DESC", Gallery.class);
+        TypedQuery<Gallery> query = em.createQuery("SELECT g FROM Gallery g LEFT JOIN FETCH g.creator ORDER BY g.date DESC, g.id DESC", Gallery.class);
         return query.getResultList();
     }
 
@@ -44,7 +42,6 @@ public class GalleryOrm {
         return gallery;
     }
 
-    @CacheResult(cacheName = "galleries-by-id")
     public Gallery getGalleryById(Long id) {
         log.info("GalleryOrm/getGalleryById: " + id);
         TypedQuery<Gallery> query = em.createQuery("SELECT g FROM Gallery g LEFT JOIN FETCH g.creator WHERE g.id = :id", Gallery.class);
@@ -62,7 +59,7 @@ public class GalleryOrm {
         log.info("GalleryOrm/updateGallery: " + gallery.getId());
         Gallery merged = em.merge(gallery);
         em.flush();
-        return getGalleryById(merged.getId());
+        return merged;
     }
 
     @Transactional

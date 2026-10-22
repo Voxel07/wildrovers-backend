@@ -80,6 +80,7 @@ public class UserPrincipalResolver {
 
     private static WebApplicationException forbidden(String message) {
         return new WebApplicationException(Response.status(Response.Status.FORBIDDEN)
+                .header(AccountStatus.STATUS_HEADER, AccountStatus.STATUS_DENIED)
                 .entity(message)
                 .build());
     }

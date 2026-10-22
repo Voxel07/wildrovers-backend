@@ -63,14 +63,50 @@ public class ForumPostOrm {
         return query.getResultList();
     }
 
-    @Transactional
+    /**
+     * Paged post list for one reader. Only one filter is applied, in the order post, topic,
+     * user, editor, title. Lists are newest first, as the topic table shows them.
+     */
+    public ForumPage<ForumPost> findPosts(Long postId, Long topicId, Long userId, Long editorId, String title,
+            List<String> visibleRoles, Integer page, Integer size) {
+        log.info("ForumPostOrm/findPosts");
+        String filter = "";
+        Object value = null;
+        if (postId != null) { filter = " AND fp.id = :val"; value = postId; }
+        else if (topicId != null) { filter = " AND t.id = :val"; value = topicId; }
+        else if (userId != null) { filter = " AND fp.creator.id = :val"; value = userId; }
+        else if (editorId != null) { filter = " AND fp.editor.id = :val"; value = editorId; }
+        else if (title != null) { filter = " AND fp.title = :val"; value = title; }
+        String where = " WHERE " + ForumPage.visibilityClause("c", visibleRoles) + filter;
+        String order = " ORDER BY fp.creationDate DESC, fp.id DESC";
+
+        TypedQuery<ForumPost> query = em.createQuery(
+                "SELECT fp FROM ForumPost fp LEFT JOIN FETCH fp.topic t LEFT JOIN FETCH t.category c" + where + order,
+                ForumPost.class);
+        TypedQuery<Long> count = em.createQuery(
+                "SELECT COUNT(fp) FROM ForumPost fp LEFT JOIN fp.topic t LEFT JOIN t.category c" + where, Long.class);
+        ForumPage.bindVisibility(query, visibleRoles);
+        ForumPage.bindVisibility(count, visibleRoles);
+        if (value != null) {
+            query.setParameter("val", value);
+            count.setParameter("val", value);
+        }
+        query.setFirstResult(ForumPage.firstResult(page, size));
+        query.setMaxResults(ForumPage.pageSize(size));
+        List<ForumPost> posts = query.getResultList();
+        if (postId != null) {
+            for (ForumPost post : posts) {
+                org.hibernate.Hibernate.initialize(post.getPolls());
+                for (model.Forum.Polls.Polls poll : post.getPolls()) {
+                    org.hibernate.Hibernate.initialize(poll.getOptions());
+                }
+            }
+        }
+        return new ForumPage<>(posts, count.getSingleResult());
+    }
+
     public List<ForumPost> getPostsById(Long postId) {
         log.info("ForumOrm/getPostsById");
-        ForumPost post = em.find(ForumPost.class, postId);
-        if (post != null) {
-            post.setViews((post.getViews() != null ? post.getViews() : 0L) + 1);
-            em.merge(post);
-        }
         TypedQuery<ForumPost> query = em.createQuery(
                 "SELECT fp FROM ForumPost fp LEFT JOIN FETCH fp.topic t LEFT JOIN FETCH t.category c WHERE fp.id = :val",
                 ForumPost.class);
@@ -156,41 +192,40 @@ public class ForumPostOrm {
     public Response addPost(ForumPost forumPost, Long topicId, Long userId) {
         log.info("ForumPostOrm/addPost");
         if (topicId == null)
-            return Response.status(401).entity("Es muss ein Tehma angegeben werden").build();
+            return Response.status(400).entity("Es muss ein Tehma angegeben werden").build();
         if (userId == null)
             return Response.status(401).entity("Es muss ein User angegebene werden").build();
 
-        List<ForumTopic> forumTopics = forumTopicOrm.getTopicById(topicId);
-        if (forumTopics.isEmpty())
-            return Response.status(401).entity("Topic nicht gefunden").build();
-        ForumTopic topic = forumTopics.get(0);
+        ForumTopic topic = em.find(ForumTopic.class, topicId);
         if (topic == null) {
             log.warning("TOPIC not found");
-            return Response.status(401).entity("Das angegebene Tehma existiert nicht").build();
+            return Response.status(404).entity("Das angegebene Tehma existiert nicht").build();
         }
-        // Check if Post title exists in current Topic
+        String title = htmlSanitizer.sanitizeTitle(forumPost.getTitle());
+        if (title == null || title.isBlank() || title.length() > 255) {
+            return Response.status(400).entity("Der Titel muss 1 bis 255 Zeichen enthalten.").build();
+        }
+        // Compare exactly the sanitised title that will be stored.
         TypedQuery<ForumPost> query = em.createQuery(
                 "SELECT fp FROM ForumPost fp WHERE fp.topic.id = :val AND fp.title = :val2", ForumPost.class);
         query.setParameter("val", topicId);
-        query.setParameter("val2", forumPost.getTitle());
+        query.setParameter("val2", title);
         if (!query.getResultList().isEmpty())
-            return Response.status(401).entity("Ein Post mit diesem Titel exestiert bereit in diesem Thema").build();
+            return Response.status(409).entity("Ein Post mit diesem Titel exestiert bereit in diesem Thema").build();
 
         User user = em.find(User.class, userId);
         if (user == null)
             return Response.status(401).entity("Der angegebene Nutzer wurde nicht gefunden").build();
 
         if (!model.Users.Roles.hasRequiredRole(user.getRole(), topic.getCategory().getVisibility())) {
-            return Response.status(403)
-                    .entity("Du hast keine Berechtigung, in dieser Kategorie einen Beitrag zu erstellen.").build();
+            return Response.status(403).entity("Du hast keine Berechtigung, in dieser Kategorie einen Beitrag zu erstellen.").build();
         }
 
         // Sanitize user-submitted content before persisting
-        forumPost.setTitle(htmlSanitizer.sanitizeTitle(forumPost.getTitle()));
+        forumPost.setTitle(title);
 
         forumPost.setCreationDate(Time.currentTimeInMillis());
 
-        topic.incPostCount();
         forumPost.setTopic(topic);
         forumPost.setCreator(user);
         forumPost.setAnswerCount(0L);
@@ -202,8 +237,9 @@ public class ForumPostOrm {
             em.persist(forumPost);
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return Response.status(401).entity("Fehler beim erstellen des Posts").build();
+            return Response.status(500).entity("Fehler beim erstellen des Posts").build();
         }
+        ForumCounters.adjust(em, "ForumTopic", "postCount", topicId, 1);
 
         // Extract base64 images from the ORIGINAL content (before sanitization strips
         // data: URIs), sanitize, and attach the author's editor uploads to this post.
@@ -229,27 +265,36 @@ public class ForumPostOrm {
      * @return
      */
     @Transactional
-    public String updatePost(ForumPost forumPost, Long userId) {
+    public Response updatePost(ForumPost forumPost, Long userId) {
         log.info("ForumPostOrm/updatePost");
 
         User user = em.find(User.class, userId);
         if (user == null)
-            return "User nicht gefunden";
+            return Response.status(401).entity("User nicht gefunden").build();
 
         ForumPost forumPostAusDB = em.find(ForumPost.class, forumPost.getId());
         if (forumPostAusDB == null)
-            return "Antwort nicht in der DB gefunden";
+            return Response.status(404).entity("Post nicht gefunden").build();
 
         User creator = forumPostAusDB.getCreatorObj();
-        if (creator == null && !user.getRole().equals("Admin"))
-            return "Nur Admins dürfen verwaiste Einträge bearbeiten";
+        if (creator == null && !model.Users.Roles.isModerator(user.getRole()))
+            return Response.status(403).entity("Nur Moderatoren dürfen verwaiste Einträge bearbeiten").build();
 
-        if (creator != null && !creator.getId().equals(userId) && !user.getRole().equals("Admin"))
-            return "Nur der Ersteller oder Mods dürfen das";
+        if (creator != null && !creator.getId().equals(userId) && !model.Users.Roles.isModerator(user.getRole()))
+            return Response.status(403).entity("Nur der Ersteller oder Mods dürfen das").build();
 
         // Extract base64 images from ORIGINAL content first, then sanitize
-        if (forumPost.getTitle() != null && !forumPost.getTitle().isBlank()) {
-            forumPostAusDB.setTitle(htmlSanitizer.sanitizeTitle(forumPost.getTitle()));
+        if (forumPost.getTitle() != null) {
+            String title = htmlSanitizer.sanitizeTitle(forumPost.getTitle());
+            if (title.isBlank() || title.length() > 255) {
+                return Response.status(400).entity("Der Titel muss 1 bis 255 Zeichen enthalten.").build();
+            }
+            if (em.createQuery("SELECT COUNT(p) FROM ForumPost p WHERE p.topic.id = :topic AND p.title = :title AND p.id <> :id", Long.class)
+                    .setParameter("topic", forumPostAusDB.getTopic().getId())
+                    .setParameter("title", title).setParameter("id", forumPostAusDB.getId()).getSingleResult() > 0) {
+                return Response.status(409).entity("Ein Post mit diesem Titel existiert bereits in diesem Thema.").build();
+            }
+            forumPostAusDB.setTitle(title);
         }
         if (forumPost.getContent() != null) {
             forumPostAusDB.setContent(
@@ -263,9 +308,9 @@ public class ForumPostOrm {
             em.merge(forumPostAusDB);
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return "Fehler beim updaten der Antwort";
+            return Response.status(500).entity("Fehler beim Aktualisieren des Posts").build();
         }
-        return "Antwort erfolgreich aktualisert";
+        return Response.status(200).entity("Post erfolgreich aktualisiert").build();
     }
 
     /**
@@ -274,33 +319,70 @@ public class ForumPostOrm {
      * @param userId
      * @return
      */
+    // Deleting a post clears the forum link of its event.
+    @io.quarkus.cache.CacheInvalidateAll.List({
+        @io.quarkus.cache.CacheInvalidateAll(cacheName = "events"),
+        @io.quarkus.cache.CacheInvalidateAll(cacheName = "events-in-range"),
+        @io.quarkus.cache.CacheInvalidateAll(cacheName = "upcoming-events"),
+        @io.quarkus.cache.CacheInvalidateAll(cacheName = "events-by-id"),
+        @io.quarkus.cache.CacheInvalidateAll(cacheName = "events-by-post-id")
+    })
     @Transactional
-    public String deletePost(ForumPost forumPost, Long userId) {
+    public Response deletePost(ForumPost forumPost, Long userId) {
         log.info("ForumPostOrm/deletePost");
 
         User user = em.find(User.class, userId);
         if (user == null)
-            return "User nicht gefunden";
+            return Response.status(401).entity("User nicht gefunden").build();
         Long postId = forumPost.getId();
         ForumPost forumPostAusDB = em.find(ForumPost.class, postId);
         if (forumPostAusDB == null)
-            return "Antwort nicht in der DB gefunden";
+            return Response.status(404).entity("Post nicht gefunden").build();
 
         User creator = forumPostAusDB.getCreatorObj();
-        if (creator == null && !user.getRole().equals("Admin"))
-            return "Nur Admins dürfen verwaiste Einträge bearbeiten";
+        if (creator == null && !model.Users.Roles.isModerator(user.getRole()))
+            return Response.status(403).entity("Nur Moderatoren dürfen verwaiste Einträge bearbeiten").build();
 
-        if (creator != null && !creator.getId().equals(userId) && !user.getRole().equals("Admin"))
-            return "Nur der Ersteller oder Mods dürfen das";
+        if (creator != null && !creator.getId().equals(userId) && !model.Users.Roles.isModerator(user.getRole()))
+            return Response.status(403).entity("Nur der Ersteller oder Mods dürfen das").build();
 
         try {
             removePostCascade(forumPostAusDB);
         } catch (Exception e) {
             log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return "Fehler beim Löschen des Posts";
+            return Response.status(500).entity("Fehler beim Löschen des Posts").build();
         }
 
-        return "Post erfolgreich gelöscht";
+        return Response.status(200).entity("Post erfolgreich gelöscht").build();
+    }
+
+    /**
+     * Rewrites the generated announcement post of an event. No permission check: callers
+     * (event updates) have checked them. Null values leave the field unchanged.
+     */
+    @Transactional
+    public void updateGeneratedPost(Long postId, String title, String content, Long editorId) {
+        ForumPost post = em.find(ForumPost.class, postId);
+        if (post == null) return;
+        if (title != null && !title.isBlank()) post.setTitle(htmlSanitizer.sanitizeTitle(title));
+        if (content != null) post.setContent(imageStore.prepareContent(content, postId, editorId));
+        User editor = editorId != null ? em.find(User.class, editorId) : null;
+        if (editor != null) {
+            post.setEditor(editor);
+            post.setEditDate(Time.currentTimeInMillis());
+        }
+    }
+
+    /**
+     * Deletes a post with all dependent rows, without permission checks (event deletion).
+     * Clears the persistence context, so callers must not use managed entities afterwards.
+     */
+    @Transactional
+    public void deletePostById(Long postId) {
+        ForumPost post = em.find(ForumPost.class, postId);
+        if (post != null) {
+            removePostCascade(post);
+        }
     }
 
     /**
@@ -309,10 +391,10 @@ public class ForumPostOrm {
      */
     private void removePostCascade(ForumPost post) {
         Long postId = post.getId();
+        unlinkEvents(postId);
         // 1. Update stats (decrement post count on topic)
         if (post.getTopic() != null) {
-            post.getTopic().decPostCount();
-            em.merge(post.getTopic());
+            ForumCounters.adjust(em, "ForumTopic", "postCount", post.getTopic().getId(), -1);
         }
 
         // Decrement answer counts of all users who answered the post
@@ -322,14 +404,6 @@ public class ForumPostOrm {
         em.flush();
 
         // 2. Run manual native SQL delete queries to delete all linked resources
-        // A. Delete answer pictures
-        em.createNativeQuery("DELETE FROM FORUM_PICTURE WHERE answer_id IN (SELECT id FROM FORUM_ANSWERS WHERE post_id = :postId)")
-                .setParameter("postId", postId).executeUpdate();
-
-        // B. Delete post pictures
-        em.createNativeQuery("DELETE FROM FORUM_PICTURE WHERE post_id = :postId")
-                .setParameter("postId", postId).executeUpdate();
-
         // C. Delete answers
         em.createNativeQuery("DELETE FROM FORUM_ANSWERS WHERE post_id = :postId")
                 .setParameter("postId", postId).executeUpdate();
@@ -366,10 +440,25 @@ public class ForumPostOrm {
         em.clear();
     }
 
+    /** An event keeps existing when its discussion post is deleted, just without the link. */
+    private void unlinkEvents(Long postId) {
+        em.createQuery("UPDATE Event e SET e.forumPostId = NULL WHERE e.forumPostId = :postId")
+                .setParameter("postId", postId)
+                .executeUpdate();
+    }
+
     /**
      * Moderation: deletes every post of a user including dependent data. A bulk JPQL
      * delete would violate the foreign keys of answers, votes, views, polls and pictures.
      */
+    // Deleting a post clears the forum link of its event.
+    @io.quarkus.cache.CacheInvalidateAll.List({
+        @io.quarkus.cache.CacheInvalidateAll(cacheName = "events"),
+        @io.quarkus.cache.CacheInvalidateAll(cacheName = "events-in-range"),
+        @io.quarkus.cache.CacheInvalidateAll(cacheName = "upcoming-events"),
+        @io.quarkus.cache.CacheInvalidateAll(cacheName = "events-by-id"),
+        @io.quarkus.cache.CacheInvalidateAll(cacheName = "events-by-post-id")
+    })
     @Transactional
     public String deleteAllPostsFromUser(Long userId) {
         log.info("ForumPostOrm/deleteAllPostsFromUser");
@@ -390,6 +479,14 @@ public class ForumPostOrm {
      * No checks, because this function does not have a public endpoint
      * gets Called when a Topic is deleted so no need to update answer count
      */
+    // Deleting a post clears the forum link of its event.
+    @io.quarkus.cache.CacheInvalidateAll.List({
+        @io.quarkus.cache.CacheInvalidateAll(cacheName = "events"),
+        @io.quarkus.cache.CacheInvalidateAll(cacheName = "events-in-range"),
+        @io.quarkus.cache.CacheInvalidateAll(cacheName = "upcoming-events"),
+        @io.quarkus.cache.CacheInvalidateAll(cacheName = "events-by-id"),
+        @io.quarkus.cache.CacheInvalidateAll(cacheName = "events-by-post-id")
+    })
     @Transactional
     public String deleteAllPostsFromTopic(Long topicId) {
         log.info("ForumPostOrm/deleteAllPostsFromTopic");
@@ -397,14 +494,13 @@ public class ForumPostOrm {
         // Get all posts to clean up associated data
         List<ForumPost> allPosts = getPostsByTopic(topicId);
         for (ForumPost forumPost : allPosts) {
+            unlinkEvents(forumPost.getId());
             forumAnswerOrm.deleteAllAnswersFromTopic(forumPost.getId());
 
             // Delete votes and views
             em.createQuery("DELETE FROM ForumPostVote v WHERE v.post.id = :postId").setParameter("postId", forumPost.getId()).executeUpdate();
             em.createQuery("DELETE FROM ForumPostView v WHERE v.post.id = :postId").setParameter("postId", forumPost.getId()).executeUpdate();
 
-            // Delete pictures
-            em.createQuery("DELETE FROM ForumPicture p WHERE p.post.id = :postId").setParameter("postId", forumPost.getId()).executeUpdate();
 
             // Delete polls
             List<model.Forum.Polls.Polls> polls = em.createQuery("SELECT p FROM Polls p WHERE p.post.id = :postId", model.Forum.Polls.Polls.class)
@@ -434,7 +530,9 @@ public class ForumPostOrm {
     @Transactional
     public Response votePost(Long postId, String type, Long userId) {
         log.info("ForumPostOrm/votePost postId=" + postId + " type=" + type + " userId=" + userId);
-        ForumPost post = em.find(ForumPost.class, postId);
+        // Row lock: concurrent votes on one post (e.g. a double click) run one after the other,
+        // so the vote lookup and the counter changes below cannot interleave.
+        ForumPost post = em.find(ForumPost.class, postId, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
         if (post == null) {
             return Response.status(404).entity("Post nicht gefunden").build();
         }
@@ -509,8 +607,15 @@ public class ForumPostOrm {
         return Response.ok(result).build();
     }
 
+    /**
+     * Marks the post as read by the user. The first read per user also counts one view on the
+     * post and its topic, so reloads and refetches do not inflate the counters. A concurrent
+     * duplicate fails on the unique (user_id, post_id) key and rolls back as a whole.
+     *
+     * @return false if the post or user does not exist
+     */
     @Transactional
-    public void recordPostView(Long postId, Long userId) {
+    public boolean recordPostView(Long postId, Long userId) {
         log.info("ForumPostOrm/recordPostView postId=" + postId + " userId=" + userId);
         TypedQuery<Long> query = em.createQuery(
             "SELECT COUNT(pv) FROM ForumPostView pv WHERE pv.user.id = :userId AND pv.post.id = :postId",
@@ -518,18 +623,22 @@ public class ForumPostOrm {
         );
         query.setParameter("userId", userId);
         query.setParameter("postId", postId);
-        Long count = query.getSingleResult();
-        if (count == 0) {
-            User user = em.find(User.class, userId);
-            ForumPost post = em.find(ForumPost.class, postId);
-            if (user != null && post != null) {
-                ForumPostView view = new ForumPostView();
-                view.setUser(user);
-                view.setPost(post);
-                view.setViewedAt(Time.currentTimeInMillis());
-                em.persist(view);
-            }
+        User user = em.find(User.class, userId);
+        ForumPost post = em.find(ForumPost.class, postId);
+        if (user == null || post == null) return false;
+        if (query.getSingleResult() > 0) return true;
+
+        ForumPostView view = new ForumPostView();
+        view.setUser(user);
+        view.setPost(post);
+        view.setViewedAt(Time.currentTimeInMillis());
+        em.persist(view);
+        em.flush();
+        ForumCounters.adjust(em, "ForumPost", "views", postId, 1);
+        if (post.getTopic() != null) {
+            ForumCounters.adjust(em, "ForumTopic", "views", post.getTopic().getId(), 1);
         }
+        return true;
     }
 
     public java.util.Set<Long> getViewedPostIds(List<Long> postIds, Long userId) {

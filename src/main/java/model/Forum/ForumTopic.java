@@ -21,7 +21,11 @@ import jakarta.persistence.JoinColumn;
 import model.User;
 
 @Entity
-@Table(name = "FORUM_TOPIC")
+// Only changed columns are written, so edits never overwrite counters updated atomically in SQL.
+@org.hibernate.annotations.DynamicUpdate
+// Topic names are unique per category, not across the whole forum.
+@Table(name = "FORUM_TOPIC", uniqueConstraints = @jakarta.persistence.UniqueConstraint(
+        name = "UK_FORUM_TOPIC_CATEGORY_TOPIC", columnNames = { "category_id", "topic" }))
 public class ForumTopic {
 
     @Id
@@ -33,7 +37,7 @@ public class ForumTopic {
 
     @NotBlank(message = "Topic is required")
     @Size(min = 3, max = 35, message = "Topic must be between 3 and 35 characters")
-    @Column(name = "topic", unique = true)
+    @Column(name = "topic")
     private String topic;
 
     @Column(name = "creationDate")
@@ -61,7 +65,33 @@ public class ForumTopic {
     @OneToMany(mappedBy = "topic",cascade = {CascadeType.ALL},fetch = FetchType.LAZY)
     private List<ForumPost> posts = new ArrayList<>();
 
+    /** Summary of the newest post, filled for topic lists so the UI needs no extra request per topic. */
+    public record LatestPost(Long id, String title, String creator, Long creationDate) { }
+
+    @jakarta.persistence.Transient
+    private LatestPost latestPost;
+
+    /** True when the current reader has viewed every post of the topic (null when not computed). */
+    @jakarta.persistence.Transient
+    private Boolean allViewed;
+
     public ForumTopic(){}
+
+    public LatestPost getLatestPost() {
+        return latestPost;
+    }
+
+    public void setLatestPost(LatestPost latestPost) {
+        this.latestPost = latestPost;
+    }
+
+    public Boolean getAllViewed() {
+        return allViewed;
+    }
+
+    public void setAllViewed(Boolean allViewed) {
+        this.allViewed = allViewed;
+    }
 
     public ForumTopic(String topic, Long creationDate, User creator, ForumCategory category) {
         this.topic = topic;

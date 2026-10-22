@@ -13,7 +13,9 @@ import jakarta.json.bind.annotation.JsonbTransient;
 import model.User;
 
 @Entity
-@Table(name = "FORUM_POST_VOTES")
+// One vote per user and post.
+@Table(name = "FORUM_POST_VOTES", uniqueConstraints = @jakarta.persistence.UniqueConstraint(
+        name = "UK_FORUM_POST_VOTES_USER_POST", columnNames = { "user_id", "post_id" }))
 public class ForumPostVote {
 
     @Id

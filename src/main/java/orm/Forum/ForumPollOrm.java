@@ -44,7 +44,7 @@ public class ForumPollOrm {
         }
 
         // Check if user is creator of post or admin
-        if (!post.getCreatorObj().getId().equals(userId) && !user.getRole().equals("Admin")) {
+        if (!post.getCreatorObj().getId().equals(userId) && !model.Users.Roles.isModerator(user.getRole())) {
             return Response.status(Response.Status.FORBIDDEN).entity("Nicht berechtigt").build();
         }
 
@@ -68,7 +68,8 @@ public class ForumPollOrm {
     })
     public Response vote(Long pollId, List<Long> optionIds, Long userId) {
         log.info("ForumPollOrm/vote on poll: " + pollId + ", options: " + optionIds + " by user: " + userId);
-        Polls poll = em.find(Polls.class, pollId);
+        // Row lock: votes on one poll run one after the other, so the voter lists and counts stay consistent.
+        Polls poll = em.find(Polls.class, pollId, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
         if (poll == null) {
             return Response.status(Response.Status.NOT_FOUND).entity("Umfrage nicht gefunden").build();
         }
@@ -94,14 +95,21 @@ public class ForumPollOrm {
                     .entity("Mehrfachauswahl ist für diese Umfrage nicht erlaubt").build();
         }
 
-        // Remove previous votes in this poll by this user
         List<PollOptions> allOptions = em.createQuery("SELECT o FROM PollOptions o WHERE o.poll.id = :pollId", PollOptions.class)
                                          .setParameter("pollId", pollId)
                                          .getResultList();
+        // Validate before changing anything: returning an error does not roll back earlier changes.
+        java.util.Set<Long> pollOptionIds = new java.util.HashSet<>();
+        for (PollOptions option : allOptions) pollOptionIds.add(option.getId());
+        if (!pollOptionIds.containsAll(optionIds)) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Ungültige Option").build();
+        }
+
+        // Remove previous votes in this poll by this user
         for (PollOptions option : allOptions) {
             if (option.getVotedUsers().contains(user)) {
                 option.getVotedUsers().remove(user);
-                option.setVotes(Math.max(0L, (option.getVotes() != null ? option.getVotes() : 0L) - 1));
+                option.setVotes((long) option.getVotedUsers().size());
                 em.merge(option);
             }
         }
@@ -114,7 +122,7 @@ public class ForumPollOrm {
             }
             if (!option.getVotedUsers().contains(user)) {
                 option.getVotedUsers().add(user);
-                option.setVotes((option.getVotes() != null ? option.getVotes() : 0L) + 1);
+                option.setVotes((long) option.getVotedUsers().size());
                 em.merge(option);
             }
         }
@@ -230,7 +238,7 @@ public class ForumPollOrm {
         }
 
         // Only post creator or admin can edit
-        if (!post.getCreatorObj().getId().equals(userId) && !user.getRole().equals("Admin")) {
+        if (!post.getCreatorObj().getId().equals(userId) && !model.Users.Roles.isModerator(user.getRole())) {
             return Response.status(Response.Status.FORBIDDEN).entity("Nicht berechtigt").build();
         }
 
@@ -301,7 +309,7 @@ public class ForumPollOrm {
         }
 
         // Only post creator or admin can delete
-        if (!post.getCreatorObj().getId().equals(userId) && !user.getRole().equals("Admin")) {
+        if (!post.getCreatorObj().getId().equals(userId) && !model.Users.Roles.isModerator(user.getRole())) {
             return Response.status(Response.Status.FORBIDDEN).entity("Nicht berechtigt").build();
         }
 

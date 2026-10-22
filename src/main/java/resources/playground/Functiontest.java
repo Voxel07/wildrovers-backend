@@ -108,24 +108,17 @@ public class Functiontest {
                 model.User user = em.createQuery("SELECT u FROM User u", model.User.class).setMaxResults(1).getSingleResult();
                 map.put("userFound", user.getUserName());
 
-                // 1. Create forum post
+                // 1. Create event together with its forum post
                 model.Forum.ForumPost post = new model.Forum.ForumPost();
                 post.setTitle("Test Event Post " + System.currentTimeMillis());
                 post.setContent("This is a test event description.");
-                Response postResponse = forumPostOrm.addPost(post, 2L, user.getId());
-                if (postResponse.getStatus() != 201) {
-                    throw new RuntimeException("Failed to create post: " + postResponse.getEntity());
-                }
-                Long postId = (Long) postResponse.getEntity();
-                map.put("createdPostId", postId);
-
-                // 2. Create Event
                 model.Event event = new model.Event();
                 event.setTitle("Test Event " + System.currentTimeMillis());
                 event.setLocation("Test Location");
                 event.setEventDate(java.time.LocalDateTime.now().plusDays(1));
-                event.setForumPostUrl("http://localhost:5173/Forum/Post/" + postId);
-                model.Event createdEvent = eventOrm.addEvent(event, user.getId());
+                model.Event createdEvent = eventOrm.addEvent(event, user.getId(), post, 2L, "http://localhost:5173");
+                Long postId = createdEvent.getForumPostId();
+                map.put("createdPostId", postId);
                 map.put("createdEventId", createdEvent.getId());
 
                 // 3. Verify post exists before deletion
@@ -192,7 +185,6 @@ public class Functiontest {
                 map.put("views", p.getViews());
                 map.put("answerCount", p.getAnswerCount());
                 map.put("answersSize", p.getAnswers() != null ? p.getAnswers().size() : 0);
-                map.put("picturesSize", p.getPictures() != null ? p.getPictures().size() : 0);
                 map.put("pollNull", p.getPolls() == null || p.getPolls().isEmpty());
                 return Response.ok(map).build();
             } catch (Exception e) {
@@ -460,8 +452,6 @@ public class Functiontest {
             @com.fasterxml.jackson.annotation.JsonIgnore
             java.util.List<model.Forum.ForumAnswer> getAnswers();
             @com.fasterxml.jackson.annotation.JsonIgnore
-            java.util.List<model.Forum.ForumPicture> getPictures();
-            @com.fasterxml.jackson.annotation.JsonIgnore
             model.User getCreatorObj();
         }
 
@@ -470,8 +460,6 @@ public class Functiontest {
             model.Forum.ForumPost getPost();
             @com.fasterxml.jackson.annotation.JsonIgnore
             model.User getEditor();
-            @com.fasterxml.jackson.annotation.JsonIgnore
-            java.util.List<model.Forum.ForumPicture> getPictures();
             @com.fasterxml.jackson.annotation.JsonIgnore
             model.User getCreatorObj();
         }

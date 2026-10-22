@@ -912,9 +912,7 @@ public class UserOrm {
 
             if (deletePosts) {
                 // ── Smart cascade: delete user's forum content bottom-up ──
-                // 1. Delete pictures of answers by this user, then delete the answers
-                em.createNativeQuery("DELETE FROM FORUM_PICTURE WHERE answer_id IN (SELECT id FROM FORUM_ANSWERS WHERE user_id = :uid)")
-                        .setParameter("uid", userId).executeUpdate();
+                // 1. Delete answers by this user
                 em.createNativeQuery("DELETE FROM FORUM_ANSWERS WHERE user_id = :uid")
                         .setParameter("uid", userId).executeUpdate();
 
@@ -942,11 +940,7 @@ public class UserOrm {
 
                 // Delete posts that have no remaining answers
                 if (!postsToDelete.isEmpty()) {
-                    em.createNativeQuery("DELETE FROM FORUM_PICTURE WHERE answer_id IN (SELECT id FROM FORUM_ANSWERS WHERE post_id IN (:pids))")
-                            .setParameter("pids", postsToDelete).executeUpdate();
                     em.createNativeQuery("DELETE FROM FORUM_ANSWERS WHERE post_id IN (:pids)")
-                            .setParameter("pids", postsToDelete).executeUpdate();
-                    em.createNativeQuery("DELETE FROM FORUM_PICTURE WHERE post_id IN (:pids)")
                             .setParameter("pids", postsToDelete).executeUpdate();
                     em.createNativeQuery("DELETE FROM FORUM_POLL_OPTION_VOTES WHERE option_id IN (SELECT id FROM FORUM_POLL_OPTIONS WHERE poll_id IN (SELECT id FROM FORUM_POLLS WHERE post_id IN (:pids)))")
                             .setParameter("pids", postsToDelete).executeUpdate();

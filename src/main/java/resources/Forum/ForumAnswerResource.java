@@ -23,6 +23,7 @@ import jakarta.ws.rs.QueryParam;
 
 import model.Forum.ForumAnswer;
 import orm.Forum.ForumAnswerOrm;
+import orm.Forum.ForumPage;
 import tools.AuditLogger;
 
 import jakarta.ws.rs.core.Response;
@@ -46,55 +47,19 @@ public class ForumAnswerResource{
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public List<ForumAnswer> getAnswers(@QueryParam("answer") Long answerId,
+    public Response getAnswers(@QueryParam("answer") Long answerId,
                                         @QueryParam("user")Long userId,
                                         @QueryParam("post")Long postId,
-                                        @QueryParam("editor")Long editorId)
+                                        @QueryParam("editor")Long editorId,
+                                        @QueryParam("page") Integer page,
+                                        @QueryParam("size") Integer size)
     {
         log.info("ForumAnswerResource/getAnswers");
-        List<ForumAnswer> answers;
-        if(answerId != null){
-            log.info("ForumAnswerResource/getAnswers/id");
-            answers = forumAnswerOrm.getAnswersById(answerId);
-        }
-        else if(postId != null){
-            log.info("ForumAnswerResource/getAnswers/name");
-            answers = forumAnswerOrm.getAnswersByPost(postId);
-        }
-        else if(userId != null){
-            log.info("ForumAnswerResource/getAnswers/user");
-            answers = forumAnswerOrm.getAnswersByUser(userId);
-        }
-        else if(editorId != null){
-            log.info("ForumAnswerResource/getAnswers/editor");
-            answers = forumAnswerOrm.getAnswersByEditor(editorId);
-        }
-        else{
-            log.info("ForumAnswerResource/getAnswers/all");
-            answers = forumAnswerOrm.getAllAnswers();
-        }
-
-        String userRole = Roles.VSISITOR;
         model.User user = userPrincipalResolver.resolveUser();
-        if (user != null) {
-            userRole = user.getRole();
-        }
-        final String finalRole = userRole;
-        List<ForumAnswer> mutableAnswers = new java.util.ArrayList<>(answers);
-        mutableAnswers.removeIf(fa -> {
-            model.Forum.ForumPost post = fa.getPost();
-            if (post == null) return false;
-            model.Forum.ForumTopic topic = post.getTopic();
-            if (topic == null) return false;
-            model.Forum.ForumCategory cat = topic.getCategory();
-            if (cat == null) return false;
-            String vis = cat.getVisibility();
-            if (vis == null || vis.isBlank()) {
-                vis = Roles.VSISITOR;
-            }
-            return !Roles.hasRequiredRole(finalRole, vis);
-        });
-        return mutableAnswers;
+        String userRole = user != null ? user.getRole() : Roles.VSISITOR;
+        ForumPage<ForumAnswer> result = forumAnswerOrm.findAnswers(answerId, postId, userId, editorId,
+                Roles.visibleTo(userRole), page, size);
+        return Response.ok(result.items()).header(ForumPage.TOTAL_HEADER, result.total()).build();
     }
     @PUT
     @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
@@ -130,8 +95,7 @@ public class ForumAnswerResource{
         model.User user = userPrincipalResolver.resolveUser();
         AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
                 "UPDATE", "Answer", forumAnswer.getId());
-        String result = forumAnswerOrm.updateAnswer(forumAnswer,userId);
-        return Response.ok(result).build();
+        return forumAnswerOrm.updateAnswer(forumAnswer, userId);
     }
 
     @DELETE
@@ -147,7 +111,6 @@ public class ForumAnswerResource{
         model.User user = userPrincipalResolver.resolveUser();
         AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
                 "DELETE", "Answer", forumAnswer.getId());
-        String result = forumAnswerOrm.deleteAnswer(forumAnswer,userId);
-        return Response.ok(result).build();
+        return forumAnswerOrm.deleteAnswer(forumAnswer, userId);
     }
 }

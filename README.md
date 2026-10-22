@@ -64,3 +64,11 @@ The models serve multiple purposes thats why they are structured the following w
     private String password;
 ```
 
+# Upload storage
+
+See [upload limits, backups and recovery](docs/uploads-backup.md). Apply
+`migrations/2026-10-22_review_low_fixes.sql` after the medium-fixes migration and
+before deploying this backend: answer `editDate` is now epoch milliseconds and
+the unused `FORUM_PICTURE` table is archived and retired. Set
+`IMMICH_ALLOWED_HOST` to restrict album links to the exact Immich hostname.
+

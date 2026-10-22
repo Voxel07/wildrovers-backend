@@ -67,4 +67,12 @@ class GalleryResourceTest {
     void delete404() {
         given().delete("/gallery/99999").then().statusCode(anyOf(is(404),is(401),is(500)));
     }
+
+    @Test void uploadUrlUnauth() {
+        given().get("/gallery/upload-url").then().statusCode(401);
+    }
+    @Test @TestSecurity(user="galTest",roles={"Besucher"})
+    void uploadUrlVisitorForbidden() {
+        given().get("/gallery/upload-url").then().statusCode(403);
+    }
 }

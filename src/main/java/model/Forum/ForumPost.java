@@ -10,7 +10,6 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.SequenceGenerator;
@@ -21,6 +20,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 
 
 @Entity
+// Only changed columns are written, so edits never overwrite counters updated atomically in SQL.
+@org.hibernate.annotations.DynamicUpdate
 @Table(name = "FORUM_POSTS")
 public class ForumPost {
     @Id
@@ -75,12 +76,8 @@ public class ForumPost {
     @OneToMany(mappedBy="post",cascade = {CascadeType.ALL},fetch = FetchType.LAZY )
     private List<ForumAnswer> answers = new ArrayList<>();
 
-    @JsonIgnore
-    @JsonbTransient
-    @OneToMany(mappedBy ="post", cascade = {CascadeType.ALL}, fetch = FetchType.LAZY)
-    private List<ForumPicture> pictures = new ArrayList<>();
 
-    @OneToMany(mappedBy = "post", cascade = {CascadeType.ALL}, fetch = FetchType.EAGER, orphanRemoval = true)
+    @OneToMany(mappedBy = "post", cascade = {CascadeType.ALL}, fetch = FetchType.LAZY, orphanRemoval = true)
     private List<model.Forum.Polls.Polls> polls = new ArrayList<>();
 
     @jakarta.persistence.Transient
@@ -243,23 +240,6 @@ public class ForumPost {
     public void setAnswerCount(Long answerCount) {
         this.answerCount = answerCount;
     }
-    @JsonIgnore
-    @JsonbTransient
-    public List<ForumPicture> getPictures() {
-        return pictures;
-    }
-
-    @JsonIgnore
-    @JsonbTransient
-    public void setPictures(List<ForumPicture> pictures) {
-        this.pictures = pictures;
-    }
-
-    public void setPicture(ForumPicture picture) {
-        this.pictures.add(picture);
-    }
-
-
     public Long getViews() {
         return views;
     }
@@ -268,6 +248,7 @@ public class ForumPost {
         this.views = views;
     }
 
+    @jakarta.json.bind.annotation.JsonbTypeSerializer(tools.ForumPollsSerializer.class)
     public List<model.Forum.Polls.Polls> getPolls() {
         return polls;
     }

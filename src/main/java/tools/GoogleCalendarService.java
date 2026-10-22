@@ -36,6 +36,10 @@ public class GoogleCalendarService {
     @ConfigProperty(name = "google.calendar.id", defaultValue = "primary")
     String calendarId;
 
+    /** Event times are entered as local wall-clock time of the team, not of the server. */
+    @ConfigProperty(name = "notification.time-zone", defaultValue = "Europe/Berlin")
+    ZoneId timeZone;
+
     private final HttpClient httpClient = HttpClient.newBuilder().build();
 
     private String cachedToken = null;
@@ -135,6 +139,11 @@ public class GoogleCalendarService {
         }
     }
 
+    /** True when credentials are set and readable, i.e. sync attempts can succeed at all. */
+    public boolean isConfigured() {
+        return credentialsJson != null && !credentialsJson.isBlank() && getCredentials() != null;
+    }
+
     public String syncEvent(Event event) {
         log.info("GoogleCalendarService/syncEvent: " + event.getTitle());
         String token = getAccessToken();
@@ -146,12 +155,12 @@ public class GoogleCalendarService {
         try {
             JSONObject start = new JSONObject()
                     .put("dateTime", formatIso(event.getEventDate()))
-                    .put("timeZone", ZoneId.systemDefault().getId());
+                    .put("timeZone", timeZone.getId());
 
             LocalDateTime endDateTime = event.getEventEndDate() != null ? event.getEventEndDate() : event.getEventDate().plusHours(2);
             JSONObject end = new JSONObject()
                     .put("dateTime", formatIso(endDateTime))
-                    .put("timeZone", ZoneId.systemDefault().getId());
+                    .put("timeZone", timeZone.getId());
 
             String desc = event.getDescription() != null ? event.getDescription() : "";
             if (event.getForumPostUrl() != null && !event.getForumPostUrl().isBlank()) {
@@ -232,6 +241,6 @@ public class GoogleCalendarService {
     }
 
     private String formatIso(LocalDateTime dateTime) {
-        return dateTime.atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+        return dateTime.atZone(timeZone).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
     }
 }

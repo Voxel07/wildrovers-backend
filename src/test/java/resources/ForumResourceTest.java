@@ -28,6 +28,122 @@ class ForumResourceTest {
         } catch (Exception ignored) {}
     }
 
+    /**
+     * Own accounts and content for the status-code tests (ids 410+), inserted once and
+     * independent of the best-effort seed above, which other test classes may wipe.
+     */
+    @BeforeEach @Transactional
+    void setupStatusFixtures() {
+        Number existing = (Number) em.createNativeQuery("SELECT COUNT(*) FROM \"FORUM_POSTS\" WHERE id = 410").getSingleResult();
+        if (existing.intValue() > 0) return;
+        em.createNativeQuery("DELETE FROM \"USER\" WHERE id IN (410,411,412)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (410,'forum-owner@t.l','forumOwner','test1234','Forum','Owner','Mitglied',true,0,true,false)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (411,'forum-other@t.l','forumOther','test1234','Forum','Other','Mitglied',true,0,false,false)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (412,'forum-blocked@t.l','forumBlocked','test1234','Forum','Blocked','Mitglied',true,0,false,true)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"FORUM_CATEGORY\" (id,category,creationDate,topicCount,position,visibility,user_id) VALUES (410,'StatusCat',0,1,99,'Besucher',410)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"FORUM_TOPIC\" (id,topic,creationDate,postCount,views,user_id,category_id) VALUES (410,'StatusTopic',0,1,0,410,410)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"FORUM_POSTS\" (id,title,content,creationDate,likes,dislikes,answerCount,user_id,topic_id) VALUES (410,'StatusPost','<p>C</p>',0,0,0,1,410,410)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"FORUM_ANSWERS\" (id,content,creationDate,likes,dislikes,user_id,post_id) VALUES (410,'<p>A</p>',0,0,0,410,410)").executeUpdate();
+        // Answers inserted out of creation order: the API must return 410, 412, 411.
+        em.createNativeQuery("INSERT INTO \"FORUM_ANSWERS\" (id,content,creationDate,likes,dislikes,user_id,post_id) VALUES (411,'<p>late</p>',20,0,0,410,410)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"FORUM_ANSWERS\" (id,content,creationDate,likes,dislikes,user_id,post_id) VALUES (412,'<p>early</p>',10,0,0,410,410)").executeUpdate();
+        // Moderator, a Vorstand-only category and a second public category for the topic-name tests.
+        em.createNativeQuery("DELETE FROM \"USER\" WHERE id = 416").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (416,'forum-mod@t.l','forumMod','test1234','Forum','Mod','Vorstand',true,0,true,false)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"FORUM_CATEGORY\" (id,category,creationDate,topicCount,position,visibility,user_id) VALUES (413,'BoardCat',0,1,98,'Vorstand',410)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"FORUM_TOPIC\" (id,topic,creationDate,postCount,views,user_id,category_id) VALUES (413,'BoardTopic',0,1,0,410,413)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"FORUM_POSTS\" (id,title,content,creationDate,likes,dislikes,answerCount,user_id,topic_id) VALUES (413,'BoardPost','<p>secret</p>',0,0,0,0,410,413)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"FORUM_CATEGORY\" (id,category,creationDate,topicCount,position,visibility,user_id) VALUES (414,'SecondCat',0,0,97,'Besucher',410)").executeUpdate();
+    }
+
+    // ── Pagination and visibility in the query (2.2) ──
+    @Test void pagedPostListCarriesTotal() {
+        given().queryParam("topic",410).queryParam("size",1).get("/forum/post").then().statusCode(200)
+                .header("X-Total-Count", "1").body("size()", is(1));
+    }
+    @Test void hiddenCategoryIsNotListedForVisitors() {
+        given().queryParam("post",413).get("/forum/post").then().statusCode(200)
+                .header("X-Total-Count", "0").body("size()", is(0));
+        given().queryParam("topicId",413).get("/forum/topic").then().statusCode(200).body("size()", is(0));
+    }
+    @Test @TestSecurity(user="forumMod",roles={"Vorstand"})
+    void hiddenCategoryIsListedForItsRole() {
+        given().queryParam("post",413).get("/forum/post").then().statusCode(200).body("[0].id", is(413));
+    }
+
+    // ── Answer order (2.3) ──
+    @Test void answersAreOrderedByCreation() {
+        given().queryParam("post",410).get("/forum/answer").then().statusCode(200)
+                .body("id", is(java.util.List.of(410, 412, 411)));
+    }
+
+    // ── Topic names per category and topic count (2.4, 2.7) ──
+    @Test @TestSecurity(user="forumOwner",roles={"Mitglied"})
+    void topicNamesAreUniquePerCategory() {
+        given().contentType(ContentType.JSON).queryParam("category",410).body("{\"topic\":\"StatusTopic\"}")
+                .put("/forum/topic").then().statusCode(409);
+        given().contentType(ContentType.JSON).queryParam("category",414).body("{\"topic\":\"StatusTopic\"}")
+                .put("/forum/topic").then().statusCode(201);
+        // The count is updated in the database and the category cache is invalidated.
+        given().queryParam("categoryId",414).get("/forum/category").then().statusCode(200)
+                .body("[0].topicCount", is(1));
+    }
+
+    // ── View counter (2.5) and votes (2.6) ──
+    @Test @TestSecurity(user="forumOther",roles={"Mitglied"})
+    void viewIsCountedOncePerUserAndNotOnGet() {
+        given().queryParam("post",410).get("/forum/post").then().statusCode(200).body("[0].views", anyOf(nullValue(), is(0)));
+        given().queryParam("post",410).post("/forum/post/view").then().statusCode(204);
+        given().queryParam("post",410).post("/forum/post/view").then().statusCode(204);
+        given().queryParam("post",410).get("/forum/post").then().statusCode(200)
+                .body("[0].views", is(1)).body("[0].viewed", is(true));
+    }
+    @Test @TestSecurity(user="forumOther",roles={"Mitglied"})
+    void viewOfHiddenPostIs404() {
+        given().queryParam("post",413).post("/forum/post/view").then().statusCode(404);
+    }
+    @Test @TestSecurity(user="forumOther",roles={"Mitglied"})
+    void secondIdenticalVoteRemovesIt() {
+        given().contentType(ContentType.JSON).queryParam("post",410).queryParam("type","like").post("/forum/post/vote").then().statusCode(200)
+                .body("likes", is(1));
+        given().contentType(ContentType.JSON).queryParam("post",410).queryParam("type","like").post("/forum/post/vote").then().statusCode(200)
+                .body("likes", is(0));
+    }
+
+    // ── Moderation (section 1) ──
+    @Test @TestSecurity(user="forumMod",roles={"Vorstand"})
+    void vorstandMayEditForeignPosts() {
+        given().contentType(ContentType.JSON).body("{\"id\":410,\"title\":\"StatusPost\",\"content\":\"<p>C</p>\"}")
+                .post("/forum/post").then().statusCode(200);
+    }
+
+    // ── Status codes ──
+    @Test @TestSecurity(user="forumOther",roles={"Mitglied"})
+    void updateForeignPostIsForbiddenWithoutAccountHeader() {
+        given().contentType(ContentType.JSON).body("{\"id\":410,\"title\":\"Hijack\",\"content\":\"<p>x</p>\"}").post("/forum/post")
+                .then().statusCode(403).header("X-Account-Status", nullValue());
+    }
+    @Test @TestSecurity(user="forumOther",roles={"Mitglied"})
+    void deleteForeignAnswerIsForbidden() {
+        given().contentType(ContentType.JSON).body("{\"id\":410}").delete("/forum/answer").then().statusCode(403);
+    }
+    @Test @TestSecurity(user="forumOther",roles={"Mitglied"})
+    void updateMissingPostIs404() {
+        given().contentType(ContentType.JSON).body("{\"id\":987654,\"title\":\"x\",\"content\":\"<p>x</p>\"}").post("/forum/post").then().statusCode(404);
+    }
+    @Test @TestSecurity(user="forumBlocked",roles={"Mitglied"})
+    void blockedAccountGetsAccountHeader() {
+        given().contentType(ContentType.JSON).queryParam("post",410).body("{\"content\":\"<p>x</p>\"}").put("/forum/answer")
+                .then().statusCode(403).header("X-Account-Status", "denied");
+    }
+
+    // ── Topic summaries ──
+    @Test void topicListCarriesLatestPost() {
+        given().queryParam("category",410).get("/forum/topic").then().statusCode(200)
+                .body("find { it.id == 410 }.latestPost.id", is(410))
+                .body("find { it.id == 410 }.allViewed", is(false));
+    }
+
     // ── Category ──
     @Test void getCategories() { given().get("/forum/category").then().statusCode(200); }
     @Test void getCategoryById() { given().queryParam("categoryId",400).get("/forum/category").then().statusCode(200); }

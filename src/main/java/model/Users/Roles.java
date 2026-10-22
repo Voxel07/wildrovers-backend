@@ -29,5 +29,17 @@ public final class Roles {
         if (requiredIndex == -1) return false;
         return userIndex >= requiredIndex;
     }
+
+    /** Vorstand and Admin may edit and delete content of other users. */
+    public static boolean isModerator(String userRole) {
+        return hasRequiredRole(userRole, ALDERMEN);
+    }
+
+    /** Category visibilities a user with this role may read (empty for unknown roles). */
+    public static List<String> visibleTo(String userRole) {
+        List<String> roles = getRoles();
+        int userIndex = roles.indexOf(userRole);
+        return userIndex == -1 ? new ArrayList<>() : new ArrayList<>(roles.subList(0, userIndex + 1));
+    }
 }
 

@@ -11,6 +11,7 @@ import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 import jakarta.json.bind.annotation.JsonbTransient;
 import jakarta.persistence.OneToMany;
@@ -20,7 +21,7 @@ import java.util.List;
 import java.util.ArrayList;
 
 @Entity
-@Table(name = "EVENT")
+@Table(name = "EVENT", indexes = @jakarta.persistence.Index(name = "IDX_EVENT_FORUM_POST", columnList = "forum_post_id"))
 public class Event {
 
     @Id
@@ -30,10 +31,14 @@ public class Event {
     private Long id;
 
     @NotBlank(message = "Event-Titel darf nicht leer sein.")
+    // The forum post title adds about 30 characters and must fit into 255.
+    @Size(max = 200, message = "Der Event-Titel darf höchstens 200 Zeichen lang sein.")
     @Column(name = "title")
     private String title;
 
-    @Column(name = "description", length = 1000)
+    public static final int DESCRIPTION_MAX_LENGTH = 1000;
+
+    @Column(name = "description", length = DESCRIPTION_MAX_LENGTH)
     private String description;
 
     @NotNull(message = "Event-Datum und -Uhrzeit müssen gesetzt sein.")
@@ -44,6 +49,7 @@ public class Event {
     private LocalDateTime eventEndDate;
 
     @NotBlank(message = "Veranstaltungsort darf nicht leer sein.")
+    @Size(max = 255, message = "Der Veranstaltungsort darf höchstens 255 Zeichen lang sein.")
     @Column(name = "location")
     private String location;
 
@@ -59,6 +65,19 @@ public class Event {
     @Column(name = "forum_post_url")
     private String forumPostUrl;
 
+    /** Discussion post of this event (no JPA relation: the post may be deleted on its own). */
+    @Column(name = "forum_post_id")
+    private Long forumPostId;
+
+    /**
+     * Set (epoch millis) when the Google Calendar entry must be created or updated, null once it
+     * is in sync. Calendar calls run after the database commit and are retried by a scheduler.
+     */
+    @JsonIgnore
+    @JsonbTransient
+    @Column(name = "calendar_sync_requested")
+    private Long calendarSyncRequested;
+
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     private List<EventAttendance> attendances = new ArrayList<>();
 
@@ -66,6 +85,27 @@ public class Event {
     private List<String> nonRespondents = new java.util.ArrayList<>();
 
     public Event() {
+    }
+
+    /**
+     * Detached copy for one response with its own non-respondent list. Cached events are shared
+     * between requests, so per-reader data must never be written into them.
+     */
+    public Event copyWithNonRespondents(List<String> nonRespondents) {
+        Event copy = new Event();
+        copy.id = id;
+        copy.title = title;
+        copy.description = description;
+        copy.eventDate = eventDate;
+        copy.eventEndDate = eventEndDate;
+        copy.location = location;
+        copy.googleCalendarEventId = googleCalendarEventId;
+        copy.creator = creator;
+        copy.forumPostUrl = forumPostUrl;
+        copy.forumPostId = forumPostId;
+        copy.attendances = attendances == null ? new ArrayList<>() : new ArrayList<>(attendances);
+        copy.nonRespondents = nonRespondents == null ? new ArrayList<>() : nonRespondents;
+        return copy;
     }
 
     public Long getId() {
@@ -147,6 +187,26 @@ public class Event {
 
     public void setForumPostUrl(String forumPostUrl) {
         this.forumPostUrl = forumPostUrl;
+    }
+
+    public Long getForumPostId() {
+        return forumPostId;
+    }
+
+    public void setForumPostId(Long forumPostId) {
+        this.forumPostId = forumPostId;
+    }
+
+    @JsonIgnore
+    @JsonbTransient
+    public Long getCalendarSyncRequested() {
+        return calendarSyncRequested;
+    }
+
+    @JsonIgnore
+    @JsonbTransient
+    public void setCalendarSyncRequested(Long calendarSyncRequested) {
+        this.calendarSyncRequested = calendarSyncRequested;
     }
 
     public List<EventAttendance> getAttendances() {

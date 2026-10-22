@@ -26,27 +26,22 @@ class UserDeletionTest {
 
     @BeforeEach @Transactional
     void setup() {
-        try {
-            em.createNativeQuery("DELETE FROM \"FORUM_ANSWERS\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"FORUM_POSTS\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"FORUM_TOPIC\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"FORUM_CATEGORY\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"EVENT_ATTENDANCES\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"EVENT\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"GALLERY\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"SECRET\"").executeUpdate();
-            em.createNativeQuery("DELETE FROM \"USER\"").executeUpdate();
-            em.flush();
+        ForumTestData.clear(em);
+        em.createNativeQuery("DELETE FROM \"EVENT_ATTENDANCES\"").executeUpdate();
+        em.createNativeQuery("DELETE FROM \"EVENT\"").executeUpdate();
+        em.createNativeQuery("DELETE FROM \"GALLERY\"").executeUpdate();
+        em.createNativeQuery("DELETE FROM \"SECRET\"").executeUpdate();
+        em.createNativeQuery("DELETE FROM \"USER\"").executeUpdate();
+        em.flush();
 
-            // Admin user + full forum data
-            em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (500,'del@t.l','delTest','test1234','Del','Test','Admin',true,0,true,false)").executeUpdate();
-            em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (500,'test1234',true,'v-del',500)").executeUpdate();
-            em.createNativeQuery("INSERT INTO \"FORUM_CATEGORY\" (id,category,creationDate,topicCount,position,visibility,user_id) VALUES (500,'DelCat',0,0,0,'Besucher',500)").executeUpdate();
-            em.createNativeQuery("INSERT INTO \"FORUM_TOPIC\" (id,topic,creationDate,postCount,views,user_id,category_id) VALUES (500,'DelTopic',0,0,0,500,500)").executeUpdate();
-            em.createNativeQuery("INSERT INTO \"FORUM_POSTS\" (id,title,content,creationDate,likes,dislikes,answerCount,user_id,topic_id) VALUES (500,'DelPost','<p>Keep me</p>',0,0,0,0,500,500)").executeUpdate();
-            em.createNativeQuery("INSERT INTO \"FORUM_ANSWERS\" (id,content,creationDate,likes,dislikes,user_id,post_id) VALUES (500,'<p>Keep answer</p>',0,0,0,500,500)").executeUpdate();
-            em.flush();
-        } catch (Exception ignored) {}
+        // Admin user + full forum data
+        em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (500,'del@t.l','delTest','test1234','Del','Test','Admin',true,0,true,false)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (500,'test1234',true,'v-del',500)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"FORUM_CATEGORY\" (id,category,creationDate,topicCount,position,visibility,user_id) VALUES (500,'DelCat',0,0,0,'Besucher',500)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"FORUM_TOPIC\" (id,topic,creationDate,postCount,views,user_id,category_id) VALUES (500,'DelTopic',0,0,0,500,500)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"FORUM_POSTS\" (id,title,content,creationDate,likes,dislikes,answerCount,user_id,topic_id) VALUES (500,'DelPost','<p>Keep me</p>',0,0,0,0,500,500)").executeUpdate();
+        em.createNativeQuery("INSERT INTO \"FORUM_ANSWERS\" (id,content,creationDate,likes,dislikes,user_id,post_id) VALUES (500,'<p>Keep answer</p>',0,0,0,500,500)").executeUpdate();
+        em.flush();
     }
 
     @Transactional

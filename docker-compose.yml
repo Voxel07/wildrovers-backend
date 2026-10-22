@@ -21,6 +21,13 @@ services:
       AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET}"
       GOOGLE_CALENDAR_CREDENTIALS: "/work/service_account.json"
       GOOGLE_CALENDAR_ID: "${GOOGLE_CALENDAR_ID}"
+      # Forum topic that receives the discussion post of every new event (must exist).
+      EVENTS_FORUM_TOPIC_ID: "${EVENTS_FORUM_TOPIC_ID:-1}"
+      # Immich upload link; only team members receive it (GET /gallery/upload-url).
+      IMMICH_DROP_URL: "${IMMICH_DROP_URL:-}"
+      IMMICH_ALLOWED_HOST: "${IMMICH_ALLOWED_HOST:-}"
+      FORUM_IMAGES_MAX_STORAGE_BYTES: "${FORUM_IMAGES_MAX_STORAGE_BYTES:-2147483648}"
+      FORUM_IMAGES_MAX_USER_DAILY_BYTES: "${FORUM_IMAGES_MAX_USER_DAILY_BYTES:-52428800}"
       FORUM_IMAGES_UPLOAD_DIR: "/work/uploads/forum"
       USER_PHOTOS_UPLOAD_DIR: "/work/uploads/user-photos"
       USER_BACKGROUNDS_UPLOAD_DIR: "/work/uploads/profile-backgrounds"
@@ -32,7 +39,8 @@ services:
       MAILER_FROM: "${MAILER_FROM}"
       MAILER_HOST: "${MAILER_HOST}"
       MAILER_PORT: "${MAILER_PORT}"
-      MAILER_SSL: "${MAILER_SSL}"
+      MAILER_SSL: "${MAILER_SSL:-false}"
+      MAILER_TLS: "${MAILER_TLS:-${MAILER_SSL:-false}}"
       MAILER_START_TLS: "${MAILER_START_TLS}"
       MAILER_USERNAME: "${MAILER_USERNAME}"
       MAILER_PASSWORD: "${MAILER_PASSWORD}"
@@ -46,8 +54,8 @@ services:
       RATE_LIMITER_ENABLED: "${RATE_LIMITER_ENABLED:-true}"
       # Required: AES key material for stored webhook URLs/secrets (prod has no default).
       NOTIFICATION_WEBHOOK_ENCRYPTION_KEY: "${NOTIFICATION_WEBHOOK_ENCRYPTION_KEY:?Set NOTIFICATION_WEBHOOK_ENCRYPTION_KEY in .env}"
-      # Optional: stable key for signed forum image URLs (random per start when unset).
-      FORUM_IMAGE_SIGNING_KEY: "${FORUM_IMAGE_SIGNING_KEY:-}"
+      # Required: stable key for signed forum image URLs (prod refuses to start without it).
+      FORUM_IMAGE_SIGNING_KEY: "${FORUM_IMAGE_SIGNING_KEY:?Set FORUM_IMAGE_SIGNING_KEY in .env}"
       # Optional: Authentik group names (comma-separated) mapped to application roles.
       APP_OIDC_GROUPS_ADMIN: "${APP_OIDC_GROUPS_ADMIN:-Admin}"
       APP_OIDC_GROUPS_VORSTAND: "${APP_OIDC_GROUPS_VORSTAND:-Vorstand}"
@@ -83,7 +91,6 @@ services:
       VITE_OIDC_CLIENT_ID: "${VITE_OIDC_CLIENT_ID}"
       VITE_OIDC_REDIRECT_URI: "${VITE_OIDC_REDIRECT_URI}"
       VITE_IMMICH_PROXY_URL: "${VITE_IMMICH_PROXY_URL}"
-      VITE_IMMICH_DROP_URL: "${VITE_IMMICH_DROP_URL}"
       VITE_IMMICH_KIOSK_URL: "${VITE_IMMICH_KIOSK_URL}"
       VITE_OPENOBSERVE_SITE: "${VITE_OPENOBSERVE_SITE}"
       VITE_OPENOBSERVE_RUM_KEY: "${VITE_OPENOBSERVE_RUM_KEY}"

@@ -16,6 +16,13 @@ public final class AccountStatus {
 
     public static final String BLOCKED_MESSAGE = "Dein Account wurde gesperrt.";
 
+    /**
+     * Response header that marks a 403 as "this account may not use the API" (blocked/inactive),
+     * as opposed to an ordinary permission denial. The frontend ends the session only on this.
+     */
+    public static final String STATUS_HEADER = "X-Account-Status";
+    public static final String STATUS_DENIED = "denied";
+
     private AccountStatus() { }
 
     public static boolean isUsable(User user) {

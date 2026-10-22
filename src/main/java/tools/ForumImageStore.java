@@ -39,6 +39,8 @@ import java.util.regex.Pattern;
  * </ul>
  */
 @ApplicationScoped
+// Created at startup so that a missing signing key in prod fails the boot, not the first image request.
+@io.quarkus.runtime.Startup
 public class ForumImageStore {
     private static final Logger log = Logger.getLogger(ForumImageStore.class.getName());
 
@@ -52,8 +54,13 @@ public class ForumImageStore {
                     + FILE_PATTERN + ")(?:\\?[^\"'\\s>]*)?\\2",
             Pattern.CASE_INSENSITIVE);
 
+    /** Any mention of a forum image path, used to decide which files are still in use. */
+    private static final Pattern IMAGE_REFERENCE = Pattern.compile(
+            "/forum/img/(" + ID_PATTERN + ")/(?:full|thumb)/(" + FILE_PATTERN + ")", Pattern.CASE_INSENSITIVE);
     /** Signed URLs stay valid for 6–12 hours and are stable within a 6 hour window (cacheable). */
     private static final long SIGNATURE_WINDOW_SECONDS = 6L * 60L * 60L;
+    /** Longest side of stored full-size images; larger uploads are scaled down. */
+    public static final int FULL_MAX_EDGE = 2560;
 
     @ConfigProperty(name = "forum.images.upload-dir", defaultValue = "${user.home}/wildrovers-uploads/forum")
     String uploadDir;
@@ -70,12 +77,29 @@ public class ForumImageStore {
     @Inject
     HtmlSanitizer htmlSanitizer;
 
+    @Inject
+    ForumImageQuota imageQuota;
+
+    @Inject
+    ForumImageAccess imageAccess;
+
+    /** True in prod: a random key would invalidate all signed URLs on every restart and differ per instance. */
+    @ConfigProperty(name = "forum.images.require-signing-key", defaultValue = "false")
+    boolean requireSigningKey;
+
+    static final int MIN_SIGNING_KEY_LENGTH = 32;
+
     private byte[] signingKey;
 
     @PostConstruct
     void init() {
-        if (configuredSigningKey.isPresent() && !configuredSigningKey.get().isBlank()) {
-            signingKey = sha256(configuredSigningKey.get().getBytes(StandardCharsets.UTF_8));
+        String key = configuredSigningKey.map(String::trim).orElse("");
+        if (requireSigningKey && key.length() < MIN_SIGNING_KEY_LENGTH) {
+            throw new IllegalStateException("forum.images.signing-key (FORUM_IMAGE_SIGNING_KEY) must be set to a stable"
+                    + " value of at least " + MIN_SIGNING_KEY_LENGTH + " characters");
+        }
+        if (!key.isEmpty()) {
+            signingKey = sha256(key.getBytes(StandardCharsets.UTF_8));
         } else {
             signingKey = new byte[32];
             new SecureRandom().nextBytes(signingKey);
@@ -94,7 +118,7 @@ public class ForumImageStore {
      * the author's pending editor uploads are attached to the post.
      */
     public String prepareContent(String rawHtml, Long postId, Long authorId) {
-        String html = imageExtractor.extractAndSaveImages(rawHtml, postId);
+        String html = imageExtractor.extractAndSaveImages(rawHtml, postId, authorId);
         html = htmlSanitizer.sanitize(html);
         html = canonicalize(html);
         return attachUploads(html, postId, authorId);
@@ -180,18 +204,57 @@ public class ForumImageStore {
      */
     public String signForOutput(String html) {
         if (html == null || !html.contains("/forum/img/")) return html;
+        html = linkThumbnails(html);
         Matcher m = IMAGE_URL_ATTRIBUTE.matcher(html);
+        java.util.Set<Long> referencedPosts = new java.util.HashSet<>();
+        while (m.find()) {
+            if (!m.group(3).startsWith("tmp_")) referencedPosts.add(Long.valueOf(m.group(3)));
+        }
+        java.util.Set<Long> readablePosts = imageAccess.readablePostIds(referencedPosts);
+        m.reset();
         StringBuilder sb = new StringBuilder();
         while (m.find()) {
             String replacement = m.group(0);
-            if (!m.group(3).startsWith("tmp_")) {
+            if (!m.group(3).startsWith("tmp_") && readablePosts.contains(Long.valueOf(m.group(3)))) {
                 replacement = m.group(1) + "=" + m.group(2)
                         + signedUrl(m.group(3), m.group(4), m.group(5)).replace("&", "&amp;") + m.group(2);
+            } else {
+                // Strip any supplied signature as well: a public post must never redistribute it.
+                replacement = m.group(1) + "=" + m.group(2)
+                        + canonicalPath(m.group(3), m.group(4), m.group(5)) + m.group(2);
             }
             m.appendReplacement(sb, Matcher.quoteReplacement(replacement));
         }
         m.appendTail(sb);
         return sb.toString();
+    }
+
+    /** Adds full-size links to uploaded thumbnails, including older stored posts. */
+    static String linkThumbnails(String html) {
+        Matcher tags = Pattern.compile("<a\\b[^>]*>|</a\\s*>|<img\\b[^>]*>", Pattern.CASE_INSENSITIVE).matcher(html);
+        StringBuilder result = new StringBuilder();
+        int anchorDepth = 0;
+        while (tags.find()) {
+            String tag = tags.group();
+            String lower = tag.toLowerCase(java.util.Locale.ROOT);
+            if (lower.startsWith("</a")) anchorDepth = Math.max(0, anchorDepth - 1);
+            else if (lower.startsWith("<a")) anchorDepth++;
+            else if (anchorDepth == 0) {
+                Matcher url = IMAGE_URL_ATTRIBUTE.matcher(tag);
+                if (url.find() && "src".equalsIgnoreCase(url.group(1)) && "thumb".equalsIgnoreCase(url.group(4))) {
+                    tag = "<a href=\"" + canonicalPath(url.group(3), "full", url.group(5))
+                            + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + tag + "</a>";
+                }
+            }
+            tags.appendReplacement(result, Matcher.quoteReplacement(tag));
+        }
+        tags.appendTail(result);
+        return result.toString();
+    }
+
+    public void saveImage(java.awt.image.BufferedImage image, String format, String id, String filename, Long userId)
+            throws IOException {
+        imageQuota.store(image, format, postsRoot(), id, filename, userId);
     }
 
     public String signedUrl(String id, String variant, String file) {
@@ -204,6 +267,19 @@ public class ForumImageStore {
         if (exp == null || sig == null || exp < System.currentTimeMillis() / 1000L) return false;
         byte[] expected = signature(canonicalPath(id, variant, file), exp).getBytes(StandardCharsets.US_ASCII);
         return MessageDigest.isEqual(expected, sig.getBytes(StandardCharsets.US_ASCII));
+    }
+
+    /**
+     * Adds every forum image referenced by {@code html} to {@code into}, keyed by image directory
+     * id (post id or tmp id) with the set of referenced file names.
+     */
+    public static void collectReferences(String html, Map<String, java.util.Set<String>> into) {
+        if (html == null || !html.contains("/forum/img/")) return;
+        // Deliberately loose (any origin, attribute or quoting): a missed reference deletes a live image.
+        Matcher m = IMAGE_REFERENCE.matcher(html);
+        while (m.find()) {
+            into.computeIfAbsent(m.group(1), k -> new java.util.HashSet<>()).add(m.group(2));
+        }
     }
 
     /** Owner (user id) of a temporary upload directory, or null for post directories. */

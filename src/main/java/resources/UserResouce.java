@@ -37,7 +37,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.Validator;
 import jakarta.ws.rs.PathParam;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-import javax.imageio.ImageIO;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
@@ -328,7 +327,7 @@ public class UserResouce {
 
         try {
             File uploadedFile = form.file.uploadedFile().toFile();
-            BufferedImage original = tools.SafeImageReader.read(uploadedFile, 25_000_000L);
+            BufferedImage original = tools.SafeImageReader.readOriented(uploadedFile, 25_000_000L);
             if (original == null) {
                 return Response.status(400).entity("Ungültiges Bildformat").build();
             }
@@ -340,7 +339,8 @@ public class UserResouce {
             Files.createDirectories(dir);
             java.nio.file.Path destPath = dir.resolve(user.getId() + ".jpg");
 
-            ImageIO.write(scaled, "jpg", destPath.toFile());
+            // Converts alpha to a white background and fails loudly if nothing was written.
+            tools.SafeImageReader.write(scaled, "jpg", destPath);
 
             String photoUrl = "/user/photo/" + user.getId() + "?v=" + System.currentTimeMillis();
             userOrm.updateUserPhotoUrl(user.getId(), photoUrl);
@@ -375,7 +375,7 @@ public class UserResouce {
 
         try {
             File uploadedFile = form.file.uploadedFile().toFile();
-            BufferedImage original = tools.SafeImageReader.read(uploadedFile, 25_000_000L);
+            BufferedImage original = tools.SafeImageReader.readOriented(uploadedFile, 25_000_000L);
             if (original == null) {
                 return Response.status(400).entity("Ungültiges Bildformat").build();
             }
@@ -387,7 +387,8 @@ public class UserResouce {
             Files.createDirectories(dir);
             java.nio.file.Path destPath = dir.resolve(user.getId() + "_background.jpg");
 
-            ImageIO.write(scaled, "jpg", destPath.toFile());
+            // Converts alpha to a white background and fails loudly if nothing was written.
+            tools.SafeImageReader.write(scaled, "jpg", destPath);
 
             String backgroundUrl = "/user/background/" + user.getId() + "?v=" + System.currentTimeMillis();
             userOrm.updateUserBackgroundUrl(user.getId(), backgroundUrl);
@@ -529,6 +530,9 @@ public class UserResouce {
         int newH = (int) Math.round(h * ratio);
         BufferedImage scaled = new BufferedImage(newW, newH, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = scaled.createGraphics();
+        // JPEG has no alpha: paint transparent areas white instead of black.
+        g.setColor(java.awt.Color.WHITE);
+        g.fillRect(0, 0, newW, newH);
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
         g.drawImage(src, 0, 0, newW, newH, null);

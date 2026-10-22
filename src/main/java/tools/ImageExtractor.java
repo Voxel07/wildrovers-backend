@@ -4,7 +4,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.awt.image.BufferedImage;
-import java.nio.file.Path;
 import java.util.Base64;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -29,8 +28,6 @@ public class ImageExtractor {
 
     private static final Logger log = Logger.getLogger(ImageExtractor.class.getName());
 
-    /** Max thumbnail width (px). Height is scaled proportionally. */
-    private static final int THUMB_MAX_WIDTH = 400;
     static final int MAX_IMAGES = 10;
     static final int MAX_IMAGE_BYTES = 5 * 1024 * 1024;
     static final long MAX_PIXELS = 25_000_000L;
@@ -50,7 +47,7 @@ public class ImageExtractor {
      * data: URIs replaced by canonical /forum/img/... URLs. Images that exceed the
      * limits or cannot be decoded are removed.
      */
-    public String extractAndSaveImages(String html, Long postId) {
+    public String extractAndSaveImages(String html, Long postId, Long authorId) {
         if (html == null || postId == null || !html.contains("data:image")) {
             return html;
         }
@@ -71,16 +68,12 @@ public class ImageExtractor {
                 try {
                     byte[] imageBytes = Base64.getMimeDecoder().decode(b64data);
                     BufferedImage original = imageBytes.length <= MAX_IMAGE_BYTES
-                            ? SafeImageReader.read(imageBytes, MAX_PIXELS) : null;
+                            ? SafeImageReader.readOriented(imageBytes, MAX_PIXELS, ForumImageStore.FULL_MAX_EDGE, format) : null;
                     if (original == null) {
                         log.warning("Could not decode embedded image " + imgIndex + " for post " + postId);
                     } else {
                         String filename = "b64-" + UUID.randomUUID() + "." + format;
-                        Path fullDir = imageStore.createDir(String.valueOf(postId), "full");
-                        Path thumbDir = imageStore.createDir(String.valueOf(postId), "thumb");
-                        SafeImageReader.write(original, format, fullDir.resolve(filename));
-                        SafeImageReader.write(SafeImageReader.scaleToWidth(original, THUMB_MAX_WIDTH, format), format,
-                                thumbDir.resolve(filename));
+                        imageStore.saveImage(original, format, String.valueOf(postId), filename, authorId);
 
                         String fullUrl = ForumImageStore.canonicalPath(String.valueOf(postId), "full", filename);
                         String thumbUrl = ForumImageStore.canonicalPath(String.valueOf(postId), "thumb", filename);
@@ -89,6 +82,8 @@ public class ImageExtractor {
                             + "</a>";
                         log.info("Saved post " + postId + " image " + imgIndex);
                     }
+                } catch (jakarta.ws.rs.WebApplicationException e) {
+                    throw e;
                 } catch (Exception e) {
                     log.log(Level.WARNING, "Rejected embedded image " + imgIndex + " for post " + postId, e);
                 }
