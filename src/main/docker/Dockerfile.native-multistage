@@ -1,0 +1,41 @@
+# syntax=docker/dockerfile:1
+# Build from the backend root:
+# docker build -f src/main/docker/Dockerfile.native-multistage -t wildrovers-backend:native .
+FROM quay.io/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-25 AS build
+
+USER root
+RUN microdnf install -y freetype fontconfig && microdnf clean all \
+    && mkdir -p /code && chown quarkus:quarkus /code
+USER quarkus
+WORKDIR /code
+
+COPY --chown=quarkus:quarkus --chmod=0755 mvnw /code/mvnw
+COPY --chown=quarkus:quarkus .mvn /code/.mvn
+COPY --chown=quarkus:quarkus pom.xml /code/pom.xml
+# Windows checkouts may use CRLF; the wrapper and JVM argument file need LF on Linux.
+RUN sed -i 's/\r$//' mvnw .mvn/jvm.config \
+    && ./mvnw -B -ntp -Pnative dependency:go-offline
+
+COPY --chown=quarkus:quarkus src /code/src
+ARG NATIVE_IMAGE_XMX=6g
+RUN ./mvnw -B -ntp package -Pnative -DskipTests \
+    -Dquarkus.native.container-build=false \
+    -Dquarkus.native.march=compatibility \
+    -Dquarkus.native.native-image-xmx=${NATIVE_IMAGE_XMX}
+
+# Keep the runtime on the same UBI major version as the native builder.
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7
+
+# Image uploads use AWT/ImageIO, including native shared libraries from the build.
+RUN microdnf install -y freetype fontconfig && microdnf clean all \
+    && mkdir -p /work/uploads /work/logs \
+    && chown -R 185:0 /work && chmod -R g+rwX /work
+WORKDIR /work
+ENV HOME=/work
+
+COPY --from=build --chown=185:0 /code/target/*.so /work/
+COPY --from=build --chown=185:0 --chmod=0755 /code/target/*-runner /work/application
+
+EXPOSE 8080
+USER 185
+ENTRYPOINT ["./application", "-Dquarkus.http.host=0.0.0.0"]

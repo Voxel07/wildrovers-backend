@@ -1,0 +1,18 @@
+# This build needs sources; the root .dockerignore only permits packaged artifacts.
+*
+!mvnw
+!.mvn/
+!.mvn/**
+!pom.xml
+!src/
+!src/**
+
+# Keep locally supplied credentials and data out of the builder and its cache.
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/service_account*.json
+**/*.mmdb

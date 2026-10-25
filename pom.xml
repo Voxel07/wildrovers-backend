@@ -190,6 +190,13 @@
   <profiles>
     <profile>
       <id>native</id>
+      <dependencies>
+        <!-- Native support for the ImageIO/Java2D upload processing paths. -->
+        <dependency>
+          <groupId>io.quarkus</groupId>
+          <artifactId>quarkus-awt</artifactId>
+        </dependency>
+      </dependencies>
       <activation>
         <property>
           <name>native</name>

@@ -53,6 +53,37 @@ You can then execute your native executable with: `./target/getting-started-1.0.
 
 If you want to learn more about building native executables, please consult https://quarkus.io/guides/maven-tooling.html.
 
+## Building a native Docker image
+
+From the backend root, build the executable and runtime image in one command:
+
+```shell
+docker build -f src/main/docker/Dockerfile.native-multistage -t wildrovers-backend:native .
+```
+
+Only Docker is required locally. The build stage uses Mandrel with JDK 25 and
+the Maven wrapper; the final UBI 9 image runs the native executable as user 185,
+matching the JVM image's upload-volume ownership. It includes the AWT/ImageIO
+libraries needed for image uploads. Supply the same runtime environment and
+mounts as `docker-compose.yml`, including `/work/uploads`, `/work/logs` and keys.
+The Dockerfile has its own source allowlist in
+`src/main/docker/Dockerfile.native-multistage.dockerignore`; local credentials
+are excluded from the build context. Tests are skipped, matching the release CI.
+
+Native compilation needs several GB of memory. The native-image heap defaults
+to 6 GB and can be changed with `--build-arg NATIVE_IMAGE_XMX=4g`.
+
+The GitHub Actions workflow `.github/workflows/build-native.yml` publishes both
+Linux AMD64 variants when a tag points to a commit on `master`:
+
+| Image | Release tag | Rolling tag |
+| --- | --- | --- |
+| JVM | `ghcr.io/voxel07/wildrovers-backend:<tag>` | `ghcr.io/voxel07/wildrovers-backend:latest` |
+| Native | `ghcr.io/voxel07/wildrovers-backend:<tag>-native` | `ghcr.io/voxel07/wildrovers-backend:native` |
+
+To deploy the native variant, use the `native` tag or a pinned `<tag>-native`
+tag for the backend service's `image` in your Compose configuration.
+
 # About this Project
 This is the backend for the www.wild-rovers.de homepage. It provides bunch of Rest endpoinst witch are secured by a role based system.
 
