@@ -35,10 +35,13 @@ public class RateLimiter {
      */
     public enum Config {
         // ── Auth endpoints ──
-        LOGIN("/user/login", "POST", 10, 60),           // 10 login attempts per minute
+        LOGIN("/auth/login", "POST", 10, 60),           // 10 login attempts per minute
+        OIDC_LOGIN("/auth/oidc", "POST", 10, 60),
+        // Every open tab refreshes about every 15 minutes; the slack covers several devices behind one IP.
+        SESSION_REFRESH("/auth/refresh", "POST", 30, 60),
+        LOGOUT("/auth/logout", "POST", 20, 60),
         RESEND_VERIFICATION("/user/resend-verification", "POST", 3, 300),
         SIGNUP("/user", "PUT", 3, 60, true),            // 3 signups per minute (exactly PUT /user)
-        LOGOUT("/user/logout", "POST", 20, 60),
 
         // ── Secret / password-reset ──
         PASSWORD_RESET_REQUEST("/secrets/reset-request", "POST", 3, 300),   // 3 per 5 min

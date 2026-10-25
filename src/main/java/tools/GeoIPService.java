@@ -1,137 +1,107 @@
 package tools;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.util.concurrent.ConcurrentHashMap;
+import com.maxmind.geoip2.DatabaseReader;
+import com.maxmind.geoip2.model.CountryResponse;
+import io.quarkus.runtime.annotations.RegisterForReflection;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+import java.io.File;
+import java.net.InetAddress;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import jakarta.enterprise.context.ApplicationScoped;
-
 /**
- * Resolves IP → country using ip-api.com (free, no API key needed).
- * Results are cached for 24 hours to avoid hitting rate limits.
- *
- * ip-api.com free tier: 45 requests per minute.
+ * Resolves IP → country from a local MaxMind GeoLite2/GeoIP2 Country database
+ * ({@code app.geoip.database}). Lookups take microseconds and never leave the
+ * server, so no client IP is sent to a third party. Without a database file the
+ * service answers "Unknown" and country tracking is off.
  */
 @ApplicationScoped
+@RegisterForReflection(targets = {
+        CountryResponse.class,
+        com.maxmind.geoip2.record.Continent.class,
+        com.maxmind.geoip2.record.Country.class,
+        com.maxmind.geoip2.record.RepresentedCountry.class,
+        com.maxmind.geoip2.record.MaxMind.class,
+        com.maxmind.geoip2.record.Traits.class
+})
 public class GeoIPService {
 
     private static final Logger log = Logger.getLogger(GeoIPService.class.getName());
 
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .build();
+    @ConfigProperty(name = "app.geoip.database")
+    Optional<String> databasePath;
 
-    private static class CacheEntry {
-        final String country;
-        final long expiryNanos;
-        CacheEntry(String country, long ttlMillis) {
-            this.country = country;
-            this.expiryNanos = System.nanoTime() + ttlMillis * 1_000_000L;
+    private DatabaseReader reader;
+
+    @PostConstruct
+    void open() {
+        String path = databasePath.map(String::trim).orElse("");
+        if (path.isEmpty()) {
+            log.info("GeoIP: no database configured (app.geoip.database); country tracking is off.");
+            return;
         }
-        boolean isExpired() {
-            return System.nanoTime() > expiryNanos;
+        try {
+            reader = new DatabaseReader.Builder(new File(path)).build();
+            log.info("GeoIP: loaded " + path);
+        } catch (Exception e) {
+            log.log(Level.WARNING, "GeoIP: database " + path + " could not be opened; country tracking is off.", e);
         }
     }
 
-    private final ConcurrentHashMap<String, CacheEntry> cache = new ConcurrentHashMap<>();
-    private static final long CACHE_TTL_MS = Duration.ofHours(24).toMillis();
+    @PreDestroy
+    void close() {
+        try {
+            if (reader != null) reader.close();
+        } catch (Exception ignored) {
+            // shutting down
+        }
+    }
 
     /**
-     * Look up the country (ISO country name, not code) for an IP address.
-     * Returns "Unknown" if the lookup fails or IP is local/private.
+     * Look up the country (English name) for an IP address.
+     * Returns "Local" for private addresses and "Unknown" if the lookup is not possible.
      */
     public String getCountry(String ip) {
         if (ip == null || ip.isBlank() || "unknown".equals(ip)) {
             return "Unknown";
         }
-
-        // Don't look up local/private IPs
-        if (isPrivateOrLocal(ip)) {
+        InetAddress address;
+        try {
+            // Only literal addresses reach this point; never resolve host names.
+            if (!ip.matches("[0-9a-fA-F:.]+")) return "Unknown";
+            address = InetAddress.getByName(ip);
+        } catch (Exception e) {
+            return "Unknown";
+        }
+        if (isPrivateOrLocal(address)) {
             return "Local";
         }
-
-        // Check cache
-        CacheEntry cached = cache.get(ip);
-        if (cached != null && !cached.isExpired()) {
-            return cached.country;
+        if (reader == null) {
+            return "Unknown";
         }
-
         try {
-            String country = lookupRemote(ip);
-            cache.put(ip, new CacheEntry(country, CACHE_TTL_MS));
-            return country;
+            return reader.tryCountry(address)
+                    .map(r -> r.getCountry().getName())
+                    .filter(name -> name != null && !name.isBlank())
+                    .orElse("Unknown");
         } catch (Exception e) {
-            log.log(Level.WARNING, "GeoIP lookup failed for " + ip + ": " + e.getMessage());
-            // Cache failures briefly so we don't hammer the API
-            cache.put(ip, new CacheEntry("Unknown", 60_000));
+            log.log(Level.FINE, "GeoIP lookup failed for " + ip, e);
             return "Unknown";
         }
     }
 
-    private String lookupRemote(String ip) throws Exception {
-        URI uri = URI.create("http://ip-api.com/json/" + ip + "?fields=country");
-        HttpRequest request = HttpRequest.newBuilder(uri)
-                .timeout(Duration.ofSeconds(3))
-                .GET()
-                .build();
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-        if (response.statusCode() == 200) {
-            String body = response.body();
-            // Parse simple JSON: {"country":"Germany"} or {"status":"fail"}
-            // We do manual parsing to avoid pulling in JSON libraries just for this
-            String country = extractJsonString(body, "country");
-            if (country != null) {
-                log.fine("GeoIP: " + ip + " → " + country);
-                return country;
-            }
-        } else {
-            log.warning("GeoIP API returned status " + response.statusCode() + " for " + ip);
-        }
-        return "Unknown";
-    }
-
-    /**
-     * Extremely simple JSON string extractor — avoids pulling in any JSON library.
-     */
-    private static String extractJsonString(String json, String key) {
-        String search = "\"" + key + "\":\"";
-        int start = json.indexOf(search);
-        if (start < 0) return null;
-        start += search.length();
-        int end = json.indexOf("\"", start);
-        if (end < 0) return null;
-        return json.substring(start, end);
-    }
-
-    /**
-     * Check if an IP is private/local (no point doing GeoIP lookup).
-     */
-    private boolean isPrivateOrLocal(String ip) {
-        if (ip.equals("127.0.0.1") || ip.equals("::1") || ip.equals("0:0:0:0:0:0:0:1")
-                || ip.startsWith("10.") || ip.startsWith("192.168.")
-                || ip.startsWith("172.") || ip.startsWith("fc") || ip.startsWith("fd")) {
+    static boolean isPrivateOrLocal(InetAddress address) {
+        if (address.isLoopbackAddress() || address.isSiteLocalAddress() || address.isLinkLocalAddress()
+                || address.isAnyLocalAddress()) {
             return true;
         }
-        // 172.16.0.0 – 172.31.255.255
-        if (ip.startsWith("172.")) {
-            try {
-                int second = Integer.parseInt(ip.split("\\.")[1]);
-                if (second >= 16 && second <= 31) return true;
-            } catch (Exception ignored) {}
-        }
-        return false;
-    }
-
-    /**
-     * Clear the cache (useful for testing or admin operations).
-     */
-    public void clearCache() {
-        cache.clear();
+        byte[] bytes = address.getAddress();
+        // IPv6 unique local addresses fc00::/7 (Java reports them as neither site- nor link-local)
+        return bytes.length == 16 && (bytes[0] & 0xFE) == 0xFC;
     }
 }

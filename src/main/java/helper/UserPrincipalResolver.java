@@ -37,6 +37,13 @@ public class UserPrincipalResolver {
     @Inject
     RequestUserCache requestUserCache;
 
+    /** Reports each user/country change once per hour instead of on every request. */
+    private final com.github.benmanes.caffeine.cache.Cache<String, Boolean> reportedCountryChanges =
+            com.github.benmanes.caffeine.cache.Caffeine.newBuilder()
+                    .expireAfterWrite(java.time.Duration.ofHours(1))
+                    .maximumSize(10_000)
+                    .build();
+
     public User resolveUser() {
         if (identity.isAnonymous()) {
             return null;
@@ -86,9 +93,9 @@ public class UserPrincipalResolver {
     }
 
     /**
-     * If the user's current IP resolves to a different country than the one
-     * recorded at login time, the auth token may have been stolen.
-     * Throws 401 to force re-login.
+     * Logs when a request comes from another country than the last login. This is
+     * only an audit signal: mobile networks, VPNs and travel change countries all
+     * the time, so it never ends the session.
      */
     private void checkCountryMismatch(User user) {
         if (user == null) return;
@@ -99,23 +106,15 @@ public class UserPrincipalResolver {
         }
 
         String currentIp = ipCapture.getClientIp();
-        if (currentIp == null || "unknown".equals(currentIp)
-                || geoIPService == null) return;
+        if (currentIp == null || "unknown".equals(currentIp)) return;
 
         String currentCountry = geoIPService.getCountry(currentIp);
-        if (currentCountry == null || "Unknown".equals(currentCountry)
-                || "Local".equals(currentCountry)) return;
+        if ("Unknown".equals(currentCountry) || "Local".equals(currentCountry)) return;
 
-        if (!currentCountry.equals(savedCountry)) {
-            log.warning("SECURITY: Country mismatch for user '" + user.getUserName()
-                    + "'. Last login: " + savedCountry
-                    + ", current: " + currentCountry
-                    + " (IP: " + currentIp + "). Possible token theft — logging out.");
-            throw new jakarta.ws.rs.WebApplicationException(
-                jakarta.ws.rs.core.Response.status(401)
-                        .entity("{\"status\":\"error\",\"message\":\"Sicherheitswarnung: Deine Sitzung wurde aus Sicherheitsgründen beendet. Bitte melde dich erneut an.\"}")
-                        .build()
-            );
+        if (!currentCountry.equals(savedCountry)
+                && reportedCountryChanges.asMap().putIfAbsent(user.getId() + "|" + currentCountry, Boolean.TRUE) == null) {
+            log.warning("SECURITY: Country change for user " + user.getId()
+                    + ". Last login: " + savedCountry + ", current: " + currentCountry + ".");
         }
     }
 }

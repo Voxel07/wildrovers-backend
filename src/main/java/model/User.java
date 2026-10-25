@@ -585,6 +585,11 @@ public class User {
         this.tokenVersion = tokenVersion;
     }
 
+    /** True when the account is bound to an Authentik identity; Authentik then owns its role. */
+    public boolean isOidcLinked() {
+        return oidcSubject != null;
+    }
+
     /** Invalidates every local JWT issued for this account so far. */
     public void revokeTokens() {
         this.tokenVersion = getTokenVersion() + 1;

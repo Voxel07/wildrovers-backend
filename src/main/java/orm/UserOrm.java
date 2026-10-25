@@ -28,8 +28,8 @@ import orm.Secrets.SecretOrm;
 import tools.Email;
 import tools.GeoIPService;
 import tools.NotificationService;
+import helper.AccountSnapshotCache;
 import helper.RequestIpCapture;
-import resources.JWT;
 import tools.Time;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -65,6 +65,12 @@ public class UserOrm {
 
     @Inject
     NotificationService notificationService;
+
+    @Inject
+    AccountSnapshotCache accountSnapshots;
+
+    /** Verified when the account does not exist, so a miss costs as much time as a wrong password. */
+    private static final String DUMMY_PASSWORD_HASH = BcryptUtil.bcryptHash(java.util.UUID.randomUUID().toString());
 
     @ConfigProperty(name = "app.frontend-url", defaultValue = "http://localhost:5173")
     String frontendUrl;
@@ -381,6 +387,7 @@ public class UserOrm {
         }
         if (changed) {
             teamMembersCache.invalidateAll().await().indefinitely();
+            accountSnapshots.invalidate(user.getId());
         }
         return new OidcResolution(user, null);
     }
@@ -510,64 +517,42 @@ public class UserOrm {
 
     @Transactional
     @CacheInvalidateAll(cacheName = "team-members")
-    public String updateUser(User u) {
+    public Response updateUser(User u) {
         log.info("UserOrm/updateUser");
 
-        boolean error = false;
-        String errorMSG = "";
-
-        TypedQuery<User> query = em.createQuery(
-                "SELECT u FROM User u WHERE u.userName =: UserName OR u.email =: Email OR u.id =: Id", User.class);
-
-        query.setParameter("UserName", u.getUserName());
-        query.setParameter("Email", u.getEmail());
-        query.setParameter("Id", u.getId());
-
-        List<User> userAusDB = query.getResultList();
-        if (userAusDB == null || userAusDB.isEmpty()) {
-            return "Keinen Nutzer mit diesen Daten gefunden";
-        }
-
-        User dbUser = null;
-        for (User aktUser : userAusDB) {
-            if (aktUser.getId().equals(u.getId())) {
-                dbUser = aktUser;
-                break;
-            }
-        }
-
+        User dbUser = em.find(User.class, u.getId());
         if (dbUser == null) {
-            return "Keinen Nutzer mit diesen Daten gefunden";
+            return Response.status(Response.Status.NOT_FOUND).entity("Keinen Nutzer mit diesen Daten gefunden").build();
+        }
+        if (u.getUserName() == null || u.getUserName().isBlank() || u.getEmail() == null || u.getEmail().isBlank()) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Benutzername und E-Mail müssen gesetzt sein").build();
         }
 
-        // Check all users in database to detect duplicate username/email conflicts.
-        for (User aktUser : userAusDB) {
-            // Überprüfen ob die ID die gleiche ist.
-            if (!aktUser.getId().equals(u.getId()) && !error) {
-                if (aktUser.getUserName().equals(u.getUserName())) {
-                    error = true;
-                    errorMSG = "Username bereits vergeben";
-                }
-                // Oder die Email
-                else if (aktUser.getEmail().equals(u.getEmail())) {
-                    error = true;
-                    errorMSG = "Email bereits vergeben";
-                }
-            }
+        List<User> conflicts = em.createQuery(
+                "SELECT u FROM User u WHERE (u.userName = :userName OR u.email = :email) AND u.id <> :id", User.class)
+                .setParameter("userName", u.getUserName())
+                .setParameter("email", u.getEmail())
+                .setParameter("id", u.getId())
+                .getResultList();
+        for (User other : conflicts) {
+            String message = u.getUserName().equals(other.getUserName())
+                    ? "Username bereits vergeben" : "Email bereits vergeben";
+            return Response.status(Response.Status.CONFLICT).entity(message).build();
         }
 
-        if (error)
-            return errorMSG; // Return the specific reason.
+        // Authentik owns the role of linked accounts and would overwrite a change made here at the next login.
+        if (dbUser.isOidcLinked() && u.getRole() != null && !u.getRole().isBlank()
+                && !u.getRole().equals(dbUser.getRole())) {
+            return Response.status(Response.Status.CONFLICT)
+                    .entity("Die Rolle dieses Benutzers wird über Authentik-Gruppen verwaltet und kann hier nicht geändert werden.")
+                    .build();
+        }
+        if (u.getRole() != null && !u.getRole().isBlank() && !model.Users.Roles.getRoles().contains(u.getRole())) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Unbekannte Rolle").build();
+        }
 
-        // No unique values are harmed, so the first and only entry in the list has to
-        // be the correct one.
         if (!u.getUserName().equals(dbUser.getUserName())) {
-            try {
-                forumCategoryOrm.invalidateCategoryCaches();
-            } catch (Exception e) {
-
-                return "Fehler beim Invalidate der Kategorien-Caches" + e.toString();
-            }
+            forumCategoryOrm.invalidateCategoryCaches();
             // Topics, Posts, and Answers reference the User entity via JPA FK relations,
             // so they automatically reflect the updated username — no manual update needed.
         }
@@ -619,49 +604,45 @@ public class UserOrm {
                 }
             }
         }
-        try {
-            em.merge(dbUser);
-            errorMSG = "User erfolgreich aktualisiert";
-        } catch (Exception e) {
-            errorMSG = "Fehler beim Updaten des User";
-        }
-
-        return errorMSG;
+        accountSnapshots.invalidate(dbUser.getId());
+        return Response.ok(jakarta.json.Json.createObjectBuilder()
+                .add("status", "success")
+                .add("message", "User erfolgreich aktualisiert")
+                .build()).build();
     }
 
+    /** Outcome of a password login: either the account or the error response to return. */
+    public record LoginResult(User user, Response error) { }
+
     @Transactional
-    public Response loginUser(User usr) {
-        log.info("UserOrm/loginUser");
-        if (usr == null || (usr.getUserName() == null && usr.getEmail() == null))
-            return Response.status(401).entity("Gib was an").build();
-        if (usr.getPassword() == null)
-            return Response.status(401).entity("Password nicht gesetzt").build();
-
-        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val1",
-                User.class);
-        query.setParameter("val1", usr.getUserName() != null ? usr.getUserName() : usr.getEmail());
-
-        // Find user in DB
-        User user;
-        try {
-            user = query.getSingleResult();
-        } catch (Exception e) {
-            log.info("Kein user gefunden");
-            return Response.status(401).entity("Benutzername oder Passwort falsch").build();
+    public LoginResult authenticateLocal(User usr) {
+        log.info("UserOrm/authenticateLocal");
+        if (usr == null || (usr.getUserName() == null && usr.getEmail() == null) || usr.getPassword() == null) {
+            return new LoginResult(null, Response.status(Response.Status.BAD_REQUEST)
+                    .entity("Bitte Benutzername/E-Mail und Passwort eingeben.").build());
         }
 
-        // Always verify the password before revealing account state. This prevents
-        // login attempts from being used to enumerate registered/unverified users.
-        try {
-            String storedPasswordHash = user.getSecret() != null ? user.getSecret().getPassword() : null;
-            if (storedPasswordHash == null || !verifyBCryptPassword(storedPasswordHash, usr.getPassword())) {
-                log.info("Falsches PW");
-                return Response.status(401).entity("Benutzername oder Passwort falsch").build();
+        List<User> found = em.createQuery("SELECT u FROM User u WHERE u.userName = :val OR u.email = :val", User.class)
+                .setParameter("val", usr.getUserName() != null ? usr.getUserName() : usr.getEmail())
+                .setMaxResults(1)
+                .getResultList();
+        User user = found.isEmpty() ? null : found.get(0);
 
-            }
+        // Always verify a password hash before revealing anything: unknown accounts are
+        // checked against a dummy hash so the response time does not reveal them, and
+        // account state is only disclosed to callers who know the password.
+        String storedPasswordHash = user != null && user.getSecret() != null ? user.getSecret().getPassword() : null;
+        boolean passwordMatches;
+        try {
+            passwordMatches = verifyBCryptPassword(
+                    storedPasswordHash != null ? storedPasswordHash : DUMMY_PASSWORD_HASH, usr.getPassword())
+                    && storedPasswordHash != null;
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
-            return invalidCredentialsResponse();
+            log.log(Level.SEVERE, "Password verification failed", e);
+            passwordMatches = false;
+        }
+        if (!passwordMatches) {
+            return new LoginResult(null, invalidCredentialsResponse());
         }
 
         if (!Boolean.TRUE.equals(user.getSecret().getIsVerifyed())) {
@@ -669,31 +650,30 @@ public class UserOrm {
                     .add("code", "ACCOUNT_NOT_VERIFIED")
                     .add("message", "Bitte verifiziere dein Konto")
                     .build();
-            return Response.status(401).entity(response).build();
+            return new LoginResult(null, Response.status(401).entity(response).build());
         }
 
         if (!helper.AccountStatus.isUsable(user)) {
-            return Response.status(403).entity(helper.AccountStatus.BLOCKED_MESSAGE).build();
+            return new LoginResult(null, Response.status(403)
+                    .header(helper.AccountStatus.STATUS_HEADER, helper.AccountStatus.STATUS_DENIED)
+                    .entity(helper.AccountStatus.BLOCKED_MESSAGE).build());
         }
 
-        user.setLastLogin(Time.currentTimeInMillis());
+        recordLogin(user);
+        return new LoginResult(user, null);
+    }
 
-        // Save IP and country for session hijacking detection
+    /** Stores login time, IP and (when a local GeoIP database is configured) country. */
+    @Transactional
+    public void recordLogin(User user) {
+        User managed = em.contains(user) ? user : em.find(User.class, user.getId());
+        if (managed == null) return;
+        managed.setLastLogin(Time.currentTimeInMillis());
         String clientIp = ipCapture.getClientIp();
-        user.setLastLoginIp(clientIp);
+        managed.setLastLoginIp(clientIp);
         if (clientIp != null && !"unknown".equals(clientIp)) {
-            String country = geoIPService.getCountry(clientIp);
-            user.setLastLoginCountry(country);
-            log.info("Login from IP: " + clientIp + " country: " + country);
+            managed.setLastLoginCountry(geoIPService.getCountry(clientIp));
         }
-
-        em.merge(user);
-
-        // Return cookie and Auth Object
-        /* For now there is no refresh token */
-        String token = JWT.generator(user);
-        JsonObject reactAuthObject = JWT.createReactAuthObject(token, user);
-        return Response.status(200).entity(reactAuthObject).build();
     }
 
     @Transactional
@@ -756,18 +736,16 @@ public class UserOrm {
     }
 
     /**
-     * Ends all sessions of a locally authenticated account by invalidating every
-     * JWT issued for it so far. OIDC sessions are ended at the identity provider.
+     * Ends every session of the account on every device: access tokens carry the
+     * token version, refresh sessions are checked against it.
      */
     @Transactional
-    public Response logoutUser(Long userId) {
-        if (userId != null) {
-            User user = em.find(User.class, userId);
-            if (user != null) {
-                user.revokeTokens();
-            }
+    public void revokeAllSessions(Long userId) {
+        User user = userId != null ? em.find(User.class, userId) : null;
+        if (user != null) {
+            user.revokeTokens();
+            accountSnapshots.invalidate(userId);
         }
-        return Response.noContent().build();
     }
 
     public static boolean verifyBCryptPassword(String bCryptPasswordHash, String passwordToVerify)
@@ -890,6 +868,7 @@ public class UserOrm {
         @CacheInvalidateAll(cacheName = "galleries-by-id")
     })
     public Response deleteUserWithOptions(Long userId, boolean deleteAccount, boolean deleteEvents, boolean deletePosts, boolean deleteGallery, boolean hardDelete) {
+        accountSnapshots.invalidate(userId);
         log.info("UserOrm/deleteUserWithOptions: " + userId + " (account=" + deleteAccount + ", events=" + deleteEvents + ", posts=" + deletePosts + ", gallery=" + deleteGallery + ")");
         User user = em.find(User.class, userId);
         if (user == null) {
@@ -1123,6 +1102,7 @@ public class UserOrm {
         if (user != null) {
             user.setRole(role);
             em.merge(user);
+            accountSnapshots.invalidate(userId);
         }
     }
 

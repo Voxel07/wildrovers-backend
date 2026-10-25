@@ -11,10 +11,8 @@ import io.smallrye.jwt.auth.principal.JWTParser;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.inject.Inject;
-import model.User;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.jwt.JsonWebToken;
-import orm.UserOrm;
 import resources.JWT;
 
 import java.nio.file.Files;
@@ -37,30 +35,30 @@ public class LocalJwtIdentityService {
     String publicKeyPath;
 
     @Inject
-    UserOrm userOrm;
+    AccountSnapshotCache accounts;
 
     @ActivateRequestContext
     public SecurityIdentity authenticate(String token) {
         try {
             JsonWebToken jwt = getParser().parse(token);
             Long userId = parseUserId(jwt.getSubject());
-            User user = userId != null ? userOrm.findById(userId) : null;
-            if (!AccountStatus.isUsable(user)) {
+            AccountSnapshotCache.Snapshot account = accounts.get(userId);
+            if (account == null || !account.usable()) {
                 log.warning("LocalJwtAuth: rejecting token of disabled or unknown account " + userId);
                 throw new AuthenticationFailedException();
             }
             Integer tokenVersion = asInteger(jwt.getClaim(JWT.TOKEN_VERSION_CLAIM));
-            if (tokenVersion == null || tokenVersion != user.getTokenVersion()) {
+            if (tokenVersion == null || tokenVersion != account.tokenVersion()) {
                 log.info("LocalJwtAuth: rejecting revoked token of account " + userId);
                 throw new AuthenticationFailedException();
             }
 
             return QuarkusSecurityIdentity.builder()
                     .setPrincipal(jwt)
-                    .addRoles(Set.of(user.getRole()))
+                    .addRoles(Set.of(account.role()))
                     .addCredential(new TokenCredential(token, "Bearer"))
                     .addAttribute("local-jwt", Boolean.TRUE)
-                    .addAttribute(AccountStatus.USER_ID_ATTRIBUTE, user.getId())
+                    .addAttribute(AccountStatus.USER_ID_ATTRIBUTE, account.id())
                     .build();
         } catch (AuthenticationFailedException e) {
             throw e;

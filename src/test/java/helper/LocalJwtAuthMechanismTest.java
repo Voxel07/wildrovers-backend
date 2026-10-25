@@ -34,12 +34,12 @@ class LocalJwtAuthMechanismTest {
         String token = given()
                 .contentType(ContentType.JSON)
                 .body("{\"userName\":\"localLoginUser\",\"password\":\"test1234\"}")
-                .post("/user/login")
+                .header("X-Requested-With", "test").post("/auth/login")
                 .then().statusCode(200)
-                .extract().path("JWT");
+                .extract().cookie("wr_at");
 
         given()
-                .header("Authorization", "Bearer " + token)
+                .cookie("wr_at", token)
                 .get("/user/me")
                 .then().statusCode(200)
                 .body("userName", equalTo("localLoginUser"));

@@ -56,6 +56,17 @@ services:
       NOTIFICATION_WEBHOOK_ENCRYPTION_KEY: "${NOTIFICATION_WEBHOOK_ENCRYPTION_KEY:?Set NOTIFICATION_WEBHOOK_ENCRYPTION_KEY in .env}"
       # Required: stable key for signed forum image URLs (prod refuses to start without it).
       FORUM_IMAGE_SIGNING_KEY: "${FORUM_IMAGE_SIGNING_KEY:?Set FORUM_IMAGE_SIGNING_KEY in .env}"
+      # Required: encrypts the Authentik refresh tokens stored with each browser session.
+      AUTH_SESSION_ENCRYPTION_KEY: "${AUTH_SESSION_ENCRYPTION_KEY:?Set AUTH_SESSION_ENCRYPTION_KEY in .env}"
+      # Browser login: client id and exact redirect URI the frontend uses (VITE_OIDC_CLIENT_ID / VITE_OIDC_REDIRECT_URI).
+      AUTHENTIK_FRONTEND_CLIENT_ID: "${AUTHENTIK_FRONTEND_CLIENT_ID:-${VITE_OIDC_CLIENT_ID}}"
+      AUTHENTIK_FRONTEND_CLIENT_SECRET: "${AUTHENTIK_FRONTEND_CLIENT_SECRET:-}"
+      OIDC_REDIRECT_URI: "${OIDC_REDIRECT_URI:-${VITE_OIDC_REDIRECT_URI}}"
+      # Session cookies; Strict needs frontend and API on the same registrable domain.
+      AUTH_COOKIE_SAME_SITE: "${AUTH_COOKIE_SAME_SITE:-Strict}"
+      AUTH_COOKIE_DOMAIN: "${AUTH_COOKIE_DOMAIN:-}"
+      # Optional: local MaxMind GeoLite2 Country database for login-country tracking.
+      GEOIP_DATABASE_PATH: "${GEOIP_DATABASE_PATH:-}"
       # Optional: Authentik group names (comma-separated) mapped to application roles.
       APP_OIDC_GROUPS_ADMIN: "${APP_OIDC_GROUPS_ADMIN:-Admin}"
       APP_OIDC_GROUPS_VORSTAND: "${APP_OIDC_GROUPS_VORSTAND:-Vorstand}"

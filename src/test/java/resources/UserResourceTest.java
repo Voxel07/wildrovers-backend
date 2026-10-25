@@ -84,9 +84,9 @@ class UserResourceTest {
         // 1. Login to get cookie
         io.restassured.response.Response loginResp = given().contentType(ContentType.JSON)
                 .body("{\"userName\":\"testBesucher\",\"password\":\"test1234\"}")
-                .post("/user/login");
+                .header("X-Requested-With", "test").post("/auth/login");
         loginResp.then().statusCode(200);
-        String token = loginResp.jsonPath().getString("JWT");
+        String token = loginResp.getCookie("wr_at");
 
         // 2. Change username to an existing one (should fail)
         given().contentType(ContentType.JSON).header("Authorization", "Bearer " + token)
@@ -101,30 +101,30 @@ class UserResourceTest {
         // 4. Try to login with old username (should fail)
         given().contentType(ContentType.JSON)
                 .body("{\"userName\":\"testBesucher\",\"password\":\"test1234\"}")
-                .post("/user/login").then().statusCode(401);
+                .header("X-Requested-With", "test").post("/auth/login").then().statusCode(401);
 
         // 5. Try to login with new username (should succeed)
         given().contentType(ContentType.JSON)
                 .body("{\"userName\":\"newBesucher\",\"password\":\"test1234\"}")
-                .post("/user/login").then().statusCode(200);
+                .header("X-Requested-With", "test").post("/auth/login").then().statusCode(200);
     }
 
     // Misc
     @Test void teamMembers() { given().get("/user/members").then().statusCode(200); }
     @Test void photo404() { given().get("/user/photo/99999").then().statusCode(404); }
     @Test void bg404() { given().get("/user/background/99999").then().statusCode(404); }
-    @Test void loginMissing() { given().contentType(ContentType.JSON).body("{\"userName\":\"x\"}").post("/user/login").then().statusCode(401); }
+    @Test void loginMissing() { given().contentType(ContentType.JSON).body("{\"userName\":\"x\"}").header("X-Requested-With", "test").post("/auth/login").then().statusCode(400); }
 
     @Test
     void unverifiedAccountCanOnlyResendAfterValidCredentials() {
         given().contentType(ContentType.JSON)
                 .body("{\"userName\":\"unverifiedUser\",\"password\":\"wrong-password\"}")
-                .post("/user/login")
-                .then().statusCode(401).body(equalTo("Benutzername oder Passwort falsch"));
+                .header("X-Requested-With", "test").post("/auth/login")
+                .then().statusCode(401).body("message", equalTo("Benutzername oder Passwort falsch"));
 
         given().contentType(ContentType.JSON)
                 .body("{\"userName\":\"unverifiedUser\",\"password\":\"correct-password\"}")
-                .post("/user/login")
+                .header("X-Requested-With", "test").post("/auth/login")
                 .then().statusCode(401)
                 .body("code", equalTo("ACCOUNT_NOT_VERIFIED"))
                 .body("message", equalTo("Bitte verifiziere dein Konto"));
@@ -132,7 +132,7 @@ class UserResourceTest {
         given().contentType(ContentType.JSON)
                 .body("{\"userName\":\"unverifiedUser\",\"password\":\"wrong-password\"}")
                 .post("/user/resend-verification")
-                .then().statusCode(401).body(equalTo("Benutzername oder Passwort falsch"));
+                .then().statusCode(401).body("message", equalTo("Benutzername oder Passwort falsch"));
         assertEquals(0, mailbox.getMailsSentTo("unverified@test.local").size());
 
         given().contentType(ContentType.JSON)
@@ -143,7 +143,7 @@ class UserResourceTest {
         assertEquals(1, mailbox.getMailsSentTo("unverified@test.local").size());
     }
 
-    @Test void logout() { given().contentType(ContentType.JSON).post("/user/logout").then().statusCode(204); }
+    @Test void logout() { given().header("X-Requested-With", "test").post("/auth/logout").then().statusCode(204); }
 
     // ── Vorstand cannot modify Admin users ─────────────────────────────────
     // Note: Under @TestSecurity (no real JWT), resolveUser() returns null,
@@ -185,11 +185,12 @@ class UserResourceTest {
 
     @Test @TestSecurity(user="testAdmin",roles={"Admin"})
     void admin_can_block_another_admin() {
-        try {
+        // Committed before the request: the old version swallowed the failing insert and only
+        // passed because updating an unknown user used to answer 200.
+        io.quarkus.narayana.jta.QuarkusTransaction.requiringNew().run(() -> {
             em.createNativeQuery("INSERT INTO \"USER\" (id,email,userName,password,firstName,lastName,role,isActive,regestrationDate,canCreateCategory,isBlocked) VALUES (200,'admin2@test.local','testAdmin2','test1234','Admin2','Test','Admin',true,0,true,false)").executeUpdate();
             em.createNativeQuery("INSERT INTO \"SECRET\" (id,password,isVerifyed,verificationId,user_id) VALUES (200,'test1234',true,'v-a2',200)").executeUpdate();
-            em.flush();
-        } catch (Exception ignored) {}
+        });
 
         given().contentType(ContentType.JSON)
             .body("{\"id\":200,\"userName\":\"testAdmin2\",\"email\":\"admin2@test.local\",\"firstName\":\"Admin2\",\"lastName\":\"Test\",\"role\":\"Admin\",\"isActive\":true,\"isBlocked\":true}")

@@ -43,17 +43,21 @@ public class EventOrm {
         }
     }
 
+    /** Loads creator, attendances and their users in the same query (no select per event). */
+    private static final String WITH_ATTENDANCES =
+            "SELECT DISTINCT e FROM Event e LEFT JOIN FETCH e.creator LEFT JOIN FETCH e.attendances a LEFT JOIN FETCH a.user";
+
     public List<Event> getAllEvents() {
         log.info("EventOrm/getAllEvents");
-        TypedQuery<Event> query = em.createQuery("SELECT e FROM Event e LEFT JOIN FETCH e.creator ORDER BY e.eventDate ASC", Event.class);
+        TypedQuery<Event> query = em.createQuery(WITH_ATTENDANCES + " ORDER BY e.eventDate ASC", Event.class);
         return query.getResultList();
     }
 
     /** Events starting in [from, to). */
     public List<Event> getEventsBetween(LocalDateTime from, LocalDateTime to) {
         log.info("EventOrm/getEventsBetween " + from + " - " + to);
-        return em.createQuery("SELECT e FROM Event e LEFT JOIN FETCH e.creator "
-                        + "WHERE e.eventDate >= :from AND e.eventDate < :to ORDER BY e.eventDate ASC", Event.class)
+        return em.createQuery(WITH_ATTENDANCES
+                        + " WHERE e.eventDate >= :from AND e.eventDate < :to ORDER BY e.eventDate ASC", Event.class)
                 .setParameter("from", from)
                 .setParameter("to", to)
                 .getResultList();
@@ -74,15 +78,22 @@ public class EventOrm {
     public List<Event> getUpcomingEvents(int limit) {
         log.info("EventOrm/getUpcomingEvents limit=" + limit);
         LocalDateTime now = LocalDateTime.now(timeZone);
-        TypedQuery<Event> query = em.createQuery("SELECT e FROM Event e LEFT JOIN FETCH e.creator WHERE e.eventDate >= :now ORDER BY e.eventDate ASC", Event.class);
-        query.setParameter("now", now);
-        query.setMaxResults(limit);
-        return query.getResultList();
+        // Limit on ids first: a row limit on a collection fetch would page in memory.
+        List<Long> ids = em.createQuery("SELECT e.id FROM Event e WHERE e.eventDate >= :now ORDER BY e.eventDate ASC", Long.class)
+                .setParameter("now", now)
+                .setMaxResults(limit)
+                .getResultList();
+        if (ids.isEmpty()) {
+            return new java.util.ArrayList<>();
+        }
+        return em.createQuery(WITH_ATTENDANCES + " WHERE e.id IN :ids ORDER BY e.eventDate ASC", Event.class)
+                .setParameter("ids", ids)
+                .getResultList();
     }
 
     public Event getEventById(Long id) {
         log.info("EventOrm/getEventById: " + id);
-        TypedQuery<Event> query = em.createQuery("SELECT e FROM Event e LEFT JOIN FETCH e.creator WHERE e.id = :id", Event.class);
+        TypedQuery<Event> query = em.createQuery(WITH_ATTENDANCES + " WHERE e.id = :id", Event.class);
         query.setParameter("id", id);
         List<Event> results = query.getResultList();
         return results.isEmpty() ? null : results.get(0);
@@ -188,7 +199,7 @@ public class EventOrm {
     public Event getEventByForumPostId(Long postId) {
         log.info("EventOrm/getEventByForumPostId: " + postId);
         TypedQuery<Event> query = em.createQuery(
-                "SELECT e FROM Event e LEFT JOIN FETCH e.creator WHERE e.forumPostId = :postId", Event.class);
+                WITH_ATTENDANCES + " WHERE e.forumPostId = :postId", Event.class);
         query.setParameter("postId", postId);
         List<Event> results = query.getResultList();
         return results.isEmpty() ? null : results.get(0);

@@ -133,6 +133,12 @@
       <groupId>io.quarkiverse.vault</groupId>
       <artifactId>quarkus-vault</artifactId>
     </dependency>
+    <!-- Offline IP-to-country lookups (MaxMind GeoLite2), replaces calls to ip-api.com -->
+    <dependency>
+      <groupId>com.maxmind.geoip2</groupId>
+      <artifactId>geoip2</artifactId>
+      <version>4.3.0</version>
+    </dependency>
     <dependency>
       <groupId>com.googlecode.owasp-java-html-sanitizer</groupId>
       <artifactId>owasp-java-html-sanitizer</artifactId>

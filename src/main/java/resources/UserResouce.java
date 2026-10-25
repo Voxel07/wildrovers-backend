@@ -76,15 +76,22 @@ public class UserResouce {
     @Inject
     Validator validator;
 
+    /**
+     * The current account. Activity counters cost five queries, so they are only
+     * computed with {@code ?stats=true} (the profile page).
+     */
     @GET
     @Path("/me")
     @io.quarkus.security.Authenticated // disabled accounts get no roles; resolveUser() explains the 403
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getMe() {
+    public Response getMe(@QueryParam("stats") @DefaultValue("false") boolean stats) {
         log.info("UserResource/getMe");
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {
             return Response.status(401).entity("Benutzer nicht eingeloggt oder unbekannt").build();
+        }
+        if (!stats) {
+            return Response.ok(user).build();
         }
         user.setEventsAttended(userOrm.getEventsAttendedCount(user.getId()));
         user.setForumPostCount(userOrm.getForumPostCount(user.getId()));
@@ -135,18 +142,7 @@ public class UserResouce {
                 return Response.status(403).entity("Vorstand darf Admin-Benutzer weder bearbeiten noch ernennen.").build();
             }
         }
-        String result = userOrm.updateUser(user);
-        return Response.ok(result).build();
-    }
-
-    @POST
-    @Path("/login")
-    @PermitAll
-    @Produces(MediaType.APPLICATION_JSON)
-    @Consumes(MediaType.APPLICATION_JSON)
-    public Response login(User user) {
-        log.info("UserResource/login");
-        return userOrm.loginUser(user);
+        return userOrm.updateUser(user);
     }
 
     @POST
@@ -157,22 +153,6 @@ public class UserResouce {
     public Response resendVerification(User credentials) {
         log.info("UserResource/resendVerification");
         return userOrm.resendVerification(credentials);
-    }
-
-    @POST
-    @Path("/logout")
-    @PermitAll
-    @Produces(MediaType.APPLICATION_JSON)
-    @Consumes(MediaType.APPLICATION_JSON)
-    public Response logout() {
-        log.info("UserResource/logout");
-        Long userId = null;
-        try {
-            userId = userPrincipalResolver.resolveUserId();
-        } catch (jakarta.ws.rs.WebApplicationException e) {
-            // Disabled accounts have nothing left to revoke.
-        }
-        return userOrm.logoutUser(userId);
     }
 
     @PUT
@@ -504,21 +484,33 @@ public class UserResouce {
         boolean isTeamMember = currentUser != null
                 && model.Users.Roles.hasRequiredRole(currentUser.getRole(), model.Users.Roles.FRESHMAN);
         if (!isTeamMember) {
-            // Strip real names for non-team members — work on copies to avoid
-            // Hibernate validation failures on managed entities
-            List<PublicMember> stripped = new java.util.ArrayList<>();
-            for (User u : members) {
-                stripped.add(new PublicMember(u.getId(), u.getUserName(), u.getRole(),
-                        u.getPhotoUrl(), u.getBackgroundUrl(), u.getPhrase(), u.getRibbon()));
-            }
-            return Response.ok(stripped).build();
+            return Response.ok(members.stream().map(PublicMember::of).toList()).build();
         }
-        return Response.ok(members).build();
+        return Response.ok(members.stream().map(TeamMember::of).toList()).build();
     }
 
     /** Explicit public projection: adding a field to User can never leak it here. */
     public record PublicMember(Long id, String userName, String role, String photoUrl,
-            String backgroundUrl, String phrase, String ribbon) { }
+            String backgroundUrl, String phrase, String ribbon) {
+        static PublicMember of(User u) {
+            return new PublicMember(u.getId(), u.getUserName(), u.getRole(),
+                    u.getPhotoUrl(), u.getBackgroundUrl(), u.getPhrase(), u.getRibbon());
+        }
+    }
+
+    /**
+     * What team members see of each other. Contact details, login metadata
+     * (IP, country, times), block and fee status stay with the board.
+     */
+    public record TeamMember(Long id, String userName, String role, String firstName, String lastName,
+            String photoUrl, String backgroundUrl, String phrase, String ribbon, java.time.LocalDate birthday,
+            Long regDate, Integer visitedOps) {
+        static TeamMember of(User u) {
+            return new TeamMember(u.getId(), u.getUserName(), u.getRole(), u.getFirstName(), u.getLastName(),
+                    u.getPhotoUrl(), u.getBackgroundUrl(), u.getPhrase(), u.getRibbon(), u.getBirthday(),
+                    u.getRegDate(), u.getVisitedOps());
+        }
+    }
 
     private BufferedImage scaleImage(BufferedImage src, int maxDim) {
         int w = src.getWidth();

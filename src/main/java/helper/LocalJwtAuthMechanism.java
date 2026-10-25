@@ -7,6 +7,7 @@ import io.quarkus.vertx.http.runtime.security.ChallengeData;
 import io.quarkus.vertx.http.runtime.security.HttpAuthenticationMechanism;
 import io.quarkus.vertx.http.runtime.security.HttpCredentialTransport;
 import io.smallrye.mutiny.Uni;
+import io.vertx.core.http.Cookie;
 import io.vertx.ext.web.RoutingContext;
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -17,9 +18,13 @@ import java.util.Set;
 /**
  * Routes locally-signed JWTs to a dedicated identity provider. Database access
  * happens there on a worker thread; OIDC tokens continue to the OIDC mechanism.
+ * Browsers send the token in the HttpOnly {@link AuthCookies#ACCESS_COOKIE}
+ * cookie; API clients may still send it as a bearer token.
  */
 @ApplicationScoped
 public class LocalJwtAuthMechanism implements HttpAuthenticationMechanism {
+
+    private static final Set<String> SESSION_ENDPOINTS = Set.of("/auth/login", "/auth/oidc", "/auth/refresh", "/auth/logout");
 
     @Override
     public int getPriority() {
@@ -28,13 +33,19 @@ public class LocalJwtAuthMechanism implements HttpAuthenticationMechanism {
 
     @Override
     public Uni<SecurityIdentity> authenticate(RoutingContext context, IdentityProviderManager identityProviderManager) {
+        String token = null;
         String authHeader = context.request().getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return Uni.createFrom().nullItem();
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7).trim();
+        } else if (!SESSION_ENDPOINTS.contains(context.normalizedPath())) {
+            // The session endpoints work from the refresh cookie; an expired access
+            // cookie must not turn them into a 401.
+            Cookie cookie = context.request().getCookie(AuthCookies.ACCESS_COOKIE);
+            if (cookie != null && !cookie.getValue().isBlank()) {
+                token = cookie.getValue();
+            }
         }
-
-        String token = authHeader.substring(7).trim();
-        if (!isWildroversToken(token)) {
+        if (token == null || !isWildroversToken(token)) {
             return Uni.createFrom().nullItem();
         }
 

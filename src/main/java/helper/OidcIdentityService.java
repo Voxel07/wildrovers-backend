@@ -29,6 +29,19 @@ public class OidcIdentityService {
     @Inject
     OidcRoleMapper roleMapper;
 
+    @Inject
+    AccountSnapshotCache accountSnapshots;
+
+    /**
+     * issuer|subject|mapped role → account id. A hit skips the transactional
+     * resolution (and its possible writes); a changed group mapping is a new key.
+     */
+    private final com.github.benmanes.caffeine.cache.Cache<String, Long> bindings =
+            com.github.benmanes.caffeine.cache.Caffeine.newBuilder()
+                    .expireAfterWrite(java.time.Duration.ofSeconds(60))
+                    .maximumSize(10_000)
+                    .build();
+
     @ActivateRequestContext
     public SecurityIdentity bind(SecurityIdentity identity) {
         if (!(identity.getPrincipal() instanceof JsonWebToken jwt)) {
@@ -59,6 +72,24 @@ public class OidcIdentityService {
                 stringClaim(jwt, "family_name"));
         String mappedRole = roleMapper.mapToRole(identity.getRoles());
 
+        QuarkusSecurityIdentity.Builder builder = QuarkusSecurityIdentity.builder()
+                .setPrincipal(jwt)
+                .addCredentials(identity.getCredentials())
+                .addAttributes(identity.getAttributes());
+
+        String bindingKey = issuer + "|" + subject + "|" + mappedRole;
+        Long boundId = bindings.getIfPresent(bindingKey);
+        AccountSnapshotCache.Snapshot snapshot = boundId != null ? accountSnapshots.get(boundId) : null;
+        if (snapshot != null) {
+            builder.addAttribute(AccountStatus.USER_ID_ATTRIBUTE, snapshot.id());
+            if (snapshot.usable()) {
+                builder.addRole(snapshot.role());
+            } else {
+                builder.addAttribute(AccountStatus.DENIED_ATTRIBUTE, AccountStatus.BLOCKED_MESSAGE);
+            }
+            return builder.build();
+        }
+
         UserOrm.OidcResolution resolution;
         try {
             resolution = userOrm.resolveOidcUser(profile, mappedRole);
@@ -67,17 +98,13 @@ public class OidcIdentityService {
             throw new AuthenticationFailedException(e);
         }
 
-        QuarkusSecurityIdentity.Builder builder = QuarkusSecurityIdentity.builder()
-                .setPrincipal(jwt)
-                .addCredentials(identity.getCredentials())
-                .addAttributes(identity.getAttributes());
-
         User user = resolution.user();
         if (user == null) {
             builder.addAttribute(AccountStatus.DENIED_ATTRIBUTE, resolution.problem());
             return builder.build();
         }
         builder.addAttribute(AccountStatus.USER_ID_ATTRIBUTE, user.getId());
+        bindings.put(bindingKey, user.getId());
         if (AccountStatus.isUsable(user)) {
             builder.addRole(user.getRole());
         } else {

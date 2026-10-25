@@ -31,7 +31,17 @@ public class SecretRecource {
     @Inject SecretOrm secretOrm;
     @Inject orm.UserOrm userOrm;
     @Inject jakarta.persistence.EntityManager em;
-    @Inject tools.Email email;
+    @Inject tools.AsyncMail asyncMail;
+    @Inject helper.AccountSnapshotCache accountSnapshots;
+    @Inject orm.AuthSessionOrm authSessions;
+
+    @org.eclipse.microprofile.config.inject.ConfigProperty(name = "app.password-reset.ttl", defaultValue = "30m")
+    java.time.Duration resetTokenTtl;
+
+    private static Response json(Response.Status status, String state, String message) {
+        return Response.status(status).entity(jakarta.json.Json.createObjectBuilder()
+                .add("status", state).add("message", message).build()).build();
+    }
 
     public static class VerificationRequest {
         public String email;
@@ -54,12 +64,9 @@ public class SecretRecource {
 
         String result = secretOrm.verifyUser(request.email, request.code);
         if ("Erfolgreich validiert".equals(result)) {
-            return Response.ok("{\"status\":\"success\", \"message\":\"Erfolgreich validiert\"}").build();
-        } else {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity("{\"status\":\"error\", \"message\":\"" + result + "\"}")
-                    .build();
+            return json(Response.Status.OK, "success", "Erfolgreich validiert");
         }
+        return json(Response.Status.BAD_REQUEST, "error", result);
     }
 
     @GET
@@ -96,32 +103,23 @@ public class SecretRecource {
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    @jakarta.transaction.Transactional
     public Response requestPasswordReset(ResetRequest request) {
-        log.info("SecretResource/requestPasswordReset for email: " + (request != null ? request.email : "null"));
+        log.info("SecretResource/requestPasswordReset");
 
         if (request == null || request.email == null || request.email.isBlank()) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity("{\"status\":\"error\", \"message\":\"E-Mail-Adresse muss ausgefüllt sein\"}")
-                    .build();
+            return json(Response.Status.BAD_REQUEST, "error", "E-Mail-Adresse muss ausgefüllt sein");
         }
 
-        model.User user = userOrm.findByEmail(request.email.trim());
-        if (user != null && user.getSecret() != null) {
-            String token = java.util.UUID.randomUUID().toString();
-            user.getSecret().setResetToken(SecretOrm.hashResetToken(token));
-            user.getSecret().setResetTokenTimestamp(tools.Time.currentTimeInMillis());
-            em.merge(user.getSecret());
-            try {
-                email.sendPasswordResetMail(user.getEmail(), token);
-            } catch (Exception e) {
-                log.log(java.util.logging.Level.SEVERE, "Fehler beim Senden der Passwort-Reset-E-Mail: " + e.getMessage(), e);
-            }
+        // The token is committed before the mail is queued; the mail goes out on a worker thread.
+        String recipient = request.email.trim();
+        String token = secretOrm.createResetToken(recipient);
+        if (token != null) {
+            asyncMail.passwordReset(recipient, token);
         }
 
         // Always return success to prevent email guessing
-        return Response.ok("{\"status\":\"success\", \"message\":\"Falls diese E-Mail-Adresse registriert ist, wurde ein Link zum Zurücksetzen des Passworts gesendet.\"}")
-                .build();
+        return json(Response.Status.OK, "success",
+                "Falls diese E-Mail-Adresse registriert ist, wurde ein Link zum Zurücksetzen des Passworts gesendet.");
     }
 
     @POST
@@ -150,10 +148,9 @@ public class SecretRecource {
         Long timestamp = secret.getResetTokenTimestamp();
         if (timestamp != null) {
             long elapsed = tools.Time.currentTimeInMillis() - timestamp;
-            if (elapsed > 5 * 60 * 1000) {
-                return Response.status(Response.Status.BAD_REQUEST)
-                        .entity("{\"status\":\"error\", \"message\":\"Dieser Reset-Link ist abgelaufen (max. 5 Minuten gültig).\"}")
-                        .build();
+            if (elapsed > resetTokenTtl.toMillis()) {
+                return json(Response.Status.BAD_REQUEST, "error",
+                        "Dieser Reset-Link ist abgelaufen (max. " + resetTokenTtl.toMinutes() + " Minuten gültig).");
             }
         } else {
             return Response.status(Response.Status.BAD_REQUEST)
@@ -168,6 +165,8 @@ public class SecretRecource {
         if (secret.getUser() != null) {
             // A reset proves the old credentials may be compromised: end every session.
             secret.getUser().revokeTokens();
+            accountSnapshots.invalidate(secret.getUser().getId());
+            authSessions.revokeAllForUser(secret.getUser().getId());
         }
         em.merge(secret);
 

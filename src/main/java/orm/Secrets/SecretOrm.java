@@ -98,6 +98,23 @@ public class SecretOrm {
         return "Erfolgreich validiert";
     }
 
+    /** Stores a new hashed reset token for the account with this e-mail; returns the raw token or null. */
+    @jakarta.transaction.Transactional
+    public String createResetToken(String email) {
+        java.util.List<model.User> users = em.createQuery("SELECT u FROM User u WHERE u.email = :email", model.User.class)
+                .setParameter("email", email)
+                .setMaxResults(1)
+                .getResultList();
+        if (users.isEmpty() || users.get(0).getSecret() == null) {
+            return null;
+        }
+        String token = java.util.UUID.randomUUID().toString();
+        Secret secret = users.get(0).getSecret();
+        secret.setResetToken(hashResetToken(token));
+        secret.setResetTokenTimestamp(tools.Time.currentTimeInMillis());
+        return token;
+    }
+
     public Secret findByResetToken(String token) {
         try {
             return em.createQuery("SELECT s FROM Secret s WHERE s.resetToken = :val", Secret.class)

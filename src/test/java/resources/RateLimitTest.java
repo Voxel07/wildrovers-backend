@@ -84,14 +84,14 @@ public class RateLimitTest {
             given()
                 .contentType(ContentType.JSON)
                 .body("{\"userName\":\"testBesucher\",\"password\":\"wrong\"}")
-                .post("/user/login")
+                .header("X-Requested-With", "test").post("/auth/login")
                 .then()
                 .statusCode(anyOf(is(200), is(401)));
         }
         given()
             .contentType(ContentType.JSON)
             .body("{\"userName\":\"testBesucher\",\"password\":\"wrong\"}")
-            .post("/user/login")
+            .header("X-Requested-With", "test").post("/auth/login")
             .then()
             .statusCode(429);
     }
