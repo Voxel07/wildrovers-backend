@@ -12,9 +12,7 @@ import jakarta.persistence.TypedQuery;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.core.Response;
 
-import java.util.logging.Level;
 //Logging
-import java.util.logging.Logger;
 
 //Time
 import tools.Time;
@@ -23,11 +21,12 @@ import tools.HtmlSanitizer;
 import model.User;
 import model.Forum.ForumCategory;
 import model.Forum.ForumTopic;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
+import tools.Telemetry;
 
 @ApplicationScoped
 public class ForumTopicOrm {
 
-    private static final Logger log = Logger.getLogger(ForumTopicOrm.class.getName());
     @Inject
     EntityManager em;
 
@@ -43,9 +42,9 @@ public class ForumTopicOrm {
 
 
     //Basic GET methods
+    @WithSpan
     public List<ForumTopic>getAllTopics()
     {
-        log.info("ForumTopicOrm/getTopics");
         TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft LEFT JOIN FETCH ft.category", ForumTopic.class);
         return query.getResultList();
     }
@@ -54,9 +53,9 @@ public class ForumTopicOrm {
      * Paged topic list for one reader. Only one filter is applied, in the order id, name, user,
      * category. Topics are listed in creation order.
      */
+    @WithSpan
     public ForumPage<ForumTopic> findTopics(Long topicId, String topicName, Long userId, Long categoryId,
             List<String> visibleRoles, Integer page, Integer size) {
-        log.info("ForumTopicOrm/findTopics");
         String filter = "";
         Object value = null;
         if (topicId != null) { filter = " AND ft.id = :val"; value = topicId; }
@@ -81,33 +80,33 @@ public class ForumTopicOrm {
         return new ForumPage<>(query.getResultList(), count.getSingleResult());
     }
 
+    @WithSpan
     public List<ForumTopic>getTopicById(Long topicId)
     {
-        log.info("ForumTopicOrm/getTopicById");
         TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft LEFT JOIN FETCH ft.category WHERE ft.id =: val", ForumTopic.class);
         query.setParameter("val", topicId);
         return query.getResultList();
     }
 
+    @WithSpan
     public List<ForumTopic>getTopicsByUser(Long userId)
     {
-        log.info("ForumTopicOrm/getTopicByUser");
         TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft LEFT JOIN FETCH ft.category WHERE ft.creator.id = :val", ForumTopic.class);
         query.setParameter("val", userId);
         return query.getResultList();
     }
 
+    @WithSpan
     public List<ForumTopic>getTopicsByCategory(Long categoryId)
     {
-        log.info("ForumTopicOrm/getTopicByCategory");
         TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft LEFT JOIN FETCH ft.category WHERE ft.category.id = :val", ForumTopic.class);
         query.setParameter("val", categoryId);
         return query.getResultList();
     }
 
+    @WithSpan
     public List<ForumTopic>getTopicsByTopic(String topic)
     {
-        log.info("ForumTopicOrm/getTopicsByTopic");
         TypedQuery<ForumTopic> query = em.createQuery("SELECT ft FROM ForumTopic ft WHERE topic =: val", ForumTopic.class);
         query.setParameter("val", topic);
         return query.getResultList();
@@ -175,8 +174,8 @@ public class ForumTopicOrm {
         - returns success or the error that accrued as a string
     */
     @Transactional
+    @WithSpan
     public Response addTopic(ForumTopic topic, Long categoryId, Long userId){
-        log.info("ForumTopicOrm/addTopic");
         // Sanitize topic name (plain text — no HTML allowed in topic titles)
         topic.setTopic(htmlSanitizer.sanitizeTitle(topic.getTopic()));
         // Check if Category exists. Loaded uncached: the cached instances are detached and shared.
@@ -184,7 +183,7 @@ public class ForumTopicOrm {
         if(forumCategory == null) return Response.status(404).entity("Kategorie nicht gefunden").build();
         //Check if Topic exists in this category
         if(topicNameTaken(topic.getTopic(), categoryId, null)){
-            log.warning("duplicate topic");
+            Telemetry.event("forum.topic.duplicate", "forum.category.id", categoryId);
             return Response.status(409).entity("Thema exestiert bereits in dieser Kategorie").build();
         }
 
@@ -194,7 +193,7 @@ public class ForumTopicOrm {
         //get corresponding user from db. Exit if not found
         User u = em.find(User.class, userId);
         if(u == null){
-            log.warning("User nicht in der DB gefunden");
+            Telemetry.warn("User not found", "user.id", userId);
             return Response.status(401).entity("User nicht gefunden").build();
         }
 
@@ -209,7 +208,7 @@ public class ForumTopicOrm {
         try {
             em.persist(topic);
         } catch (Exception e) {
-             log.log(Level.SEVERE, "Result{0}", e.getMessage());
+             Telemetry.error("Adding topic failed", e, "forum.category.id", categoryId, "user.id", userId);
             return Response.status(500).entity("Fehler beim erstellen des neuen Tehmas").build();
         }
         ForumCounters.adjust(em, "ForumCategory", "topicCount", categoryId, 1);
@@ -219,9 +218,8 @@ public class ForumTopicOrm {
      * Updates the topic name. Only the creator or an Admin may update a topic.
      */
     @Transactional
+    @WithSpan
     public Response updateTopic(ForumTopic forumTopic, Long userId){
-        log.info("ForumTopicOrm/updateTopic");
-
         User user = em.find(User.class, userId);
         if(user == null) return Response.status(401).entity("User nicht gefunden").build();
 
@@ -245,7 +243,7 @@ public class ForumTopicOrm {
         try{
             em.merge(forumTopicAusDB);
         }catch(Exception e){
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            Telemetry.error("Updating topic failed", e, "forum.topic.id", forumTopic.getId(), "user.id", userId);
             return Response.status(500).entity("Fehler beim updaten der Antwort").build();
         }
         return Response.status(200).entity("Thema erfolgreich aktualisert").build();
@@ -254,9 +252,8 @@ public class ForumTopicOrm {
      * Deletes a topic and all its nested posts/answers. Only the creator or an Admin may delete a topic.
      */
     @Transactional
+    @WithSpan
     public Response deleteTopic(ForumTopic forumTopic, Long userId){
-        log.info("ForumTopicOrm/deleteTopic");
-
         User user = em.find(User.class, userId);
         if(user == null) return Response.status(401).entity("User nicht gefunden").build();
         Long topicId = forumTopic.getId();
@@ -274,7 +271,7 @@ public class ForumTopicOrm {
             em.remove(forumTopicAusDB);
             ForumCounters.adjust(em, "ForumCategory", "topicCount", categoryId, -1);
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            Telemetry.error("Deleting topic failed", e, "forum.topic.id", forumTopic.getId(), "user.id", userId);
             return Response.status(500).entity("Fehler beim Löschen des Topics").build();
         }
 
@@ -285,9 +282,8 @@ public class ForumTopicOrm {
      * gets Called when a Topic is deleted so no need to update answer count
      */
     @Transactional
+    @WithSpan
     public String deleteAllTopicsFromCategory(Long categoryId){
-        log.info("ForumCategoryOrm/deleteAllTopicsFromCategory");
-
         //Get all answers that will be affected to Update the affected user.
         List<ForumTopic> allTopics = getTopicsByCategory(categoryId);
         HashMap<User, Long> map = new HashMap<User,Long>();
@@ -306,7 +302,7 @@ public class ForumTopicOrm {
         try {
             em.createQuery("DELETE FROM ForumTopic ft WHERE ft.category.id = :val").setParameter("val", categoryId).executeUpdate();
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            Telemetry.error("Deleting topics of category failed", e, "forum.category.id", categoryId);
             return "Fehler beim Löschen der Antworten";
         }
 

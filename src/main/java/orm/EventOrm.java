@@ -10,18 +10,18 @@ import java.time.ZoneId;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.logging.Logger;
 import model.Event;
 import model.User;
 import model.Forum.ForumPost;
 import orm.Forum.ForumPostOrm;
 import io.quarkus.cache.CacheResult;
 import io.quarkus.cache.CacheInvalidateAll;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
+import tools.Telemetry;
 
 @ApplicationScoped
 public class EventOrm {
 
-    private static final Logger log = Logger.getLogger(EventOrm.class.getName());
 
     @Inject
     EntityManager em;
@@ -47,15 +47,16 @@ public class EventOrm {
     private static final String WITH_ATTENDANCES =
             "SELECT DISTINCT e FROM Event e LEFT JOIN FETCH e.creator LEFT JOIN FETCH e.attendances a LEFT JOIN FETCH a.user";
 
+    @WithSpan
     public List<Event> getAllEvents() {
-        log.info("EventOrm/getAllEvents");
         TypedQuery<Event> query = em.createQuery(WITH_ATTENDANCES + " ORDER BY e.eventDate ASC", Event.class);
         return query.getResultList();
     }
 
     /** Events starting in [from, to). */
+    @WithSpan
     public List<Event> getEventsBetween(LocalDateTime from, LocalDateTime to) {
-        log.info("EventOrm/getEventsBetween " + from + " - " + to);
+        Telemetry.attrs("event.range.from", from, "event.range.to", to);
         return em.createQuery(WITH_ATTENDANCES
                         + " WHERE e.eventDate >= :from AND e.eventDate < :to ORDER BY e.eventDate ASC", Event.class)
                 .setParameter("from", from)
@@ -65,8 +66,8 @@ public class EventOrm {
 
     /** Years that have at least one event, ascending. */
     @CacheResult(cacheName = "event-years")
+    @WithSpan
     public List<Integer> getEventYears() {
-        log.info("EventOrm/getEventYears");
         return em.createQuery("SELECT DISTINCT EXTRACT(YEAR FROM e.eventDate) FROM Event e WHERE e.eventDate IS NOT NULL",
                         Integer.class)
                 .getResultList()
@@ -75,8 +76,9 @@ public class EventOrm {
                 .toList();
     }
 
+    @WithSpan
     public List<Event> getUpcomingEvents(int limit) {
-        log.info("EventOrm/getUpcomingEvents limit=" + limit);
+        Telemetry.attr("event.limit", limit);
         LocalDateTime now = LocalDateTime.now(timeZone);
         // Limit on ids first: a row limit on a collection fetch would page in memory.
         List<Long> ids = em.createQuery("SELECT e.id FROM Event e WHERE e.eventDate >= :now ORDER BY e.eventDate ASC", Long.class)
@@ -91,8 +93,9 @@ public class EventOrm {
                 .getResultList();
     }
 
+    @WithSpan
     public Event getEventById(Long id) {
-        log.info("EventOrm/getEventById: " + id);
+        Telemetry.attr("event.id", id);
         TypedQuery<Event> query = em.createQuery(WITH_ATTENDANCES + " WHERE e.id = :id", Event.class);
         query.setParameter("id", id);
         List<Event> results = query.getResultList();
@@ -118,11 +121,12 @@ public class EventOrm {
         @CacheInvalidateAll(cacheName = "events-by-id"),
         @CacheInvalidateAll(cacheName = "events-by-post-id")
     })
+    @WithSpan
     public Event addEvent(Event event, Long userId, ForumPost post, Long topicId, String frontendUrl) {
-        log.info("EventOrm/addEvent by user: " + userId);
+        Telemetry.attrs("user.id", userId, "forum.topic.id", topicId);
         User user = em.find(User.class, userId);
         if (user == null) {
-            log.warning("User not found in DB");
+            Telemetry.warn("User not found", "user.id", userId);
             throw new IllegalArgumentException("Benutzer nicht gefunden.");
         }
         Response postResponse = forumPostOrm.addPost(post, topicId, userId);
@@ -151,8 +155,9 @@ public class EventOrm {
         @CacheInvalidateAll(cacheName = "events-by-id"),
         @CacheInvalidateAll(cacheName = "events-by-post-id")
     })
+    @WithSpan
     public Event updateEvent(Long eventId, Event changes, String postTitle, String postContent, Long editorId) {
-        log.info("EventOrm/updateEvent: " + eventId);
+        Telemetry.attrs("event.id", eventId, "user.id", editorId);
         Event event = em.find(Event.class, eventId);
         if (event == null) return null;
         event.setTitle(changes.getTitle());
@@ -182,8 +187,9 @@ public class EventOrm {
         @CacheInvalidateAll(cacheName = "events-by-id"),
         @CacheInvalidateAll(cacheName = "events-by-post-id")
     })
+    @WithSpan
     public String deleteEvent(Long eventId) {
-        log.info("EventOrm/deleteEvent: " + eventId);
+        Telemetry.attr("event.id", eventId);
         Event event = em.find(Event.class, eventId);
         if (event == null) return null;
         String googleCalendarEventId = event.getGoogleCalendarEventId();
@@ -196,8 +202,9 @@ public class EventOrm {
         return googleCalendarEventId;
     }
 
+    @WithSpan
     public Event getEventByForumPostId(Long postId) {
-        log.info("EventOrm/getEventByForumPostId: " + postId);
+        Telemetry.attr("forum.post.id", postId);
         TypedQuery<Event> query = em.createQuery(
                 WITH_ATTENDANCES + " WHERE e.forumPostId = :postId", Event.class);
         query.setParameter("postId", postId);
@@ -248,8 +255,9 @@ public class EventOrm {
         @CacheInvalidateAll(cacheName = "events-by-id"),
         @CacheInvalidateAll(cacheName = "events-by-post-id")
     })
+    @WithSpan
     public Event saveAttendance(Long eventId, Long userId, String status) {
-        log.info("EventOrm/saveAttendance: eventId=" + eventId + " userId=" + userId + " status=" + status);
+        Telemetry.attrs("event.id", eventId, "user.id", userId, "event.attendance.status", status);
 
         Event event = em.find(Event.class, eventId);
         if (event == null) {

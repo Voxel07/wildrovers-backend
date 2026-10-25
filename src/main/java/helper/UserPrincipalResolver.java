@@ -9,7 +9,7 @@ import jakarta.ws.rs.core.Response;
 import model.User;
 import orm.UserOrm;
 import tools.GeoIPService;
-import java.util.logging.Logger;
+import tools.Telemetry;
 
 /**
  * Resolves the database account of the current request. The account is
@@ -20,7 +20,6 @@ import java.util.logging.Logger;
  */
 @ApplicationScoped
 public class UserPrincipalResolver {
-    private static final Logger log = Logger.getLogger(UserPrincipalResolver.class.getName());
 
     @Inject
     SecurityIdentity identity;
@@ -65,12 +64,16 @@ public class UserPrincipalResolver {
             // @TestSecurity identities carry no token; resolve them by test username.
             user = userOrm.findByUsername(identity.getPrincipal().getName());
         } else {
-            log.warning("Authenticated identity without bound account id; denying user resolution.");
+            Telemetry.warn("Authenticated identity without bound account id; denying user resolution");
         }
 
         if (user != null && !AccountStatus.isUsable(user)) {
-            log.warning("User " + user.getId() + " is blocked or inactive. Denying access.");
+            Telemetry.warn("User is blocked or inactive; denying access", "user.id", user.getId(), "security.event", "blocked_account");
             throw forbidden(AccountStatus.BLOCKED_MESSAGE);
+        }
+
+        if (user != null) {
+            Telemetry.attrs("enduser.id", String.valueOf(user.getId()), "enduser.role", user.getRole());
         }
 
         // ── IP country-change detection ──
@@ -113,8 +116,8 @@ public class UserPrincipalResolver {
 
         if (!currentCountry.equals(savedCountry)
                 && reportedCountryChanges.asMap().putIfAbsent(user.getId() + "|" + currentCountry, Boolean.TRUE) == null) {
-            log.warning("SECURITY: Country change for user " + user.getId()
-                    + ". Last login: " + savedCountry + ", current: " + currentCountry + ".");
+            Telemetry.warn("Country change since last login", "security.event", "country_change",
+                    "user.id", user.getId(), "geo.country.previous", savedCountry, "geo.country", currentCountry);
         }
     }
 }

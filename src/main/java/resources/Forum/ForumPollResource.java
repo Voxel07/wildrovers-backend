@@ -13,14 +13,13 @@ import orm.Forum.ForumPollOrm;
 import helper.UserPrincipalResolver;
 import tools.AuditLogger;
 import java.util.List;
-import java.util.logging.Logger;
+import tools.Telemetry;
 
 @Path("/forum/poll")
 @ApplicationScoped
 @Produces(MediaType.APPLICATION_JSON)
 public class ForumPollResource {
 
-    private static final Logger log = Logger.getLogger(ForumPollResource.class.getName());
 
     @Inject
     ForumPollOrm forumPollOrm;
@@ -38,7 +37,7 @@ public class ForumPollResource {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Nicht angemeldet").build();
         }
         model.User user = userPrincipalResolver.resolveUser();
-        AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+        AuditLogger.crud(user != null ? user.getUserName() : "unknown", userId,
                 "CREATE", "Poll", "post=" + postId);
         return forumPollOrm.createPoll(postId, poll, userId);
     }
@@ -52,7 +51,7 @@ public class ForumPollResource {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Nicht angemeldet").build();
         }
         model.User user = userPrincipalResolver.resolveUser();
-        AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+        AuditLogger.crud(user != null ? user.getUserName() : "unknown", userId,
                 "VOTE", "Poll", pollId);
         return forumPollOrm.vote(pollId, optionIds, userId);
     }
@@ -84,7 +83,7 @@ public class ForumPollResource {
     @Path("/voters")
     @PermitAll
     public Response getVoters(@QueryParam("poll") Long pollId) {
-        log.info("ForumPollResource/getVoters: " + pollId);
+        Telemetry.attr("poll.id", pollId);
         if (pollId == null) {
             return Response.status(Response.Status.BAD_REQUEST).entity("poll parameter required").build();
         }
@@ -107,7 +106,7 @@ public class ForumPollResource {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Nicht angemeldet").build();
         }
         model.User user = userPrincipalResolver.resolveUser();
-        AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+        AuditLogger.crud(user != null ? user.getUserName() : "unknown", userId,
                 "DELETE", "Poll", pollId);
         return forumPollOrm.deletePoll(pollId, userId);
     }
@@ -122,7 +121,7 @@ public class ForumPollResource {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Nicht angemeldet").build();
         }
         model.User user = userPrincipalResolver.resolveUser();
-        AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+        AuditLogger.crud(user != null ? user.getUserName() : "unknown", userId,
                 "UPDATE", "Poll", pollId);
         return forumPollOrm.updatePoll(pollId, poll, userId);
     }

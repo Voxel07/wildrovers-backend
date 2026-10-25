@@ -25,13 +25,12 @@ import tools.NotificationService;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.List;
-import java.util.logging.Logger;
+import tools.Telemetry;
 
 @Path("/gallery")
 @RequestScoped
 public class GalleryResource {
 
-    private static final Logger log = Logger.getLogger(GalleryResource.class.getName());
 
     @Inject
     GalleryOrm galleryOrm;
@@ -69,7 +68,6 @@ public class GalleryResource {
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     public Response getAllGalleries() {
-        log.info("GalleryResource/getAllGalleries");
         List<Gallery> list = galleryOrm.getAllGalleries();
         return Response.ok(list).build();
     }
@@ -98,12 +96,11 @@ public class GalleryResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response addGallery(@Valid Gallery gallery) {
-        log.info("GalleryResource/addGallery");
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
         }
-        AuditLogger.crud(log, user.getUserName(), user.getId(), "CREATE", "Gallery",
+        AuditLogger.crud(user.getUserName(), user.getId(), "CREATE", "Gallery",
                 gallery.getTitle());
 
         // Sanitize user inputs
@@ -135,12 +132,12 @@ public class GalleryResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response updateGallery(@PathParam("id") Long id, @Valid Gallery gallery) {
-        log.info("GalleryResource/updateGallery: " + id);
+        Telemetry.attr("gallery.id", id);
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
         }
-        AuditLogger.crud(log, user.getUserName(), user.getId(), "UPDATE", "Gallery", id);
+        AuditLogger.crud(user.getUserName(), user.getId(), "UPDATE", "Gallery", id);
 
         Gallery existing = galleryOrm.getGalleryById(id);
         if (existing == null) {
@@ -179,12 +176,12 @@ public class GalleryResource {
     @RolesAllowed({ "Frischling", "Mitglied", "Vorstand", "Admin" })
     @Produces(MediaType.APPLICATION_JSON)
     public Response deleteGallery(@PathParam("id") Long id) {
-        log.info("GalleryResource/deleteGallery: " + id);
+        Telemetry.attr("gallery.id", id);
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
         }
-        AuditLogger.crud(log, user.getUserName(), user.getId(), "DELETE", "Gallery", id);
+        AuditLogger.crud(user.getUserName(), user.getId(), "DELETE", "Gallery", id);
 
         Gallery existing = galleryOrm.getGalleryById(id);
         if (existing == null) {

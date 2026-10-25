@@ -34,16 +34,15 @@ import tools.Time;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 //Logging
-import java.util.logging.Logger;
-import java.util.logging.Level;
 
 //Coockie
 import jakarta.ws.rs.core.Response;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
+import tools.Telemetry;
 
 @ApplicationScoped
 public class UserOrm {
 
-    private static final Logger log = Logger.getLogger(UserOrm.class.getName());
 
     @Inject
     EntityManager em;
@@ -135,7 +134,7 @@ public class UserOrm {
             for (Object[] row : counts) map.put((Long) row[0], (Long) row[1]);
             for (User u : users) u.setForumPostCount(map.getOrDefault(u.getId(), 0L));
         } catch (Exception e) {
-            log.warning("Failed to populate forum post counts: " + e.getMessage());
+            Telemetry.warn("Failed to populate forum post counts", e);
         }
 
         // Forum answers (not deleted)
@@ -149,7 +148,7 @@ public class UserOrm {
             for (Object[] row : counts) map.put((Long) row[0], (Long) row[1]);
             for (User u : users) u.setForumAnswerCount(map.getOrDefault(u.getId(), 0L));
         } catch (Exception e) {
-            log.warning("Failed to populate forum answer counts: " + e.getMessage());
+            Telemetry.warn("Failed to populate forum answer counts", e);
         }
 
         // Forum topics (not deleted)
@@ -163,7 +162,7 @@ public class UserOrm {
             for (Object[] row : counts) map.put((Long) row[0], (Long) row[1]);
             for (User u : users) u.setForumTopicCount(map.getOrDefault(u.getId(), 0L));
         } catch (Exception e) {
-            log.warning("Failed to populate forum topic counts: " + e.getMessage());
+            Telemetry.warn("Failed to populate forum topic counts", e);
         }
 
         // Forum categories (not deleted)
@@ -177,7 +176,7 @@ public class UserOrm {
             for (Object[] row : counts) map.put((Long) row[0], (Long) row[1]);
             for (User u : users) u.setForumCategoryCount(map.getOrDefault(u.getId(), 0L));
         } catch (Exception e) {
-            log.warning("Failed to populate forum category counts: " + e.getMessage());
+            Telemetry.warn("Failed to populate forum category counts", e);
         }
 
         // Last forum activity (most recent post or answer creationDate)
@@ -201,7 +200,7 @@ public class UserOrm {
             }
             for (User u : users) u.setLastForumActivity(lastActivity.get(u.getId()));
         } catch (Exception e) {
-            log.warning("Failed to populate last forum activity: " + e.getMessage());
+            Telemetry.warn("Failed to populate last forum activity", e);
         }
     }
 
@@ -226,7 +225,7 @@ public class UserOrm {
                 u.setEventsAttended(countsMap.getOrDefault(u.getId(), 0L));
             }
         } catch (Exception e) {
-            log.warning("Failed to populate events attended count: " + e.getMessage());
+            Telemetry.warn("Failed to populate events attended count", e);
         }
     }
 
@@ -258,13 +257,12 @@ public class UserOrm {
                 u.setHasPaidCurrentYear(years.contains(currentYear));
             }
         } catch (Exception e) {
-            log.warning("Failed to populate yearly fees: " + e.getMessage());
+            Telemetry.warn("Failed to populate yearly fees", e);
         }
     }
 
+    @WithSpan
     public List<User> getUsers() {
-        log.info("UserOrm/getUsers");
-
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u", User.class);
         List<User> users = query.getResultList();
         populateEventsAttended(users);
@@ -273,9 +271,8 @@ public class UserOrm {
         return users;
     }
 
+    @WithSpan
     public List<User> getUserById(Long userId) {
-        log.info("UserOrm/getUserById");
-
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE id =: val", User.class);
         query.setParameter("val", userId);
         List<User> users = query.getResultList();
@@ -285,9 +282,8 @@ public class UserOrm {
         return users;
     }
 
+    @WithSpan
     public List<User> getUserByUsername(String userName) {
-        log.info("UserOrm/getUserByUsername");
-
         TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE userName =: val", User.class);
         query.setParameter("val", userName);
         List<User> users = query.getResultList();
@@ -295,6 +291,7 @@ public class UserOrm {
         return users;
     }
 
+    @WithSpan
     public User findByUsername(String username) {
         try {
             return em.createQuery("SELECT u FROM User u WHERE u.userName = :val", User.class)
@@ -303,7 +300,7 @@ public class UserOrm {
         } catch (jakarta.persistence.NoResultException e) {
             return null;
         } catch (RuntimeException e) {
-            log.log(Level.WARNING, "User lookup failed for username " + username, e);
+            Telemetry.warn("User lookup by username failed", e);
             throw e;
         }
     }
@@ -350,6 +347,7 @@ public class UserOrm {
      * The application role is synchronised from the identity provider's group mapping.
      */
     @Transactional
+    @WithSpan
     public OidcResolution resolveOidcUser(OidcProfile profile, String mappedRole) {
         String role = mappedRole != null ? mappedRole : model.Users.Roles.VSISITOR;
         boolean changed = false;
@@ -364,15 +362,15 @@ public class UserOrm {
             User existing = findByEmail(email);
             if (existing != null) {
                 if (existing.getOidcSubject() != null || !profile.emailVerified()) {
-                    log.warning("OIDC identity " + profile.subject() + " cannot be linked to account " + existing.getId()
-                            + " (already bound or e-mail not verified)");
+                    Telemetry.warn("OIDC identity cannot be linked to account (already bound or e-mail not verified)",
+                            "user.id", existing.getId(), "oidc.issuer", profile.issuer(), "oidc.email_verified", profile.emailVerified());
                     return new OidcResolution(null,
                             "Dieses Anmeldekonto kann keinem Benutzer zugeordnet werden. Bitte wende dich an den Vorstand.");
                 }
                 existing.setOidcIssuer(profile.issuer());
                 existing.setOidcSubject(profile.subject());
                 user = existing;
-                log.info("Linked OIDC identity to existing account " + existing.getId());
+                Telemetry.event("oidc.account_linked", "user.id", existing.getId(), "oidc.issuer", profile.issuer());
             } else {
                 user = createOidcUser(profile, email, role);
                 changed = true;
@@ -380,8 +378,7 @@ public class UserOrm {
         }
 
         if (!role.equals(user.getRole())) {
-            log.info("User role changed in identity provider. Syncing role of account " + user.getId()
-                    + ": " + user.getRole() + " -> " + role);
+            Telemetry.event("oidc.role_synced", "user.id", user.getId(), "user.role.previous", user.getRole(), "user.role", role);
             user.setRole(role);
             changed = true;
         }
@@ -394,7 +391,7 @@ public class UserOrm {
 
     private User createOidcUser(OidcProfile profile, String email, String role) {
         String username = uniqueUsername(profile.preferredUsername(), profile.subject());
-        log.info("UserOrm/createOidcUser: " + username);
+        Telemetry.event("oidc.account_created", "oidc.issuer", profile.issuer(), "user.role", role);
         User usr = new User();
         usr.setUserName(username);
         usr.setEmail(email);
@@ -439,8 +436,8 @@ public class UserOrm {
 
     @Transactional
     @CacheInvalidateAll(cacheName = "team-members")
+    @WithSpan
     public Response addUser(model.Users.SignupRequest signup) {
-        log.info("UserOrm/addUser");
         String userName = signup.userName.trim();
         String mail = signup.email.trim();
 
@@ -471,7 +468,7 @@ public class UserOrm {
         try {
             em.persist(usr);
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Fehler beim Nutzer einfügen", e);
+            Telemetry.error("Inserting user failed", e);
             return Response.status(500).entity("Fehler beim Nutzer einfügen").build();
         }
 
@@ -495,7 +492,7 @@ public class UserOrm {
         try {
             email.sendVerificationMail(usr.getEmail(), verificationId);
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Fehler beim Senden der Verifizierungs-E-Mail: " + e.getMessage(), e);
+            Telemetry.error("Sending verification e-mail failed", e);
             throw new jakarta.ws.rs.WebApplicationException(
                 Response.status(500)
                     .entity("Fehler beim Senden der Verifizierungs-E-Mail: " + e.getMessage())
@@ -511,15 +508,14 @@ public class UserOrm {
         try {
             notificationService.recordSignup(user, frontendUrl);
         } catch (Exception e) {
-            log.log(Level.WARNING, "Could not record signup notification for user " + user.getId(), e);
+            Telemetry.warn("Could not record signup notification", e, "user.id", user.getId());
         }
     }
 
     @Transactional
     @CacheInvalidateAll(cacheName = "team-members")
+    @WithSpan
     public Response updateUser(User u) {
-        log.info("UserOrm/updateUser");
-
         User dbUser = em.find(User.class, u.getId());
         if (dbUser == null) {
             return Response.status(Response.Status.NOT_FOUND).entity("Keinen Nutzer mit diesen Daten gefunden").build();
@@ -615,8 +611,8 @@ public class UserOrm {
     public record LoginResult(User user, Response error) { }
 
     @Transactional
+    @WithSpan
     public LoginResult authenticateLocal(User usr) {
-        log.info("UserOrm/authenticateLocal");
         if (usr == null || (usr.getUserName() == null && usr.getEmail() == null) || usr.getPassword() == null) {
             return new LoginResult(null, Response.status(Response.Status.BAD_REQUEST)
                     .entity("Bitte Benutzername/E-Mail und Passwort eingeben.").build());
@@ -638,7 +634,7 @@ public class UserOrm {
                     storedPasswordHash != null ? storedPasswordHash : DUMMY_PASSWORD_HASH, usr.getPassword())
                     && storedPasswordHash != null;
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Password verification failed", e);
+            Telemetry.error("Password verification failed", e);
             passwordMatches = false;
         }
         if (!passwordMatches) {
@@ -677,8 +673,8 @@ public class UserOrm {
     }
 
     @Transactional
+    @WithSpan
     public Response resendVerification(User credentials) {
-        log.info("UserOrm/resendVerification");
         if (credentials == null || credentials.getPassword() == null
                 || (credentials.getUserName() == null && credentials.getEmail() == null)) {
             return invalidCredentialsResponse();
@@ -708,7 +704,7 @@ public class UserOrm {
                 return invalidCredentialsResponse();
             }
         } catch (Exception e) {
-            log.log(Level.FINE, "Verification resend credential check failed", e);
+            Telemetry.event("verification.resend_rejected");
             return invalidCredentialsResponse();
         }
 
@@ -768,8 +764,8 @@ public class UserOrm {
     }
 
     @CacheResult(cacheName = "team-members")
+    @WithSpan
     public List<User> getTeamMembers() {
-        log.info("UserOrm/getTeamMembers");
         TypedQuery<User> query = em.createQuery(
                 "SELECT u FROM User u WHERE u.role IN ('Admin', 'Vorstand', 'Mitglied', 'Frischling') AND u.isActive = true",
                 User.class);
@@ -780,9 +776,9 @@ public class UserOrm {
 
     @Transactional
     @CacheInvalidateAll(cacheName = "team-members")
+    @WithSpan
     public User updateUserProfile(Long userId, String phrase, java.time.LocalDate birthday, String firstName,
             String lastName, String email, String userName) {
-        log.info("UserOrm/updateUserProfile");
         User user = em.find(User.class, userId);
         if (user != null) {
             if (userName != null && !userName.isBlank()) {
@@ -823,8 +819,8 @@ public class UserOrm {
 
     @Transactional
     @CacheInvalidateAll(cacheName = "team-members")
+    @WithSpan
     public void updateUserPhotoUrl(Long userId, String photoUrl) {
-        log.info("UserOrm/updateUserPhotoUrl");
         User user = em.find(User.class, userId);
         if (user != null) {
             user.setPhotoUrl(photoUrl);
@@ -834,8 +830,8 @@ public class UserOrm {
 
     @Transactional
     @CacheInvalidateAll(cacheName = "team-members")
+    @WithSpan
     public void updateUserBackgroundUrl(Long userId, String backgroundUrl) {
-        log.info("UserOrm/updateUserBackgroundUrl");
         User user = em.find(User.class, userId);
         if (user != null) {
             user.setBackgroundUrl(backgroundUrl);
@@ -867,9 +863,11 @@ public class UserOrm {
         @CacheInvalidateAll(cacheName = "galleries"),
         @CacheInvalidateAll(cacheName = "galleries-by-id")
     })
+    @WithSpan
     public Response deleteUserWithOptions(Long userId, boolean deleteAccount, boolean deleteEvents, boolean deletePosts, boolean deleteGallery, boolean hardDelete) {
         accountSnapshots.invalidate(userId);
-        log.info("UserOrm/deleteUserWithOptions: " + userId + " (account=" + deleteAccount + ", events=" + deleteEvents + ", posts=" + deletePosts + ", gallery=" + deleteGallery + ")");
+        Telemetry.attrs("user.id", userId, "user.delete.account", deleteAccount, "user.delete.events", deleteEvents,
+                "user.delete.posts", deletePosts, "user.delete.gallery", deleteGallery, "user.delete.hard", hardDelete);
         User user = em.find(User.class, userId);
         if (user == null) {
             return Response.status(404).entity("Benutzer nicht gefunden").build();
@@ -1029,7 +1027,7 @@ public class UserOrm {
                                 .setParameter("oid", optionId).executeUpdate();
                     }
                 } catch (Exception e) {
-                    log.warning("Failed to decrement user poll votes: " + e.getMessage());
+                    Telemetry.warn("Failed to decrement user poll votes", e);
                 }
 
                 em.createNativeQuery("DELETE FROM FORUM_POLL_OPTION_VOTES WHERE user_id = :uid")
@@ -1084,7 +1082,7 @@ public class UserOrm {
 
             return Response.ok("Benutzer erfolgreich gelöscht").build();
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Error deleting user " + userId, e);
+            Telemetry.error("Deleting user failed", e, "user.id", userId);
             return Response.status(500).entity("Fehler beim Löschen des Benutzers: " + e.getMessage()).build();
         }
     }
@@ -1096,8 +1094,9 @@ public class UserOrm {
      */
     @Transactional
     @CacheInvalidateAll(cacheName = "team-members")
+    @WithSpan
     public void updateUserRole(Long userId, String role) {
-        log.info("UserOrm/updateUserRole: userId=" + userId + " role=" + role);
+        Telemetry.attrs("user.id", userId, "user.role", role);
         User user = em.find(User.class, userId);
         if (user != null) {
             user.setRole(role);

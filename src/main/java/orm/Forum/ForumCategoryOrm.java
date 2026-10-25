@@ -15,9 +15,7 @@ import io.quarkus.cache.CacheResult;
 import io.quarkus.cache.CacheInvalidateAll;
 
 
-import java.util.logging.Level;
 //Logging
-import java.util.logging.Logger;
 
 //Zeit
 import tools.Time;
@@ -26,10 +24,11 @@ import tools.Time;
 import model.User;
 import model.Forum.ForumCategory;
 import model.Users.Roles;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
+import tools.Telemetry;
 @ApplicationScoped
 public class ForumCategoryOrm {
 
-    private static final Logger log = Logger.getLogger(ForumCategoryOrm.class.getName());
     @Inject
     EntityManager em;
     @Inject
@@ -37,26 +36,26 @@ public class ForumCategoryOrm {
 
     // Entity reads are intentionally uncached: JPA objects must not be shared between requests.
     //Basic GET methods
+    @WithSpan
     public List<ForumCategory>getAllCategories(){
-       log.info("ForumCategoryOrm/getAllCategories");
         TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c ORDER BY c.position ASC, c.id ASC", ForumCategory.class);
         return query.getResultList();
     }
+    @WithSpan
     public List<ForumCategory>getCategoriesByName(String category){
-        log.info("ForumCategoryOrm/getCategoriesByName");
         TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c WHERE category =: val", ForumCategory.class);
         query.setParameter("val", category);
         return query.getResultList();
     }
+    @WithSpan
     public List<ForumCategory>getCategoriesById(Long id){
-        log.info("ForumCategoryOrm/getCategoriesById");
         TypedQuery<ForumCategory> query = em.createQuery("SELECT c FROM ForumCategory c WHERE id =: val", ForumCategory.class);
         query.setParameter("val", id);
         return query.getResultList();
     }
     @CacheResult(cacheName = "forum-category-count")
+    @WithSpan
     public long getCategoryCnt(){
-        log.info("ForumCategoryOrm/getCategoryCnt");
         Query query = em.createQuery("SELECT COUNT(*) FROM ForumCategory");
         return (Long)query.getSingleResult();
     }
@@ -75,14 +74,14 @@ public class ForumCategoryOrm {
         @CacheInvalidateAll(cacheName = "forum-categories-by-id"),
         @CacheInvalidateAll(cacheName = "forum-category-count")
     })
+    @WithSpan
     public Response addCategory(ForumCategory category, Long userId){
-        log.info("ForumCategoryOrm/addCategory");
         if(!getCategoriesByName(category.getCategory()).isEmpty()) return Response.status(409).entity("Kategorie existiert bereits").build(); //Check if category already exists
 
         //get corresponding user from db. Exit if not found
         User user = em.find(User.class, userId);
         if(user == null){
-            log.warning("User nicht in der DB gefunden");
+            Telemetry.warn("User not found", "user.id", userId);
             return Response.status(401).entity("User nicht gefunden").build();
         }
 
@@ -108,7 +107,7 @@ public class ForumCategoryOrm {
         try {
             em.persist(category);
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            Telemetry.error("Adding category failed", e, "user.id", userId);
             return Response.status(500).entity("Error while creating the new Category").build();
         }
 
@@ -138,9 +137,8 @@ public class ForumCategoryOrm {
         @CacheInvalidateAll(cacheName = "forum-categories-by-id"),
         @CacheInvalidateAll(cacheName = "forum-category-count")
     })
+    @WithSpan
     public Response updateCategory(ForumCategory forumCategory, Long userId){
-        log.info("ForumCategoryOrm/updateCategory");
-
         User user = em.find(User.class, userId);
         if(user == null) return Response.status(401).entity("User nicht gefunden").build();
 
@@ -173,7 +171,7 @@ public class ForumCategoryOrm {
         try{
             em.merge(forumCategoryAusDB);
         }catch(Exception e){
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            Telemetry.error("Updating category failed", e, "forum.category.id", forumCategory.getId(), "user.id", userId);
             return Response.status(500).entity("Fehler beim updaten der Kategorie").build();
         }
         return Response.status(200).entity("Kategorie erfolgreich aktualisert").build();
@@ -189,8 +187,8 @@ public class ForumCategoryOrm {
         @CacheInvalidateAll(cacheName = "forum-categories-by-id"),
         @CacheInvalidateAll(cacheName = "forum-category-count")
     })
+    @WithSpan
     public Response deleteCategory(ForumCategory forumCategory, Long userId){
-        log.info("ForumCategoryOrm/removeCategory");
         User user = em.find(User.class, userId);
         if(user == null) return Response.status(401).entity("User nicht gefunden").build();
         Long categoryId = forumCategory.getId();
@@ -211,7 +209,7 @@ public class ForumCategoryOrm {
                     .setLockMode(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE).getResultList();
             for (int i = 0; i < remaining.size(); i++) remaining.get(i).setPosition((long) i);
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            Telemetry.error("Deleting category failed", e, "forum.category.id", forumCategory.getId(), "user.id", userId);
             return Response.status(500).entity("Fehler beim Löschen der Kategorie").build();
         }
 
@@ -224,7 +222,7 @@ public class ForumCategoryOrm {
         @CacheInvalidateAll(cacheName = "forum-categories-by-id"),
         @CacheInvalidateAll(cacheName = "forum-category-count")
     })
+    @WithSpan
     public void invalidateCategoryCaches(){
-        log.info("ForumCategoryOrm/invalidateCategoryCaches");
     }
 }

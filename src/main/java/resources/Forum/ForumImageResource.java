@@ -17,7 +17,7 @@ import tools.ForumImageStore;
 
 import java.io.File;
 import java.util.List;
-import java.util.logging.Logger;
+import tools.Telemetry;
 
 /**
  * Serves uploaded forum images (full resolution and thumbnails).
@@ -34,7 +34,6 @@ import java.util.logging.Logger;
 @ApplicationScoped
 public class ForumImageResource {
 
-    private static final Logger log = Logger.getLogger(ForumImageResource.class.getName());
 
     @Inject
     ForumImageStore imageStore;
@@ -88,7 +87,7 @@ public class ForumImageResource {
                 if (!signed) {
                     User user = currentUser();
                     if (user == null || !Roles.hasRequiredRole(user.getRole(), required)) {
-                        log.info("Denied forum image read for post " + postId);
+                        Telemetry.event("forum.image.access_denied", "forum.post.id", postId, "user.id", user != null ? user.getId() : null);
                         return Response.status(404).entity("Bild nicht gefunden").build();
                     }
                 }

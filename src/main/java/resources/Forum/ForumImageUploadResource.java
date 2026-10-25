@@ -19,8 +19,7 @@ import tools.SafeImageReader;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import tools.Telemetry;
 
 /**
  * Accepts image uploads from the Quill editor toolbar.
@@ -35,7 +34,6 @@ import java.util.logging.Logger;
 @ApplicationScoped
 public class ForumImageUploadResource {
 
-    private static final Logger log = Logger.getLogger(ForumImageUploadResource.class.getName());
 
     @Inject
     ForumImageStore imageStore;
@@ -49,8 +47,6 @@ public class ForumImageUploadResource {
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     @Produces(MediaType.APPLICATION_JSON)
     public Response uploadImage(@jakarta.ws.rs.BeanParam UploadForm form) {
-        log.info("ForumImageUploadResource/uploadImage");
-
         Long userId = userPrincipalResolver.resolveUserId();
         if (userId == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
@@ -95,7 +91,7 @@ public class ForumImageUploadResource {
         } catch (jakarta.ws.rs.WebApplicationException e) {
             return e.getResponse();
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Image upload failed", e);
+            Telemetry.error("Image upload failed", e);
             return Response.status(500).entity("Fehler beim Verarbeiten des Bildes").build();
         }
     }

@@ -11,8 +11,6 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.io.File;
 import java.net.InetAddress;
 import java.util.Optional;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Resolves IP → country from a local MaxMind GeoLite2/GeoIP2 Country database
@@ -31,7 +29,6 @@ import java.util.logging.Logger;
 })
 public class GeoIPService {
 
-    private static final Logger log = Logger.getLogger(GeoIPService.class.getName());
 
     @ConfigProperty(name = "app.geoip.database")
     Optional<String> databasePath;
@@ -42,14 +39,14 @@ public class GeoIPService {
     void open() {
         String path = databasePath.map(String::trim).orElse("");
         if (path.isEmpty()) {
-            log.info("GeoIP: no database configured (app.geoip.database); country tracking is off.");
+            Telemetry.event("geoip.disabled", "reason", "no database configured (app.geoip.database)");
             return;
         }
         try {
             reader = new DatabaseReader.Builder(new File(path)).build();
-            log.info("GeoIP: loaded " + path);
+            Telemetry.event("geoip.loaded");
         } catch (Exception e) {
-            log.log(Level.WARNING, "GeoIP: database " + path + " could not be opened; country tracking is off.", e);
+            Telemetry.warn("GeoIP database could not be opened; country tracking is off", e);
         }
     }
 
@@ -90,7 +87,7 @@ public class GeoIPService {
                     .filter(name -> name != null && !name.isBlank())
                     .orElse("Unknown");
         } catch (Exception e) {
-            log.log(Level.FINE, "GeoIP lookup failed for " + ip, e);
+            Telemetry.event("geoip.lookup_failed");
             return "Unknown";
         }
     }

@@ -13,8 +13,6 @@ import jakarta.transaction.Transactional;
 import jakarta.ws.rs.core.Response;
 
 //Logging
-import java.util.logging.Logger;
-import java.util.logging.Level;
 
 //Time
 
@@ -23,10 +21,11 @@ import model.Forum.ForumPost;
 import model.User;
 import tools.Time;
 import tools.HtmlSanitizer;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
+import tools.Telemetry;
 
 @ApplicationScoped
 public class ForumAnswerOrm {
-    private static final Logger log = Logger.getLogger(ForumAnswerOrm.class.getName());
     @Inject
     EntityManager em;
 
@@ -41,9 +40,9 @@ public class ForumAnswerOrm {
      * Paged answer list for one reader, oldest first. Only one filter is applied, in the order
      * answer, post, user, editor.
      */
+    @WithSpan
     public ForumPage<ForumAnswer> findAnswers(Long answerId, Long postId, Long userId, Long editorId,
             List<String> visibleRoles, Integer page, Integer size) {
-        log.info("ForumAnswerOrm/findAnswers");
         String filter = "";
         Object value = null;
         if (answerId != null) { filter = " AND fa.id = :val"; value = answerId; }
@@ -67,39 +66,39 @@ public class ForumAnswerOrm {
         return new ForumPage<>(query.getResultList(), count.getSingleResult());
     }
 
+    @WithSpan
     public List<ForumAnswer>getAllAnswers(){
-        log.info("ForumOrm/getAnswers");
         TypedQuery<ForumAnswer> query = em.createQuery("SELECT fa FROM ForumAnswer fa", ForumAnswer.class);
         return query.getResultList();
     }
+    @WithSpan
     public List<ForumAnswer>getAnswersByUser(Long userId){
-        log.info("ForumOrm/getAnswersByUser");
         TypedQuery<ForumAnswer> query = em.createQuery("SELECT fa FROM ForumAnswer fa WHERE fa.creator.id = :val", ForumAnswer.class);
         query.setParameter("val",userId);
         return query.getResultList();
     }
+    @WithSpan
     public List<ForumAnswer>getAnswersById(Long answerId){
-        log.info("ForumOrm/getAnswersById");
         TypedQuery<ForumAnswer> query = em.createQuery("SELECT fa FROM ForumAnswer fa WHERE id =: val", ForumAnswer.class);
         query.setParameter("val",answerId);
         return query.getResultList();
    }
+    @WithSpan
     public List<ForumAnswer>getAnswersByEditor(Long userId){
-        log.info("ForumOrm/getAnswersByEditor");
         TypedQuery<ForumAnswer> query = em.createQuery("SELECT fa FROM ForumAnswer fa WHERE fa.editor.id = :val", ForumAnswer.class);
         query.setParameter("val",userId);
         return query.getResultList();
    }
+    @WithSpan
     public List<ForumAnswer>getAnswersByPost(Long postId){
-        log.info("ForumOrm/getAnswersByPost");
         TypedQuery<ForumAnswer> query = em.createQuery("SELECT fa FROM ForumAnswer fa WHERE fa.post.id = :val ORDER BY fa.creationDate ASC, fa.id ASC", ForumAnswer.class);
         query.setParameter("val",postId);
         return query.getResultList();
     }
 
     @Transactional
+    @WithSpan
     public Response addAnswer(ForumAnswer forumAnswer, Long postId, Long userId){
-        log.info("ForumAnswerOrm/addAnswer");
         ForumPost forumPost = em.find(ForumPost.class, postId);
         if(forumPost == null) return Response.status(404).entity("Post nicht gefunden").build();
         User user = em.find(User.class, userId);
@@ -120,7 +119,7 @@ public class ForumAnswerOrm {
         try {
             em.persist(forumAnswer);
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            Telemetry.error("Adding answer failed", e, "forum.post.id", postId, "user.id", userId);
             return Response.status(500).entity("Fehler beim erstellen der Antwort").build();
         }
         ForumCounters.adjust(em, "ForumPost", "answerCount", forumPost.getId(), 1);
@@ -129,9 +128,8 @@ public class ForumAnswerOrm {
 
     }
     @Transactional
+    @WithSpan
     public Response updateAnswer(ForumAnswer forumAnswer, Long userId){
-        log.info("ForumAnswerOrm/updateAnswer");
-
         User user = em.find(User.class, userId);
         if(user == null) return Response.status(401).entity("User nicht gefunden").build();
 
@@ -154,16 +152,15 @@ public class ForumAnswerOrm {
         try{
             em.merge(forumAnswerAusDB);
         }catch(Exception e){
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            Telemetry.error("Updating answer failed", e, "forum.answer.id", forumAnswer.getId(), "user.id", userId);
             return Response.status(500).entity("Fehler beim updaten der Antwort").build();
         }
         return Response.status(200).entity("Antwort erfolgreich aktualisert").build();
 
     }
     @Transactional
+    @WithSpan
     public Response deleteAnswer(ForumAnswer forumAnswer, Long userId){
-        log.info("ForumAnswerOrm/deleteAnswer");
-
         User user = em.find(User.class, userId);
         if(user == null) return Response.status(401).entity("User nicht gefunden").build();
 
@@ -181,7 +178,7 @@ public class ForumAnswerOrm {
                 ForumCounters.adjust(em, "ForumPost", "answerCount", forumAnswerAusDB.getPost().getId(), -1);
             }
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            Telemetry.error("Deleting answer failed", e, "forum.answer.id", forumAnswer.getId(), "user.id", userId);
             return Response.status(500).entity("Fehler beim Löschen der Antwort").build();
         }
 
@@ -192,13 +189,12 @@ public class ForumAnswerOrm {
      * gets Called when a Topic is deleted so no need to update answer count
      */
     @Transactional
+    @WithSpan
     public String deleteAllAnswersFromTopic(Long postId){
-        log.info("ForumAnswerOrm/deleteAllAnswersFromTopic");
-
         try {
             em.createQuery("DELETE FROM ForumAnswer fa WHERE fa.post.id = :val").setParameter("val", postId).executeUpdate();
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            Telemetry.error("Deleting answers of post failed", e, "forum.post.id", postId);
             return "Fehler beim Löschen der Antworten";
         }
 

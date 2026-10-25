@@ -7,11 +7,10 @@ import io.quarkus.mailer.Mail;
 import io.quarkus.mailer.Mailer;
 
 import jakarta.enterprise.context.ApplicationScoped;
-import java.util.logging.Logger;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 
 @ApplicationScoped
 public class Email {
-    private static final Logger log = Logger.getLogger(Email.class.getName());
 
     //Blocking sync
     @Inject
@@ -103,14 +102,15 @@ public class Email {
         return Response.accepted().build();
     }
 
+    @WithSpan
     public boolean trySendNotificationMail(String recipient, String subject, String htmlBody) {
         if (recipient == null || recipient.isBlank()) {
-            log.warning("Notification email has no recipient address");
+            Telemetry.warn("Notification e-mail has no recipient address");
             return false;
         }
         Long reservation = quotaService.reserve(recipient, "NOTIFICATION");
         if (reservation == null) {
-            log.warning("Notification email quota reached for recipient " + recipient);
+            Telemetry.warn("Notification e-mail quota reached", "email.quota.kind", "NOTIFICATION");
             return false;
         }
         try {

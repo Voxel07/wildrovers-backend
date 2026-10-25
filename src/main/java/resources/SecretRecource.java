@@ -5,7 +5,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 //Logging zeug
-import java.util.logging.Logger;
 
 //HTTP Requests
 import jakarta.ws.rs.Consumes;
@@ -22,11 +21,11 @@ import jakarta.annotation.security.RolesAllowed;
 
 //Eigene Imports
 import orm.Secrets.SecretOrm;
+import tools.Telemetry;
 
 @Path("/secrets")
 @ApplicationScoped
 public class SecretRecource {
-    private static final Logger log = Logger.getLogger(SecretRecource.class.getName());
 
     @Inject SecretOrm secretOrm;
     @Inject orm.UserOrm userOrm;
@@ -54,7 +53,6 @@ public class SecretRecource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response verifyUser(VerificationRequest request){
-        log.info("SecretResource/verifyUser for email: " + (request != null ? request.email : "null"));
 
         if (request == null || request.email == null || request.code == null) {
             return Response.status(Response.Status.BAD_REQUEST)
@@ -75,7 +73,7 @@ public class SecretRecource {
     @Produces(MediaType.APPLICATION_JSON)
     @jakarta.transaction.Transactional
     public String autoVerify(@QueryParam("username") String username) {
-        log.info("SecretResource/autoVerify: " + username);
+        Telemetry.attr("user.name", username);
         try {
             model.User user = userOrm.findByUsername(username);
             if (user != null && user.getSecret() != null) {
@@ -104,8 +102,6 @@ public class SecretRecource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response requestPasswordReset(ResetRequest request) {
-        log.info("SecretResource/requestPasswordReset");
-
         if (request == null || request.email == null || request.email.isBlank()) {
             return json(Response.Status.BAD_REQUEST, "error", "E-Mail-Adresse muss ausgefüllt sein");
         }
@@ -129,8 +125,6 @@ public class SecretRecource {
     @Consumes(MediaType.APPLICATION_JSON)
     @jakarta.transaction.Transactional
     public Response resetPassword(ResetPasswordRequest request) {
-        log.info("SecretResource/resetPassword");
-
         if (request == null || request.token == null || request.token.isBlank() || request.password == null
                 || request.password.length() < 8 || request.password.length() > 256) {
             return Response.status(Response.Status.BAD_REQUEST)

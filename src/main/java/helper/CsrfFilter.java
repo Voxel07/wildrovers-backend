@@ -13,7 +13,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Logger;
+import tools.Telemetry;
 
 /**
  * Cookie sessions are sent by the browser automatically, so state-changing
@@ -31,7 +31,6 @@ import java.util.logging.Logger;
 @PreMatching
 @Priority(Priorities.AUTHENTICATION - 100)
 public class CsrfFilter implements ContainerRequestFilter {
-    private static final Logger log = Logger.getLogger(CsrfFilter.class.getName());
     private static final Set<String> SAFE_METHODS = Set.of("GET", "HEAD", "OPTIONS");
     public static final String HEADER = "X-Requested-With";
 
@@ -54,7 +53,8 @@ public class CsrfFilter implements ContainerRequestFilter {
         String requestedWith = request.getHeaderString(HEADER);
         if (requestedWith == null || requestedWith.isBlank()
                 || (origin != null && !"null".equals(origin) && !isAllowed(origin))) {
-            log.warning("CSRF check failed for " + request.getMethod() + " " + path + " (origin " + origin + ")");
+            Telemetry.warn("CSRF check failed", "security.event", "csrf_rejected", "http.request.header.origin", origin,
+                    "csrf.header_present", requestedWith != null && !requestedWith.isBlank());
             request.abortWith(Response.status(Response.Status.FORBIDDEN)
                     .entity("Anfrage abgelehnt (fehlender CSRF-Schutz).")
                     .build());

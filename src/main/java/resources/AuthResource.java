@@ -28,9 +28,8 @@ import orm.AuthSessionOrm;
 import orm.UserOrm;
 import tools.AuditLogger;
 import tools.OidcClient;
+import tools.Telemetry;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Browser sessions. Both login methods end in the same place: a short-lived
@@ -41,7 +40,6 @@ import java.util.logging.Logger;
 @Path("/auth")
 @RequestScoped
 public class AuthResource {
-    private static final Logger log = Logger.getLogger(AuthResource.class.getName());
 
     @Inject UserOrm userOrm;
     @Inject AuthSessionOrm sessions;
@@ -67,7 +65,7 @@ public class AuthResource {
             return result.error();
         }
         User user = result.user();
-        AuditLogger.crud(log, user.getUserName(), user.getId(), "LOGIN", "Session", user.getId(), "method=local");
+        AuditLogger.crud(user.getUserName(), user.getId(), "LOGIN", "Session", user.getId(), "method=local");
         String refreshToken = sessions.create(user.getId(), user.getTokenVersion(), AuthSession.METHOD_LOCAL,
                 null, null, userAgent);
         return withSession(user, refreshToken);
@@ -86,11 +84,11 @@ public class AuthResource {
         try {
             tokens = oidcClient.exchangeCode(callback.code, callback.codeVerifier);
         } catch (OidcClient.GrantRejectedException e) {
-            log.info("OIDC code exchange rejected: " + e.getMessage());
+            Telemetry.warn("OIDC code exchange rejected", e, "auth.method", "oidc");
             return Response.status(Response.Status.UNAUTHORIZED)
                     .entity("Anmeldung fehlgeschlagen. Bitte versuche es erneut.").build();
         } catch (Exception e) {
-            log.log(Level.WARNING, "OIDC code exchange failed", e);
+            Telemetry.error("OIDC code exchange failed", e, "auth.method", "oidc");
             return Response.status(Response.Status.BAD_GATEWAY)
                     .entity("Der Anmeldedienst ist gerade nicht erreichbar.").build();
         }
@@ -104,7 +102,7 @@ public class AuthResource {
             return denied();
         }
         userOrm.recordLogin(user);
-        AuditLogger.crud(log, user.getUserName(), user.getId(), "LOGIN", "Session", user.getId(), "method=oidc");
+        AuditLogger.crud(user.getUserName(), user.getId(), "LOGIN", "Session", user.getId(), "method=oidc");
         String refreshToken = sessions.create(user.getId(), user.getTokenVersion(), AuthSession.METHOD_OIDC,
                 tokens.refreshToken(), tokens.accessExpiresAt(), userAgent);
         return withSession(user, refreshToken);
@@ -198,10 +196,10 @@ public class AuthResource {
             UserOrm.OidcResolution resolution = userOrm.resolveOidcUser(profile(tokens), roleMapper.mapToRole(tokens.groups()));
             return resolution.user() != null && resolution.user().getId().equals(session.getUserId());
         } catch (OidcClient.GrantRejectedException e) {
-            log.info("Identity provider ended session " + session.getId() + ": " + e.getMessage());
+            Telemetry.event("oidc.session_ended_by_idp", "auth.session.id", session.getId(), "user.id", session.getUserId(), "reason", e.getMessage());
             return false;
         } catch (Exception e) {
-            log.log(Level.WARNING, "Identity provider unreachable while refreshing session " + session.getId(), e);
+            Telemetry.warn("Identity provider unreachable while refreshing session", e, "auth.session.id", session.getId());
             return true;
         }
     }

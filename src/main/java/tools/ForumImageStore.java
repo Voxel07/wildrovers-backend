@@ -20,8 +20,6 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -42,7 +40,6 @@ import java.util.regex.Pattern;
 // Created at startup so that a missing signing key in prod fails the boot, not the first image request.
 @io.quarkus.runtime.Startup
 public class ForumImageStore {
-    private static final Logger log = Logger.getLogger(ForumImageStore.class.getName());
 
     public static final String ID_PATTERN = "[0-9]{1,18}|tmp_[0-9]{1,18}_[0-9]{1,18}";
     public static final String FILE_PATTERN = "[A-Za-z0-9][A-Za-z0-9._-]{0,120}";
@@ -103,7 +100,6 @@ public class ForumImageStore {
         } else {
             signingKey = new byte[32];
             new SecureRandom().nextBytes(signingKey);
-            log.info("forum.images.signing-key not set; using a random per-process key for image URLs");
         }
         while (publicApiUrl.endsWith("/")) {
             publicApiUrl = publicApiUrl.substring(0, publicApiUrl.length() - 1);
@@ -183,7 +179,7 @@ public class ForumImageStore {
             deleteIfEmpty(tmpDir);
             return any ? newName : null;
         } catch (IOException e) {
-            log.log(Level.WARNING, "Could not attach upload " + tmpId + "/" + file + " to post " + postId, e);
+            Telemetry.warn("Could not attach upload to post", e, "forum.post.id", postId, "forum.upload.id", tmpId);
             return null;
         }
     }

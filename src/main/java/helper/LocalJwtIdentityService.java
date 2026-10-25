@@ -22,12 +22,10 @@ import java.security.PublicKey;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import tools.Telemetry;
 
 @ApplicationScoped
 public class LocalJwtIdentityService {
-    private static final Logger log = Logger.getLogger(LocalJwtIdentityService.class.getName());
 
     private volatile JWTParser jwtParser;
 
@@ -44,12 +42,12 @@ public class LocalJwtIdentityService {
             Long userId = parseUserId(jwt.getSubject());
             AccountSnapshotCache.Snapshot account = accounts.get(userId);
             if (account == null || !account.usable()) {
-                log.warning("LocalJwtAuth: rejecting token of disabled or unknown account " + userId);
+                Telemetry.warn("Rejecting token of disabled or unknown account", "auth.method", "local", "user.id", userId);
                 throw new AuthenticationFailedException();
             }
             Integer tokenVersion = asInteger(jwt.getClaim(JWT.TOKEN_VERSION_CLAIM));
             if (tokenVersion == null || tokenVersion != account.tokenVersion()) {
-                log.info("LocalJwtAuth: rejecting revoked token of account " + userId);
+                Telemetry.event("auth.token_revoked", "auth.method", "local", "user.id", userId);
                 throw new AuthenticationFailedException();
             }
 
@@ -63,7 +61,7 @@ public class LocalJwtIdentityService {
         } catch (AuthenticationFailedException e) {
             throw e;
         } catch (Exception e) {
-            log.log(Level.WARNING, "LocalJwtAuth: validation failed", e);
+            Telemetry.warn("Local JWT validation failed", e, "auth.method", "local");
             throw new AuthenticationFailedException(e);
         }
     }
@@ -106,10 +104,10 @@ public class LocalJwtIdentityService {
             try (classpathStream) {
                 pem = new String(classpathStream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
             }
-            log.info("LocalJwtAuth: loaded public key from classpath: " + publicKeyPath);
+            Telemetry.event("auth.public_key_loaded", "auth.public_key.source", "classpath");
         } else {
             pem = Files.readString(Path.of(publicKeyPath));
-            log.info("LocalJwtAuth: loaded public key from filesystem: " + publicKeyPath);
+            Telemetry.event("auth.public_key_loaded", "auth.public_key.source", "filesystem");
         }
 
         pem = pem.replace("-----BEGIN PUBLIC KEY-----", "")

@@ -24,14 +24,12 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import model.Event;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 
 @ApplicationScoped
 public class GoogleCalendarService {
 
-    private static final Logger log = Logger.getLogger(GoogleCalendarService.class.getName());
 
     @ConfigProperty(name = "google.calendar.credentials", defaultValue = "")
     String credentialsJson;
@@ -51,7 +49,7 @@ public class GoogleCalendarService {
     private JsonObject getCredentials() {
         String jsonStr = credentialsJson;
         if (jsonStr == null || jsonStr.isBlank()) {
-            log.warning("Google Calendar credentials are not configured.");
+            Telemetry.warn("Google Calendar credentials are not configured");
             return null;
         }
         String trimmed = jsonStr.trim();
@@ -62,18 +60,18 @@ public class GoogleCalendarService {
                 if (Files.exists(path)) {
                     jsonStr = Files.readString(path, StandardCharsets.UTF_8);
                 } else {
-                    log.warning("Google Calendar credentials file does not exist: " + filePath);
+                    Telemetry.warn("Google Calendar credentials file does not exist", "file.path", filePath);
                     return null;
                 }
             } catch (Exception e) {
-                log.log(Level.WARNING, "Failed to read Google credentials from file: " + filePath, e);
+                Telemetry.warn("Failed to read Google credentials from file", e, "file.path", filePath);
                 return null;
             }
         }
         try {
             return parseJson(jsonStr);
         } catch (Exception e) {
-            log.log(Level.WARNING, "Failed to parse Google credentials JSON", e);
+            Telemetry.warn("Failed to parse Google credentials JSON", e);
             return null;
         }
     }
@@ -85,7 +83,7 @@ public class GoogleCalendarService {
 
         JsonObject creds = getCredentials();
         if (creds == null) {
-            log.warning("Google Calendar credentials are not configured.");
+            Telemetry.warn("Google Calendar credentials are not configured");
             return null;
         }
 
@@ -124,8 +122,8 @@ public class GoogleCalendarService {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
-                log.severe("Failed to retrieve Google OAuth token. Status: " + response.statusCode() + ", Body: "
-                        + response.body());
+                Telemetry.error("Failed to retrieve Google OAuth token",
+                        "http.response.status_code", response.statusCode(), "http.response.body", response.body());
                 return null;
             }
 
@@ -137,7 +135,7 @@ public class GoogleCalendarService {
             return cachedToken;
 
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Exception while obtaining Google access token", e);
+            Telemetry.error("Exception while obtaining Google access token", e);
             return null;
         }
     }
@@ -147,11 +145,12 @@ public class GoogleCalendarService {
         return credentialsJson != null && !credentialsJson.isBlank() && getCredentials() != null;
     }
 
+    @WithSpan
     public String syncEvent(Event event) {
-        log.info("GoogleCalendarService/syncEvent: " + event.getTitle());
+        Telemetry.attrs("event.id", event.getId(), "google.calendar.event.id", event.getGoogleCalendarEventId());
         String token = getAccessToken();
         if (token == null) {
-            log.warning("Skipping Google Calendar sync: service token could not be fetched.");
+            Telemetry.warn("Skipping Google Calendar sync: service token could not be fetched");
             return null;
         }
 
@@ -208,24 +207,25 @@ public class GoogleCalendarService {
                 JsonObject resp = parseJson(response.body());
                 return resp.getString("id");
             } else {
-                log.severe("Google Calendar API request failed. Status: " + response.statusCode() + ", Body: "
-                        + response.body());
+                Telemetry.error("Google Calendar API request failed",
+                        "http.response.status_code", response.statusCode(), "http.response.body", response.body());
             }
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Failed to sync event to Google Calendar", e);
+            Telemetry.error("Failed to sync event to Google Calendar", e);
         }
         return null;
     }
 
+    @WithSpan
     public void deleteEvent(String googleCalendarEventId) {
-        log.info("GoogleCalendarService/deleteEvent: " + googleCalendarEventId);
+        Telemetry.attr("google.calendar.event.id", googleCalendarEventId);
         if (googleCalendarEventId == null || googleCalendarEventId.isBlank()) {
             return;
         }
 
         String token = getAccessToken();
         if (token == null) {
-            log.warning("Skipping Google Calendar deletion: service token could not be fetched.");
+            Telemetry.warn("Skipping Google Calendar deletion: service token could not be fetched");
             return;
         }
 
@@ -240,11 +240,11 @@ public class GoogleCalendarService {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200 && response.statusCode() != 204 && response.statusCode() != 410
                     && response.statusCode() != 404) {
-                log.severe("Google Calendar event deletion failed. Status: " + response.statusCode() + ", Body: "
-                        + response.body());
+                Telemetry.error("Google Calendar event deletion failed",
+                        "http.response.status_code", response.statusCode(), "http.response.body", response.body());
             }
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Failed to delete event from Google Calendar", e);
+            Telemetry.error("Failed to delete event from Google Calendar", e);
         }
     }
 

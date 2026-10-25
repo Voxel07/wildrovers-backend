@@ -19,8 +19,6 @@ import jakarta.ws.rs.QueryParam;
 
 
 //Logging
-import java.util.logging.Logger;
-import java.util.logging.Level;
 
 import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
@@ -32,11 +30,11 @@ import tools.NotificationService;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import model.Users.Roles;
+import tools.Telemetry;
 
 @Path("/forum/post")
 @ApplicationScoped
 public class ForumPostResource {
-    private static final Logger log = Logger.getLogger(ForumPostResource.class.getName());
 
     @Inject
     ForumPostOrm forumPostOrm;
@@ -63,7 +61,6 @@ public class ForumPostResource {
                             @QueryParam("page") Integer page,
                             @QueryParam("size") Integer size)
     {
-        log.info("ForumResource/getPosts");
         model.User user = userPrincipalResolver.resolveUser();
         String userRole = user != null ? user.getRole() : Roles.VSISITOR;
         ForumPage<ForumPost> result = forumPostOrm.findPosts(postId, topicId, userId, editorId, title,
@@ -84,7 +81,7 @@ public class ForumPostResource {
                     }
                 }
             } catch (Exception e) {
-                log.log(Level.WARNING, "Failed to set viewed state on posts", e);
+                Telemetry.warn("Failed to set viewed state on posts", e);
             }
         }
         return Response.ok(mutablePosts).header(ForumPage.TOTAL_HEADER, result.total()).build();
@@ -110,7 +107,7 @@ public class ForumPostResource {
             forumPostOrm.recordPostView(postId, user.getId());
         } catch (Exception e) {
             // A parallel request recorded the same view first (unique key); nothing to do.
-            log.log(Level.FINE, "Post view already recorded", e);
+            Telemetry.event("forum.post.view_already_recorded", "forum.post.id", postId);
         }
         return Response.noContent().build();
     }
@@ -160,7 +157,6 @@ public class ForumPostResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response addPost(ForumPost forumPost,@QueryParam("topic")Long topicId){
-        log.info("ForumPostResource/addPost");
         Long userId = userPrincipalResolver.resolveUserId();
 
         if(userId == null || forumPost == null)
@@ -170,7 +166,7 @@ public class ForumPostResource {
         else
         {
             model.User user = userPrincipalResolver.resolveUser();
-            AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+            AuditLogger.crud(user != null ? user.getUserName() : "unknown", userId,
                     "CREATE", "Post", forumPost.getTitle());
             Response response = forumPostOrm.addPost(forumPost, topicId, userId);
             if (response.getStatus() == 201 && response.getEntity() instanceof Long postId) {
@@ -185,14 +181,13 @@ public class ForumPostResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response updatePost(ForumPost forumPost){
-        log.info("ForumPostResource/updatePost");
         Long userId = userPrincipalResolver.resolveUserId();
 
         if (userId == null || forumPost == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
         } else {
             model.User user = userPrincipalResolver.resolveUser();
-            AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+            AuditLogger.crud(user != null ? user.getUserName() : "unknown", userId,
                     "UPDATE", "Post", forumPost.getId());
             Response result = forumPostOrm.updatePost(forumPost, userId);
             if (result.getStatus() == 200) {
@@ -207,14 +202,13 @@ public class ForumPostResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response deletePost(ForumPost forumPost){
-        log.info("ForumPostResource/deletePost");
         Long userId = userPrincipalResolver.resolveUserId();
 
         if (userId == null || forumPost == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
         } else {
             model.User user = userPrincipalResolver.resolveUser();
-            AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+            AuditLogger.crud(user != null ? user.getUserName() : "unknown", userId,
                     "DELETE", "Post", forumPost.getId());
             // Title and audience must come from the stored post, before it is deleted.
             ForumPostOrm.NotificationInfo info = forumPostOrm.notificationInfo(forumPost.getId());
@@ -232,14 +226,13 @@ public class ForumPostResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response votePost(@QueryParam("post") Long postId, @QueryParam("type") String type) {
-        log.info("ForumPostResource/votePost");
         Long userId = userPrincipalResolver.resolveUserId();
 
         if (userId == null || postId == null || type == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
         }
         model.User user = userPrincipalResolver.resolveUser();
-        AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+        AuditLogger.crud(user != null ? user.getUserName() : "unknown", userId,
                 "VOTE", "Post", postId, "type=" + type);
         return forumPostOrm.votePost(postId, type, userId);
     }

@@ -15,8 +15,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Stream;
 
 /**
@@ -27,7 +25,6 @@ import java.util.stream.Stream;
  */
 @ApplicationScoped
 public class ForumImageCleanup {
-    private static final Logger log = Logger.getLogger(ForumImageCleanup.class.getName());
 
     /** Files younger than this are kept: their post/answer may not be committed yet. */
     static final Duration MIN_AGE = Duration.ofHours(1);
@@ -44,9 +41,9 @@ public class ForumImageCleanup {
     void scheduledCleanup() {
         try {
             int removed = cleanup(Instant.now());
-            log.info("Forum image cleanup removed " + removed + " files");
+            Telemetry.attr("forum.images.removed", removed);
         } catch (Exception e) {
-            log.log(Level.WARNING, "Forum image cleanup failed", e);
+            Telemetry.error("Forum image cleanup failed", e);
         }
     }
 

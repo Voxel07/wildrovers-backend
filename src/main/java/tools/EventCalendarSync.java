@@ -3,8 +3,6 @@ package tools;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import model.Event;
 import orm.EventOrm;
 
@@ -18,7 +16,6 @@ import static io.quarkus.scheduler.Scheduled.ConcurrentExecution.SKIP;
 @ApplicationScoped
 public class EventCalendarSync {
 
-    private static final Logger log = Logger.getLogger(EventCalendarSync.class.getName());
     /** The request thread syncs right after the commit; the retry leaves those alone for a while. */
     private static final long RETRY_GRACE_MILLIS = 2 * 60 * 1000L;
 
@@ -42,7 +39,7 @@ public class EventCalendarSync {
                 eventOrm.markCalendarSynced(eventId, googleId, requested);
             }
         } catch (Exception e) {
-            log.log(Level.WARNING, "Calendar sync failed for event " + eventId + "; will retry", e);
+            Telemetry.error("Calendar sync failed; will retry", e, "event.id", eventId);
         }
     }
 
@@ -52,7 +49,7 @@ public class EventCalendarSync {
         try {
             googleCalendarService.deleteEvent(googleCalendarEventId);
         } catch (Exception e) {
-            log.log(Level.WARNING, "Calendar delete failed for " + googleCalendarEventId, e);
+            Telemetry.error("Calendar delete failed", e, "google.calendar.event.id", googleCalendarEventId);
         }
     }
 

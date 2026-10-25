@@ -7,8 +7,6 @@ import jakarta.inject.Inject;
 import jakarta.annotation.PostConstruct;
 
 import java.util.UUID;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import static io.quarkus.scheduler.Scheduled.ConcurrentExecution.SKIP;
@@ -16,7 +14,6 @@ import static io.quarkus.scheduler.Scheduled.ConcurrentExecution.SKIP;
 @ApplicationScoped
 @Startup
 public class NotificationScheduler {
-    private static final Logger log = Logger.getLogger(NotificationScheduler.class.getName());
     @Inject NotificationService notifications;
     @Inject NotificationPreferenceService preferences;
     @Inject Email email;
@@ -25,7 +22,6 @@ public class NotificationScheduler {
 
     @PostConstruct
     void started() {
-        log.info("Notification delivery scheduler started");
     }
 
     @Scheduled(every = "${notification.mail.delivery-interval:15s}", concurrentExecution = SKIP)
@@ -56,8 +52,8 @@ public class NotificationScheduler {
             try {
                 boolean sent;
                 if ("EMAIL".equals(channel)) {
-                    log.info("Attempting notification email delivery for user " + batch.userId()
-                            + " with " + batch.items().size() + " item(s)");
+                    Telemetry.event("notification.delivery_attempt", "notification.channel", channel,
+                            "user.id", batch.userId(), "notification.items", batch.items().size(), "notification.attempts", batch.attempts());
                     sent = email.trySendNotificationMail(batch.email(), subject, html(batch));
                 } else {
                     NotificationPreferenceService.WebhookTarget target = preferences.target(batch.userId());
@@ -69,13 +65,16 @@ public class NotificationScheduler {
                 }
                 if (sent) {
                     notifications.markDelivered(batch.receiptIds(), channel);
-                    log.info(channel + " notification delivered for user " + batch.userId());
+                    Telemetry.event("notification.delivered", "notification.channel", channel, "user.id", batch.userId(),
+                            "notification.items", batch.items().size());
                 } else {
-                    log.warning(channel + " notification deferred by delivery limits for user " + batch.userId());
+                    Telemetry.warn("Notification deferred by delivery limits", "notification.channel", channel, "user.id", batch.userId(),
+                            "notification.attempts", batch.attempts());
                     notifications.markRetry(batch.receiptIds(), channel, batch.attempts());
                 }
             } catch (Exception e) {
-                log.log(Level.WARNING, channel + " notification delivery failed for user " + batch.userId(), e);
+                Telemetry.warn("Notification delivery failed", e, "notification.channel", channel, "user.id", batch.userId(),
+                        "notification.attempts", batch.attempts());
                 notifications.markRetry(batch.receiptIds(), channel, batch.attempts());
             }
         }

@@ -4,16 +4,14 @@ import jakarta.inject.Inject;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.TypedQuery;
 import jakarta.persistence.EntityManager;
-//Logging zeug
-import org.jboss.logging.Logger;
 
 import model.Address;
 import model.User;
+import tools.Telemetry;
 
 @ApplicationScoped
 public class AddressOrm {
 
-    private static final Logger LOG = Logger.getLogger(AddressOrm.class);
 
     @Inject
     EntityManager em;
@@ -28,7 +26,7 @@ public class AddressOrm {
         try {
             a = query.getSingleResult();
         } catch (Exception e) {
-            LOG.error("Fehler bei getAddressByUser");
+            Telemetry.warn("Address lookup failed", e, "user.id", userId);
         }
 
         return a;

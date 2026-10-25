@@ -30,12 +30,10 @@ import jakarta.ws.rs.core.Response;
 import model.Users.Roles;
 
 //Logging
-import java.util.logging.Logger;
 
 @Path("/forum/answer")
 @ApplicationScoped
 public class ForumAnswerResource{
-    private static final Logger log = Logger.getLogger(ForumAnswerResource.class.getName());
 
     @Inject
     ForumAnswerOrm forumAnswerOrm;
@@ -54,7 +52,6 @@ public class ForumAnswerResource{
                                         @QueryParam("page") Integer page,
                                         @QueryParam("size") Integer size)
     {
-        log.info("ForumAnswerResource/getAnswers");
         model.User user = userPrincipalResolver.resolveUser();
         String userRole = user != null ? user.getRole() : Roles.VSISITOR;
         ForumPage<ForumAnswer> result = forumAnswerOrm.findAnswers(answerId, postId, userId, editorId,
@@ -66,7 +63,6 @@ public class ForumAnswerResource{
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response addAnswer(ForumAnswer forumAnswer, @QueryParam("post") Long postId){
-        log.info("ForumAnswerResource/addAnswer");
         Long userId = userPrincipalResolver.resolveUserId();
 
         if(userId == null || forumAnswer == null)
@@ -76,7 +72,7 @@ public class ForumAnswerResource{
         else
         {
             model.User user = userPrincipalResolver.resolveUser();
-            AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+            AuditLogger.crud(user != null ? user.getUserName() : "unknown", userId,
                     "CREATE", "Answer", postId);
             return forumAnswerOrm.addAnswer(forumAnswer, postId, userId);
         }
@@ -87,13 +83,12 @@ public class ForumAnswerResource{
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response updateAnswer(ForumAnswer forumAnswer){
-        log.info("ForumAnswerResource/updateAnswer");
         Long userId = userPrincipalResolver.resolveUserId();
         if(userId == null || forumAnswer == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
         }
         model.User user = userPrincipalResolver.resolveUser();
-        AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+        AuditLogger.crud(user != null ? user.getUserName() : "unknown", userId,
                 "UPDATE", "Answer", forumAnswer.getId());
         return forumAnswerOrm.updateAnswer(forumAnswer, userId);
     }
@@ -103,13 +98,12 @@ public class ForumAnswerResource{
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response deleteAnswer(ForumAnswer forumAnswer){
-        log.info("ForumAnswerResource/deleteAnswer");
         Long userId = userPrincipalResolver.resolveUserId();
         if(userId == null || forumAnswer == null) {
             return Response.status(401).entity("Fehlender oder falscher Parameter").build();
         }
         model.User user = userPrincipalResolver.resolveUser();
-        AuditLogger.crud(log, user != null ? user.getUserName() : "unknown", userId,
+        AuditLogger.crud(user != null ? user.getUserName() : "unknown", userId,
                 "DELETE", "Answer", forumAnswer.getId());
         return forumAnswerOrm.deleteAnswer(forumAnswer, userId);
     }

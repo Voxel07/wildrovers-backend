@@ -14,7 +14,8 @@ import tools.Time;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.logging.Logger;
+import tools.Telemetry;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 
 /**
  * Refresh sessions behind the HttpOnly {@code wr_rt} cookie. Each refresh
@@ -23,7 +24,6 @@ import java.util.logging.Logger;
  */
 @ApplicationScoped
 public class AuthSessionOrm {
-    private static final Logger log = Logger.getLogger(AuthSessionOrm.class.getName());
 
     /** Parallel requests from several tabs may present the token that was just replaced. */
     static final long ROTATION_GRACE_MS = 30_000L;
@@ -83,8 +83,8 @@ public class AuthSessionOrm {
             if (replaced.getRotatedAt() != null && now - replaced.getRotatedAt() <= ROTATION_GRACE_MS) {
                 return new Refresh(Outcome.GRACE, replaced, null);
             }
-            log.warning("Refresh token reuse detected for session " + replaced.getId() + " of user "
-                    + replaced.getUserId() + "; ending the session.");
+            Telemetry.warn("Refresh token reuse detected; ending the session",
+                    "auth.session.id", replaced.getId(), "user.id", replaced.getUserId(), "security.event", "refresh_token_reuse");
             replaced.setRevokedAt(now);
             return new Refresh(Outcome.REUSED, replaced, null);
         }
@@ -147,7 +147,7 @@ public class AuthSessionOrm {
         try {
             return AesGcm.decrypt(encryptionKey, value);
         } catch (Exception e) {
-            log.warning("Stored identity-provider token of session " + session.getId() + " cannot be decrypted");
+            Telemetry.warn("Stored identity-provider token cannot be decrypted", e, "auth.session.id", session.getId());
             return null;
         }
     }
@@ -155,13 +155,14 @@ public class AuthSessionOrm {
     /** Deletes sessions that can no longer be used. */
     @Scheduled(cron = "0 15 4 * * ?")
     @Transactional
+    @WithSpan
     void purgeExpired() {
         long now = Time.currentTimeInMillis();
         int removed = em.createQuery("DELETE FROM AuthSession s WHERE s.revokedAt IS NOT NULL OR s.lastUsedAt < :idle OR s.createdAt < :max")
                 .setParameter("idle", now - idleTtl.toMillis())
                 .setParameter("max", now - maxAge.toMillis())
                 .executeUpdate();
-        if (removed > 0) log.info("Removed " + removed + " expired auth sessions");
+        Telemetry.attr("auth.sessions.purged", removed);
     }
 
     private AuthSession findBy(String field, String hash) {

@@ -9,17 +9,16 @@ import jakarta.inject.Inject;
 import model.User;
 import orm.UserOrm;
 //Logging
-import java.util.logging.Logger;
-import java.util.logging.Level;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.HexFormat;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
+import tools.Telemetry;
 
 @ApplicationScoped
 public class SecretOrm {
-    private static final Logger log = Logger.getLogger(SecretOrm.class.getName());
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Inject
@@ -28,13 +27,12 @@ public class SecretOrm {
     @Inject
     EntityManager em;
 
+    @WithSpan
     public String addSecret(Long userId, Boolean isVerifyed, String verificationId, String password){
-        log.info("SecretOrm/addSecret");
-
         User user = em.find(User.class, userId);
 
         if(user == null){
-            log.warning("USER not found");
+            Telemetry.warn("User not found", "user.id", userId);
             return "User nicht gefunden";
         }
 
@@ -46,7 +44,7 @@ public class SecretOrm {
         try {
             em.persist(secret);
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            Telemetry.error("Storing secret failed", e, "user.id", userId);
             return "Fehler beim erstellen des Eintrags";
         }
         return "Secreat erfolgreich erstellt";
@@ -59,13 +57,13 @@ public class SecretOrm {
     }
 
     @Transactional
+    @WithSpan
     public String verifyUser(String email, String verificationId)
     {
-        log.info("SecretOrm/verifyUser for email: " + email);
 
         User user = userOrm.findByEmail(email);
         if (user == null) {
-            log.info("User not found: " + email);
+            Telemetry.event("verification.user_not_found");
             return "Der User wurde nicht gefunden";
         }
         if (user.getSecret() == null) {
@@ -92,7 +90,7 @@ public class SecretOrm {
         try {
             em.merge(user);
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Result: " + e.getMessage(), e);
+            Telemetry.error("Account verification failed", e);
             return "Fehler beim update";
         }
         return "Erfolgreich validiert";
@@ -121,7 +119,7 @@ public class SecretOrm {
                     .setParameter("val", hashResetToken(token))
                     .getSingleResult();
         } catch (Exception e) {
-            log.log(Level.FINE, "Reset token was not found", e);
+            Telemetry.event("password_reset.token_not_found");
             return null;
         }
     }

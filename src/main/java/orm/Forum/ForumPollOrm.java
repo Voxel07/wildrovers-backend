@@ -9,14 +9,14 @@ import model.Forum.ForumPost;
 import model.Forum.Polls.Polls;
 import model.Forum.Polls.PollOptions;
 import model.User;
-import java.util.logging.Logger;
 import java.util.List;
 import io.quarkus.cache.CacheResult;
 import io.quarkus.cache.CacheInvalidateAll;
+import tools.Telemetry;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 
 @ApplicationScoped
 public class ForumPollOrm {
-    private static final Logger log = Logger.getLogger(ForumPollOrm.class.getName());
 
     @Inject
     EntityManager em;
@@ -26,8 +26,9 @@ public class ForumPollOrm {
         @CacheInvalidateAll(cacheName = "poll-has-voted"),
         @CacheInvalidateAll(cacheName = "poll-voted-options")
     })
+    @WithSpan
     public Response createPoll(Long postId, Polls poll, Long userId) {
-        log.info("ForumPollOrm/createPoll for post: " + postId);
+        Telemetry.attrs("forum.post.id", postId, "user.id", userId);
         ForumPost post = em.find(ForumPost.class, postId);
         if (post == null) {
             return Response.status(Response.Status.NOT_FOUND).entity("Post nicht gefunden").build();
@@ -66,8 +67,9 @@ public class ForumPollOrm {
         @CacheInvalidateAll(cacheName = "poll-has-voted"),
         @CacheInvalidateAll(cacheName = "poll-voted-options")
     })
+    @WithSpan
     public Response vote(Long pollId, List<Long> optionIds, Long userId) {
-        log.info("ForumPollOrm/vote on poll: " + pollId + ", options: " + optionIds + " by user: " + userId);
+        Telemetry.attrs("poll.id", pollId, "poll.option.ids", optionIds, "poll.option.count", optionIds != null ? optionIds.size() : 0, "user.id", userId);
         // Row lock: votes on one poll run one after the other, so the voter lists and counts stay consistent.
         Polls poll = em.find(Polls.class, pollId, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
         if (poll == null) {
@@ -220,8 +222,9 @@ public class ForumPollOrm {
         @CacheInvalidateAll(cacheName = "poll-has-voted"),
         @CacheInvalidateAll(cacheName = "poll-voted-options")
     })
+    @WithSpan
     public Response updatePoll(Long pollId, Polls updatedPoll, Long userId) {
-        log.info("ForumPollOrm/updatePoll: " + pollId + " by user: " + userId);
+        Telemetry.attrs("poll.id", pollId, "user.id", userId);
         Polls poll = em.find(Polls.class, pollId);
         if (poll == null) {
             return Response.status(Response.Status.NOT_FOUND).entity("Umfrage nicht gefunden").build();
@@ -291,8 +294,9 @@ public class ForumPollOrm {
         @CacheInvalidateAll(cacheName = "poll-has-voted"),
         @CacheInvalidateAll(cacheName = "poll-voted-options")
     })
+    @WithSpan
     public Response deletePoll(Long pollId, Long userId) {
-        log.info("ForumPollOrm/deletePoll: " + pollId + " by user: " + userId);
+        Telemetry.attrs("poll.id", pollId, "user.id", userId);
         Polls poll = em.find(Polls.class, pollId);
         if (poll == null) {
             return Response.status(Response.Status.NOT_FOUND).entity("Umfrage nicht gefunden").build();

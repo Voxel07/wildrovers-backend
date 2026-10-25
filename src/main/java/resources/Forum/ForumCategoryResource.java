@@ -21,7 +21,6 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.Response;
 
 //Logging
-import java.util.logging.Logger;
 
 import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
@@ -29,13 +28,13 @@ import model.Forum.ForumCategory;
 import orm.Forum.ForumCategoryOrm;
 import model.Users.Roles;
 import tools.AuditLogger;
+import tools.Telemetry;
 
 
 
 @Path("/forum/category")
 @ApplicationScoped
 public class ForumCategoryResource {
-    private static final Logger log = Logger.getLogger(ForumCategoryResource.class.getName());
 
     @Inject
     ForumCategoryOrm forumCategoryOrm;
@@ -49,16 +48,15 @@ public class ForumCategoryResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public List<ForumCategory> getCategorys(@QueryParam("categoryId") Long categoryId,
             @QueryParam("category") String category) {
-        log.info("ForumResource/getCategorys");
         List<ForumCategory> categories;
         if (categoryId != null) {
-            log.info("ForumResource/getCategorys/id");
+            Telemetry.attrs("forum.query", "id", "forum.category.id", categoryId);
             categories = forumCategoryOrm.getCategoriesById(categoryId);
         } else if (category != null) {
-            log.info("ForumResource/getCategorys/name");
+            Telemetry.attr("forum.query", "name");
             categories = forumCategoryOrm.getCategoriesByName(category);
         } else {
-            log.info("ForumResource/getCategorys/all");
+            Telemetry.attr("forum.query", "all");
             categories = forumCategoryOrm.getAllCategories();
         }
 
@@ -84,7 +82,6 @@ public class ForumCategoryResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response addCategory(@Valid ForumCategory forumCategory) {
-        log.info("ForumResource/addCategory");
         model.User user = userPrincipalResolver.resolveUser();
 
         if (user == null || forumCategory == null) {
@@ -93,7 +90,7 @@ public class ForumCategoryResource {
         if (Roles.VSISITOR.equals(user.getRole()) && !user.getCanCreateCategory()) {
             return Response.status(403).entity("Du hast keine Berechtigung, Kategorien zu verwalten.").build();
         }
-        AuditLogger.crud(log, user.getUserName(), user.getId(), "CREATE", "Category",
+        AuditLogger.crud(user.getUserName(), user.getId(), "CREATE", "Category",
                 forumCategory.getCategory());
         return forumCategoryOrm.addCategory(forumCategory, user.getId());
     }
@@ -103,7 +100,6 @@ public class ForumCategoryResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response updateCategory(ForumCategory forumCategory) {
-        log.info("ForumResource/updateCategory");
         model.User user = userPrincipalResolver.resolveUser();
 
         if (user == null || forumCategory == null) {
@@ -112,7 +108,7 @@ public class ForumCategoryResource {
         if (Roles.VSISITOR.equals(user.getRole()) && !user.getCanCreateCategory()) {
             return Response.status(403).entity("Du hast keine Berechtigung, Kategorien zu verwalten.").build();
         }
-        AuditLogger.crud(log, user.getUserName(), user.getId(), "UPDATE", "Category",
+        AuditLogger.crud(user.getUserName(), user.getId(), "UPDATE", "Category",
                 forumCategory.getId());
         return forumCategoryOrm.updateCategory(forumCategory, user.getId());
     }
@@ -122,7 +118,6 @@ public class ForumCategoryResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response deleteCategory(ForumCategory forumCategory) {
-        log.info("ForumResource/deleteCategory");
         model.User user = userPrincipalResolver.resolveUser();
 
         if (user == null || forumCategory == null) {
@@ -131,7 +126,7 @@ public class ForumCategoryResource {
         if (Roles.VSISITOR.equals(user.getRole()) && !user.getCanCreateCategory()) {
             return Response.status(403).entity("Du hast keine Berechtigung, Kategorien zu verwalten.").build();
         }
-        AuditLogger.crud(log, user.getUserName(), user.getId(), "DELETE", "Category",
+        AuditLogger.crud(user.getUserName(), user.getId(), "DELETE", "Category",
                 forumCategory.getId());
         return forumCategoryOrm.deleteCategory(forumCategory, user.getId());
     }

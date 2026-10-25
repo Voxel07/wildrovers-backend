@@ -10,7 +10,6 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
 
 /**
  * Rate limiter using Bucket4j and backed by a Caffeine cache for auto-cleanup.
@@ -19,7 +18,6 @@ import java.util.logging.Logger;
 @ApplicationScoped
 public class RateLimiter {
 
-    private static final Logger log = Logger.getLogger(RateLimiter.class.getName());
 
     @Inject
     SecurityIdentity identity;
@@ -117,8 +115,9 @@ public class RateLimiter {
         boolean allowed = bucket.tryConsume(1);
 
         if (!allowed) {
-            log.warning("Rate limit exceeded for " + identityKey + " (IP: " + ip + ", Role: " + role + ") on " + path 
-                    + " [" + match.pathPrefix + "] limit is " + (int) Math.round(match.limit * multiplier) + "/" + match.windowSeconds + "s");
+            Telemetry.warn("Rate limit exceeded", "security.event", "rate_limited", "rate_limit.key", identityKey,
+                    "enduser.role", role, "rate_limit.path_prefix", match.pathPrefix,
+                    "rate_limit.limit", (int) Math.round(match.limit * multiplier), "rate_limit.window_seconds", match.windowSeconds);
         }
         return allowed;
     }

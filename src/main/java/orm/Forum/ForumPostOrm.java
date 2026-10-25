@@ -12,8 +12,6 @@ import jakarta.persistence.TypedQuery;
 import jakarta.transaction.Transactional;
 
 //Logging
-import java.util.logging.Logger;
-import java.util.logging.Level;
 
 import model.User;
 import model.Forum.ForumPost;
@@ -26,12 +24,13 @@ import jakarta.ws.rs.core.Response;
 import tools.Time;
 import tools.HtmlSanitizer;
 import tools.ForumImageStore;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
+import tools.Telemetry;
 
 
 
 @ApplicationScoped
 public class ForumPostOrm {
-    private static final Logger log = Logger.getLogger(ForumPostOrm.class.getName());
     @Inject
     EntityManager em;
     @Inject
@@ -47,15 +46,15 @@ public class ForumPostOrm {
     @Inject
     ForumImageStore imageStore;
 
+    @WithSpan
     public List<ForumPost> getAllPosts() {
-        log.info("ForumOrm/getPosts");
         TypedQuery<ForumPost> query = em.createQuery(
                 "SELECT fp FROM ForumPost fp LEFT JOIN FETCH fp.topic t LEFT JOIN FETCH t.category c", ForumPost.class);
         return query.getResultList();
     }
 
+    @WithSpan
     public List<ForumPost> getPostsByUser(Long userId) {
-        log.info("ForumOrm/getPostsByUser");
         TypedQuery<ForumPost> query = em.createQuery(
                 "SELECT fp FROM ForumPost fp LEFT JOIN FETCH fp.topic t LEFT JOIN FETCH t.category c WHERE fp.creator.id = :val",
                 ForumPost.class);
@@ -67,9 +66,9 @@ public class ForumPostOrm {
      * Paged post list for one reader. Only one filter is applied, in the order post, topic,
      * user, editor, title. Lists are newest first, as the topic table shows them.
      */
+    @WithSpan
     public ForumPage<ForumPost> findPosts(Long postId, Long topicId, Long userId, Long editorId, String title,
             List<String> visibleRoles, Integer page, Integer size) {
-        log.info("ForumPostOrm/findPosts");
         String filter = "";
         Object value = null;
         if (postId != null) { filter = " AND fp.id = :val"; value = postId; }
@@ -105,8 +104,8 @@ public class ForumPostOrm {
         return new ForumPage<>(posts, count.getSingleResult());
     }
 
+    @WithSpan
     public List<ForumPost> getPostsById(Long postId) {
-        log.info("ForumOrm/getPostsById");
         TypedQuery<ForumPost> query = em.createQuery(
                 "SELECT fp FROM ForumPost fp LEFT JOIN FETCH fp.topic t LEFT JOIN FETCH t.category c WHERE fp.id = :val",
                 ForumPost.class);
@@ -114,8 +113,8 @@ public class ForumPostOrm {
         return query.getResultList();
     }
 
+    @WithSpan
     public List<ForumPost> getPostsByEditor(Long userId) {
-        log.info("ForumOrm/getPostsByEditor");
         TypedQuery<ForumPost> query = em.createQuery(
                 "SELECT fp FROM ForumPost fp LEFT JOIN FETCH fp.topic t LEFT JOIN FETCH t.category c WHERE fp.editor.id = :val",
                 ForumPost.class);
@@ -123,8 +122,8 @@ public class ForumPostOrm {
         return query.getResultList();
     }
 
+    @WithSpan
     public List<ForumPost> getPostsByTopic(Long topicId) {
-        log.info("ForumOrm/getPostsByTopic");
         TypedQuery<ForumPost> query = em.createQuery(
                 "SELECT fp FROM ForumPost fp LEFT JOIN FETCH fp.topic t LEFT JOIN FETCH t.category c WHERE fp.topic.id = :val",
                 ForumPost.class);
@@ -132,8 +131,8 @@ public class ForumPostOrm {
         return query.getResultList();
     }
 
+    @WithSpan
     public List<ForumPost> getPostByTitel(String title) {
-        log.info("ForumOrm/getPostByTitel");
         TypedQuery<ForumPost> query = em.createQuery(
                 "SELECT fp FROM ForumPost fp LEFT JOIN FETCH fp.topic t LEFT JOIN FETCH t.category c WHERE fp.title = :val",
                 ForumPost.class);
@@ -141,8 +140,9 @@ public class ForumPostOrm {
         return query.getResultList();
     }
 
+    @WithSpan
     public ForumPost getLatestPost(Long topicId) {
-        log.info("ForumPostOrm/getLatestPost " + topicId);
+        Telemetry.attr("forum.topic.id", topicId);
         TypedQuery<ForumPost> query = em.createQuery(
                 "SELECT fp FROM ForumPost fp LEFT JOIN FETCH fp.topic t LEFT JOIN FETCH t.category c WHERE fp.topic.id = :val ORDER BY fp.creationDate DESC",
                 ForumPost.class);
@@ -154,7 +154,6 @@ public class ForumPostOrm {
         } catch (Exception e) {
             return fp;
         }
-        log.info("Creator:" + fp.getCreator());
 
         fp.setCreator(fp.getCreatorObj());
 
@@ -189,8 +188,8 @@ public class ForumPostOrm {
      * @return
      */
     @Transactional
+    @WithSpan
     public Response addPost(ForumPost forumPost, Long topicId, Long userId) {
-        log.info("ForumPostOrm/addPost");
         if (topicId == null)
             return Response.status(400).entity("Es muss ein Tehma angegeben werden").build();
         if (userId == null)
@@ -198,7 +197,7 @@ public class ForumPostOrm {
 
         ForumTopic topic = em.find(ForumTopic.class, topicId);
         if (topic == null) {
-            log.warning("TOPIC not found");
+            Telemetry.warn("Topic not found", "forum.topic.id", topicId);
             return Response.status(404).entity("Das angegebene Tehma existiert nicht").build();
         }
         String title = htmlSanitizer.sanitizeTitle(forumPost.getTitle());
@@ -236,7 +235,7 @@ public class ForumPostOrm {
         try {
             em.persist(forumPost);
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            Telemetry.error("Adding post failed", e, "forum.topic.id", topicId, "user.id", userId);
             return Response.status(500).entity("Fehler beim erstellen des Posts").build();
         }
         ForumCounters.adjust(em, "ForumTopic", "postCount", topicId, 1);
@@ -247,7 +246,7 @@ public class ForumPostOrm {
         try {
             em.merge(forumPost);
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Image content update failed", e);
+            Telemetry.error("Image content update failed", e, "forum.topic.id", topicId);
             // Non-fatal: post is saved, images may still be base64
         }
 
@@ -265,9 +264,8 @@ public class ForumPostOrm {
      * @return
      */
     @Transactional
+    @WithSpan
     public Response updatePost(ForumPost forumPost, Long userId) {
-        log.info("ForumPostOrm/updatePost");
-
         User user = em.find(User.class, userId);
         if (user == null)
             return Response.status(401).entity("User nicht gefunden").build();
@@ -307,7 +305,7 @@ public class ForumPostOrm {
         try {
             em.merge(forumPostAusDB);
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            Telemetry.error("Updating post failed", e, "forum.post.id", forumPost.getId(), "user.id", userId);
             return Response.status(500).entity("Fehler beim Aktualisieren des Posts").build();
         }
         return Response.status(200).entity("Post erfolgreich aktualisiert").build();
@@ -328,9 +326,8 @@ public class ForumPostOrm {
         @io.quarkus.cache.CacheInvalidateAll(cacheName = "events-by-post-id")
     })
     @Transactional
+    @WithSpan
     public Response deletePost(ForumPost forumPost, Long userId) {
-        log.info("ForumPostOrm/deletePost");
-
         User user = em.find(User.class, userId);
         if (user == null)
             return Response.status(401).entity("User nicht gefunden").build();
@@ -349,7 +346,7 @@ public class ForumPostOrm {
         try {
             removePostCascade(forumPostAusDB);
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            Telemetry.error("Deleting post failed", e, "forum.post.id", forumPost.getId(), "user.id", userId);
             return Response.status(500).entity("Fehler beim Löschen des Posts").build();
         }
 
@@ -460,9 +457,8 @@ public class ForumPostOrm {
         @io.quarkus.cache.CacheInvalidateAll(cacheName = "events-by-post-id")
     })
     @Transactional
+    @WithSpan
     public String deleteAllPostsFromUser(Long userId) {
-        log.info("ForumPostOrm/deleteAllPostsFromUser");
-
         List<Long> postIds = em.createQuery("SELECT fp.id FROM ForumPost fp WHERE fp.creator.id = :val", Long.class)
                 .setParameter("val", userId)
                 .getResultList();
@@ -488,9 +484,8 @@ public class ForumPostOrm {
         @io.quarkus.cache.CacheInvalidateAll(cacheName = "events-by-post-id")
     })
     @Transactional
+    @WithSpan
     public String deleteAllPostsFromTopic(Long topicId) {
-        log.info("ForumPostOrm/deleteAllPostsFromTopic");
-
         // Get all posts to clean up associated data
         List<ForumPost> allPosts = getPostsByTopic(topicId);
         for (ForumPost forumPost : allPosts) {
@@ -517,7 +512,7 @@ public class ForumPostOrm {
             em.createQuery("DELETE FROM ForumPost fp WHERE fp.topic.id = :val").setParameter("val", topicId)
                     .executeUpdate();
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Result{0}", e.getMessage());
+            Telemetry.error("Deleting posts of topic failed", e, "forum.topic.id", topicId);
             return "Fehler beim Löschen der Antworten";
         }
 
@@ -528,8 +523,9 @@ public class ForumPostOrm {
      * Increment like or dislike counter for a post with single-vote enforcement.
      */
     @Transactional
+    @WithSpan
     public Response votePost(Long postId, String type, Long userId) {
-        log.info("ForumPostOrm/votePost postId=" + postId + " type=" + type + " userId=" + userId);
+        Telemetry.attrs("forum.post.id", postId, "forum.vote.type", type, "user.id", userId);
         // Row lock: concurrent votes on one post (e.g. a double click) run one after the other,
         // so the vote lookup and the counter changes below cannot interleave.
         ForumPost post = em.find(ForumPost.class, postId, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
@@ -596,7 +592,7 @@ public class ForumPostOrm {
         try {
             em.merge(post);
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Failed to save vote", e);
+            Telemetry.error("Failed to save vote", e);
             return Response.status(500).entity("Fehler beim Speichern der Stimme").build();
         }
 
@@ -615,8 +611,9 @@ public class ForumPostOrm {
      * @return false if the post or user does not exist
      */
     @Transactional
+    @WithSpan
     public boolean recordPostView(Long postId, Long userId) {
-        log.info("ForumPostOrm/recordPostView postId=" + postId + " userId=" + userId);
+        Telemetry.attrs("forum.post.id", postId, "user.id", userId);
         TypedQuery<Long> query = em.createQuery(
             "SELECT COUNT(pv) FROM ForumPostView pv WHERE pv.user.id = :userId AND pv.post.id = :postId",
             Long.class

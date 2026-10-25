@@ -6,10 +6,9 @@ import jakarta.inject.Inject;
 import java.awt.image.BufferedImage;
 import java.util.Base64;
 import java.util.UUID;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 
 /**
  * Extracts base64-encoded images from HTML content, saves them as files,
@@ -26,7 +25,6 @@ import java.util.regex.Pattern;
 @ApplicationScoped
 public class ImageExtractor {
 
-    private static final Logger log = Logger.getLogger(ImageExtractor.class.getName());
 
     static final int MAX_IMAGES = 10;
     static final int MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -47,6 +45,7 @@ public class ImageExtractor {
      * data: URIs replaced by canonical /forum/img/... URLs. Images that exceed the
      * limits or cannot be decoded are removed.
      */
+    @WithSpan
     public String extractAndSaveImages(String html, Long postId, Long authorId) {
         if (html == null || postId == null || !html.contains("data:image")) {
             return html;
@@ -61,16 +60,16 @@ public class ImageExtractor {
             String format = SafeImageReader.outputFormat(matcher.group(2));
             String replacement = "";
             if (imgIndex >= MAX_IMAGES) {
-                log.warning("Post " + postId + ": dropping embedded image beyond the limit of " + MAX_IMAGES);
+                Telemetry.warn("Dropping embedded image beyond the limit", "forum.post.id", postId, "image.index", imgIndex, "image.limit", MAX_IMAGES);
             } else if (b64data.length() > MAX_BASE64_CHARS) {
-                log.warning("Post " + postId + ": dropping oversized embedded image " + imgIndex);
+                Telemetry.warn("Dropping oversized embedded image", "forum.post.id", postId, "image.index", imgIndex, "image.base64_length", b64data.length());
             } else {
                 try {
                     byte[] imageBytes = Base64.getMimeDecoder().decode(b64data);
                     BufferedImage original = imageBytes.length <= MAX_IMAGE_BYTES
                             ? SafeImageReader.readOriented(imageBytes, MAX_PIXELS, ForumImageStore.FULL_MAX_EDGE, format) : null;
                     if (original == null) {
-                        log.warning("Could not decode embedded image " + imgIndex + " for post " + postId);
+                        Telemetry.warn("Could not decode embedded image", "forum.post.id", postId, "image.index", imgIndex, "image.format", format);
                     } else {
                         String filename = "b64-" + UUID.randomUUID() + "." + format;
                         imageStore.saveImage(original, format, String.valueOf(postId), filename, authorId);
@@ -80,12 +79,13 @@ public class ImageExtractor {
                         replacement = "<a href=\"" + fullUrl + "\" target=\"_blank\">"
                             + "<img src=\"" + thumbUrl + "\" alt=\"Beitragsbild\" style=\"max-width:100%;height:auto;\">"
                             + "</a>";
-                        log.info("Saved post " + postId + " image " + imgIndex);
+                        Telemetry.event("image.saved", "forum.post.id", postId, "image.index", imgIndex, "image.format", format,
+                                "image.width", original.getWidth(), "image.height", original.getHeight());
                     }
                 } catch (jakarta.ws.rs.WebApplicationException e) {
                     throw e;
                 } catch (Exception e) {
-                    log.log(Level.WARNING, "Rejected embedded image " + imgIndex + " for post " + postId, e);
+                    Telemetry.warn("Rejected embedded image", e, "forum.post.id", postId, "image.index", imgIndex);
                 }
             }
             imgIndex++;

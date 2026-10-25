@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 /**
@@ -40,7 +39,6 @@ import java.util.stream.Collectors;
  */
 @ApplicationScoped
 public class OidcClient {
-    private static final Logger log = Logger.getLogger(OidcClient.class.getName());
 
     /** The identity provider rejected the grant (expired, revoked, wrong verifier). */
     public static class GrantRejectedException extends Exception {
@@ -127,7 +125,7 @@ public class OidcClient {
             try {
                 access = parser.parse(accessToken);
             } catch (Exception e) {
-                log.fine("Access token is not a verifiable JWT; using id_token claims only");
+                Telemetry.event("oidc.access_token_not_jwt");
             }
         }
         Collection<String> groups = groups(primary);

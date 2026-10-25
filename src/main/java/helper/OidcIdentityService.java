@@ -10,8 +10,8 @@ import jakarta.inject.Inject;
 import model.User;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import orm.UserOrm;
+import tools.Telemetry;
 
-import java.util.logging.Logger;
 
 /**
  * Binds an OIDC bearer token to exactly one database account via the immutable
@@ -21,7 +21,6 @@ import java.util.logging.Logger;
  */
 @ApplicationScoped
 public class OidcIdentityService {
-    private static final Logger log = Logger.getLogger(OidcIdentityService.class.getName());
 
     @Inject
     UserOrm userOrm;
@@ -58,7 +57,7 @@ public class OidcIdentityService {
         String issuer = jwt.getIssuer();
         String subject = jwt.getSubject();
         if (issuer == null || issuer.isBlank() || subject == null || subject.isBlank()) {
-            log.warning("OIDC token without issuer/subject rejected");
+            Telemetry.warn("OIDC token without issuer/subject rejected", "auth.method", "oidc");
             throw new AuthenticationFailedException();
         }
 
@@ -94,7 +93,7 @@ public class OidcIdentityService {
         try {
             resolution = userOrm.resolveOidcUser(profile, mappedRole);
         } catch (RuntimeException e) {
-            log.log(java.util.logging.Level.WARNING, "OIDC account resolution failed", e);
+            Telemetry.warn("OIDC account resolution failed", e, "auth.method", "oidc", "oidc.issuer", issuer);
             throw new AuthenticationFailedException(e);
         }
 

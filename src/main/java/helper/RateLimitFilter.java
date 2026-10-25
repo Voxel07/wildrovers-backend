@@ -9,7 +9,6 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.Provider;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import java.util.logging.Logger;
 
 import jakarta.ws.rs.container.ContainerRequestFilter;
 import tools.RateLimiter;
@@ -25,7 +24,6 @@ import tools.RateLimiter;
 @ApplicationScoped
 public class RateLimitFilter implements ContainerRequestFilter {
 
-    private static final Logger log = Logger.getLogger(RateLimitFilter.class.getName());
 
     @Inject
     RateLimiter rateLimiter;

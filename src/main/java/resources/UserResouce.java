@@ -8,7 +8,6 @@ import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
 
 //Logging zeug
-import java.util.logging.Logger;
 
 //HTTP Requests
 import jakarta.ws.rs.Consumes;
@@ -43,12 +42,11 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.logging.Level;
+import tools.Telemetry;
 
 @Path("/user")
 @RequestScoped
 public class UserResouce {
-    private static final Logger log = Logger.getLogger(UserResouce.class.getName());
 
     @Inject
     UserOrm userOrm;
@@ -85,7 +83,6 @@ public class UserResouce {
     @io.quarkus.security.Authenticated // disabled accounts get no roles; resolveUser() explains the 403
     @Produces(MediaType.APPLICATION_JSON)
     public Response getMe(@QueryParam("stats") @DefaultValue("false") boolean stats) {
-        log.info("UserResource/getMe");
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {
             return Response.status(401).entity("Benutzer nicht eingeloggt oder unbekannt").build();
@@ -106,15 +103,14 @@ public class UserResouce {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public List<User> getUser(@QueryParam("userId") Long userId, @QueryParam("username") String userName) {
-        log.info("UserResource/getUser");
         if (userId != null) {
-            log.info("getUserById");
+            Telemetry.attrs("user.query", "id", "user.id", userId);
             return userOrm.getUserById(userId);
         } else if (userName != null) {
-            log.info("getUserByUsername");
+            Telemetry.attrs("user.query", "username", "user.name", userName);
             return userOrm.getUserByUsername(userName);
         } else {
-            log.info("getUsers");
+            Telemetry.attr("user.query", "all");
             return userOrm.getUsers();
         }
     }
@@ -124,12 +120,11 @@ public class UserResouce {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response updateUser(User user) {
-        log.info("UserResource/updateUser");
         User admin = userPrincipalResolver.resolveUser();
         if (user == null || user.getId() == null) {
             return Response.status(400).entity("Benutzer-ID fehlt.").build();
         }
-        AuditLogger.crud(log, admin != null ? admin.getUserName() : "unknown",
+        AuditLogger.crud(admin != null ? admin.getUserName() : "unknown",
                 admin != null ? admin.getId() : null,
                 "UPDATE", "User", user.getId(), "userName=" + user.getUserName());
         if (admin != null && Roles.ALDERMEN.equals(admin.getRole())) {
@@ -138,7 +133,7 @@ public class UserResouce {
                 return Response.status(404).entity("Benutzer nicht gefunden.").build();
             }
             if (Roles.ADMIN.equals(targets.get(0).getRole()) || Roles.ADMIN.equals(user.getRole())) {
-                log.warning("Vorstand attempted a forbidden Admin account change: " + user.getId());
+                Telemetry.warn("Vorstand attempted a forbidden Admin account change", "user.id", user.getId(), "security.event", "forbidden_admin_change");
                 return Response.status(403).entity("Vorstand darf Admin-Benutzer weder bearbeiten noch ernennen.").build();
             }
         }
@@ -151,7 +146,6 @@ public class UserResouce {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response resendVerification(User credentials) {
-        log.info("UserResource/resendVerification");
         return userOrm.resendVerification(credentials);
     }
 
@@ -160,7 +154,6 @@ public class UserResouce {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response addUser(@Valid model.Users.SignupRequest signup) {
-        log.info("UserResource/addUser");
         if (!signupSettings.isSignupEnabled()) {
             return Response.status(Response.Status.FORBIDDEN)
                     .entity("Die Registrierung ist derzeit deaktiviert.")
@@ -169,7 +162,7 @@ public class UserResouce {
         if (signup == null) {
             return Response.status(Response.Status.BAD_REQUEST).entity("Registrierungsdaten fehlen.").build();
         }
-        AuditLogger.crud(log, signup.userName, null, "REGISTER", "User", signup.userName);
+        AuditLogger.crud(signup.userName, null, "REGISTER", "User", signup.userName);
         return userOrm.addUser(signup);
     }
 
@@ -183,12 +176,12 @@ public class UserResouce {
     @RolesAllowed({ "Admin", "Vorstand" })
     @Produces(MediaType.APPLICATION_JSON)
     public Response deleteAllUserPosts(@PathParam("userId") Long userId) {
-        log.info("UserResource/deleteAllUserPosts: " + userId);
+        Telemetry.attr("user.id", userId);
         try {
             String result = forumPostOrm.deleteAllPostsFromUser(userId);
             return Response.ok(result).build();
         } catch (Exception e) {
-            log.log(java.util.logging.Level.SEVERE, "Error deleting posts for user " + userId, e);
+            Telemetry.error("Deleting posts of user failed", e, "user.id", userId);
             return Response.status(500).entity("Fehler beim Löschen der Forumsbeiträge: " + e.getMessage()).build();
         }
     }
@@ -201,7 +194,6 @@ public class UserResouce {
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     public Response getSignupStatus() {
-        log.info("UserResource/getSignupStatus");
         jakarta.json.JsonObject result = jakarta.json.Json.createObjectBuilder()
                 .add("signupEnabled", signupSettings.isSignupEnabled())
                 .build();
@@ -217,9 +209,9 @@ public class UserResouce {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response setSignupEnabled(@QueryParam("enabled") boolean enabled) {
-        log.info("UserResource/setSignupEnabled: " + enabled);
+        Telemetry.attr("signup.enabled", enabled);
         User admin = userPrincipalResolver.resolveUser();
-        AuditLogger.crud(log, admin != null ? admin.getUserName() : "unknown",
+        AuditLogger.crud(admin != null ? admin.getUserName() : "unknown",
                 admin != null ? admin.getId() : null,
                 "TOGGLE", "SignupSettings", null, "enabled=" + enabled);
         signupSettings.setSignupEnabled(enabled);
@@ -240,14 +232,10 @@ public class UserResouce {
             @QueryParam("deletePosts") @DefaultValue("false") boolean deletePosts,
             @QueryParam("deleteGallery") @DefaultValue("true") boolean deleteGallery,
             @QueryParam("hardDelete") @DefaultValue("false") boolean hardDelete) {
-        log.info("UserResource/deleteUser: " + userId
-            + " (account=" + deleteAccount
-            + ", events=" + deleteEvents
-            + ", posts=" + deletePosts
-            + ", gallery=" + deleteGallery
-            + ", hardDelete=" + hardDelete + ")");
+        Telemetry.attrs("user.id", userId, "user.delete.account", deleteAccount, "user.delete.events", deleteEvents,
+                "user.delete.posts", deletePosts, "user.delete.gallery", deleteGallery, "user.delete.hard", hardDelete);
         User admin = userPrincipalResolver.resolveUser();
-        AuditLogger.crud(log, admin != null ? admin.getUserName() : "unknown",
+        AuditLogger.crud(admin != null ? admin.getUserName() : "unknown",
                 admin != null ? admin.getId() : null,
                 "DELETE", "User", userId,
                 "hardDelete=" + hardDelete + " events=" + deleteEvents + " posts=" + deletePosts + " gallery=" + deleteGallery);
@@ -267,12 +255,11 @@ public class UserResouce {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response updateProfile(User profileData) {
-        log.info("UserResource/updateProfile");
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {
             return Response.status(401).entity("Benutzer nicht eingeloggt").build();
         }
-        AuditLogger.crud(log, user.getUserName(), user.getId(), "UPDATE", "Profile",
+        AuditLogger.crud(user.getUserName(), user.getId(), "UPDATE", "Profile",
                 user.getId());
         String phrase = null;
         if (profileData.getPhrase() != null) {
@@ -293,7 +280,6 @@ public class UserResouce {
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     @Produces(MediaType.APPLICATION_JSON)
     public Response uploadPhoto(@jakarta.ws.rs.BeanParam PhotoUploadForm form) {
-        log.info("UserResource/uploadPhoto");
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
@@ -330,7 +316,7 @@ public class UserResouce {
                     .build();
             return Response.ok(result).build();
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Failed to upload photo", e);
+            Telemetry.error("Failed to upload photo", e);
             return Response.status(500).entity("Fehler beim Verarbeiten des Fotos").build();
         }
     }
@@ -341,7 +327,6 @@ public class UserResouce {
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     @Produces(MediaType.APPLICATION_JSON)
     public Response uploadBackground(@jakarta.ws.rs.BeanParam PhotoUploadForm form) {
-        log.info("UserResource/uploadBackground");
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
@@ -378,7 +363,7 @@ public class UserResouce {
                     .build();
             return Response.ok(result).build();
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Failed to upload background", e);
+            Telemetry.error("Failed to upload background", e);
             return Response.status(500).entity("Fehler beim Verarbeiten des Hintergrundbildes").build();
         }
     }
@@ -388,7 +373,6 @@ public class UserResouce {
     @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
     @Produces(MediaType.APPLICATION_JSON)
     public Response deleteBackground() {
-        log.info("UserResource/deleteBackground");
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
@@ -407,7 +391,7 @@ public class UserResouce {
                     .add("message", "Hintergrundbild gelöscht")
                     .build()).build();
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Failed to delete background", e);
+            Telemetry.error("Failed to delete background", e);
             return Response.status(500).entity("Fehler beim Löschen des Hintergrundbildes").build();
         }
     }
@@ -417,7 +401,6 @@ public class UserResouce {
     @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
     @Produces(MediaType.APPLICATION_JSON)
     public Response deletePhoto() {
-        log.info("UserResource/deletePhoto");
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
@@ -436,7 +419,7 @@ public class UserResouce {
                     .add("message", "Profilbild gelöscht")
                     .build()).build();
         } catch (Exception e) {
-            log.log(Level.SEVERE, "Failed to delete photo", e);
+            Telemetry.error("Failed to delete photo", e);
             return Response.status(500).entity("Fehler beim Löschen des Profilbildes").build();
         }
     }
@@ -446,7 +429,7 @@ public class UserResouce {
     @PermitAll
     @Produces("image/jpeg")
     public Response getPhoto(@PathParam("userId") Long userId) {
-        log.info("UserResource/getPhoto: " + userId);
+        Telemetry.attr("user.id", userId);
         String base = uploadDir.replace("${user.home}", System.getProperty("user.home"));
         File file = Paths.get(base, userId + ".jpg").toFile();
         if (!file.exists() || !file.isFile()) {
@@ -462,7 +445,7 @@ public class UserResouce {
     @PermitAll
     @Produces("image/jpeg")
     public Response getBackground(@PathParam("userId") Long userId) {
-        log.info("UserResource/getBackground: " + userId);
+        Telemetry.attr("user.id", userId);
         String base = backgroundUploadDir.replace("${user.home}", System.getProperty("user.home"));
         File file = Paths.get(base, userId + "_background.jpg").toFile();
         if (!file.exists() || !file.isFile()) {
@@ -478,7 +461,6 @@ public class UserResouce {
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     public Response getTeamMembers() {
-        log.info("UserResource/getTeamMembers");
         List<User> members = userOrm.getTeamMembers();
         User currentUser = userPrincipalResolver.resolveUser();
         boolean isTeamMember = currentUser != null

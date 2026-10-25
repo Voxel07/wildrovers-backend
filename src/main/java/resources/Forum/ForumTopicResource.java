@@ -21,7 +21,6 @@ import model.Users.Roles;
 
 
 //Logging
-import java.util.logging.Logger;
 
 import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
@@ -34,7 +33,6 @@ import tools.AuditLogger;
 @Path("/forum/topic")
 @ApplicationScoped
 public class ForumTopicResource {
-    private static final Logger log = Logger.getLogger(ForumTopicResource.class.getName());
 
     @Inject
     ForumTopicOrm forumTopicOrm;
@@ -56,7 +54,6 @@ public class ForumTopicResource {
                                         @QueryParam("page") Integer page,
                                         @QueryParam("size") Integer size)
     {
-         log.info("ForumResource/getTopics");
          model.User user = userPrincipalResolver.resolveUser();
          String userRole = user != null ? user.getRole() : Roles.VSISITOR;
          ForumPage<ForumTopic> result = forumTopicOrm.findTopics(topicId, topic, userId, categoryId,
@@ -71,7 +68,6 @@ public class ForumTopicResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response addTopic(ForumTopic forumTopic, @QueryParam("category") Long categoryId){
-        log.info("ForumResource/addTopic");
         model.User user = userPrincipalResolver.resolveUser();
 
         if (user == null || forumTopic == null || forumTopic.getTopic() == null) {
@@ -80,7 +76,7 @@ public class ForumTopicResource {
         if (Roles.VSISITOR.equals(user.getRole()) && !user.getCanCreateCategory()) {
             return Response.status(403).entity("Besucher dürfen keine Themen erstellen/verwalten.").build();
         }
-        AuditLogger.crud(log, user.getUserName(), user.getId(), "CREATE", "Topic",
+        AuditLogger.crud(user.getUserName(), user.getId(), "CREATE", "Topic",
                 forumTopic.getTopic());
         return invalidateCategoriesOnSuccess(forumTopicOrm.addTopic(forumTopic, categoryId, user.getId()));
     }
@@ -90,7 +86,6 @@ public class ForumTopicResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response updateTopic(ForumTopic ft){
-        log.info("ForumResource/updateTopic");
         model.User user = userPrincipalResolver.resolveUser();
 
         if (user == null || ft == null) {
@@ -99,7 +94,7 @@ public class ForumTopicResource {
         if (Roles.VSISITOR.equals(user.getRole()) && !user.getCanCreateCategory()) {
             return Response.status(403).entity("Besucher dürfen keine Themen erstellen/verwalten.").build();
         }
-        AuditLogger.crud(log, user.getUserName(), user.getId(), "UPDATE", "Topic", ft.getId());
+        AuditLogger.crud(user.getUserName(), user.getId(), "UPDATE", "Topic", ft.getId());
         return forumTopicOrm.updateTopic(ft, user.getId());
     }
 
@@ -108,7 +103,6 @@ public class ForumTopicResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response deleteTopic(ForumTopic ft){
-        log.info("ForumResource/deleteTopic");
         model.User user = userPrincipalResolver.resolveUser();
 
         if (user == null || ft == null) {
@@ -117,7 +111,7 @@ public class ForumTopicResource {
         if (Roles.VSISITOR.equals(user.getRole()) && !user.getCanCreateCategory()) {
             return Response.status(403).entity("Besucher dürfen keine Themen erstellen/verwalten.").build();
         }
-        AuditLogger.crud(log, user.getUserName(), user.getId(), "DELETE", "Topic", ft.getId());
+        AuditLogger.crud(user.getUserName(), user.getId(), "DELETE", "Topic", ft.getId());
         return invalidateCategoriesOnSuccess(forumTopicOrm.deleteTopic(ft, user.getId()));
     }
 

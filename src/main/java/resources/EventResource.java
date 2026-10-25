@@ -29,17 +29,15 @@ import tools.NotificationService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.logging.Level;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.List;
-import java.util.logging.Logger;
+import tools.Telemetry;
 
 @Path("/event")
 @RequestScoped
 public class EventResource {
 
-    private static final Logger log = Logger.getLogger(EventResource.class.getName());
     private static final DateTimeFormatter EVENT_FORUM_TITLE_DATE_FORMAT =
             DateTimeFormatter.ofPattern("dd.MM.yyyy, HH:mm 'Uhr'");
 
@@ -80,7 +78,6 @@ public class EventResource {
     public Response getAllEvents(@QueryParam("year") Integer year,
                                  @QueryParam("from") String from,
                                  @QueryParam("to") String to) {
-        log.info("EventResource/getAllEvents");
         List<Event> list;
         try {
             if (year != null) {
@@ -113,7 +110,6 @@ public class EventResource {
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     public Response getUpcomingEvents() {
-        log.info("EventResource/getUpcomingEvents");
         List<Event> list = eventOrm.getUpcomingEvents(3);
         return Response.ok(forReader(list)).build();
     }
@@ -127,12 +123,11 @@ public class EventResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response addEvent(@Valid Event input) {
-        log.info("EventResource/addEvent");
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
         }
-        AuditLogger.crud(log, user.getUserName(), user.getId(), "CREATE", "Event",
+        AuditLogger.crud(user.getUserName(), user.getId(), "CREATE", "Event",
                 input.getTitle());
 
         // Only user-editable fields; ids, links and sync state are never taken from the client.
@@ -150,14 +145,14 @@ public class EventResource {
         try {
             created = eventOrm.addEvent(event, user.getId(), post, eventTopicId, frontendUrl);
         } catch (EventOrm.ForumPostFailedException e) {
-            log.warning("Event '" + event.getTitle() + "' not created: " + e.getMessage());
+            Telemetry.warn("Event not created", e, "event.title", event.getTitle(), "forum.topic.id", eventTopicId, "http.response.status_code", e.status);
             boolean topicMissing = e.status == 404;
             String message = topicMissing
                     ? "Das Forum-Thema für Events (app.events.forum-topic-id=" + eventTopicId + ") existiert nicht."
                     : e.getMessage();
             return Response.status(topicMissing ? 500 : e.status).entity(message).build();
         } catch (Exception e) {
-            log.log(Level.SEVERE, "EventResource/createEvent failed", e);
+            Telemetry.error("Creating event failed", e);
             return Response.status(500).entity("Fehler beim Erstellen des Events").build();
         }
 
@@ -229,12 +224,12 @@ public class EventResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response updateEvent(@Valid Event event) {
-        log.info("EventResource/updateEvent: " + event.getId());
+        Telemetry.attr("event.id", event.getId());
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
         }
-        AuditLogger.crud(log, user.getUserName(), user.getId(), "UPDATE", "Event",
+        AuditLogger.crud(user.getUserName(), user.getId(), "UPDATE", "Event",
                 event.getId());
 
         Event existing = event.getId() != null ? eventOrm.getEventById(event.getId()) : null;
@@ -260,7 +255,7 @@ public class EventResource {
             updated = eventOrm.updateEvent(existing.getId(), changes, formatEventTitleForPost(changes),
                     formatEventPostContent(changes), user.getId());
         } catch (Exception e) {
-            log.log(java.util.logging.Level.SEVERE, "EventResource/updateEvent failed for event " + event.getId(), e);
+            Telemetry.error("Updating event failed", e, "event.id", event.getId());
             return Response.status(500).entity("Fehler beim Aktualisieren des Events").build();
         }
         if (updated == null) {
@@ -278,12 +273,12 @@ public class EventResource {
     @RolesAllowed({ "Frischling", "Mitglied", "Vorstand", "Admin" })
     @Produces(MediaType.APPLICATION_JSON)
     public Response deleteEvent(@PathParam("id") Long id) {
-        log.info("EventResource/deleteEvent: " + id);
+        Telemetry.attr("event.id", id);
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
         }
-        AuditLogger.crud(log, user.getUserName(), user.getId(), "DELETE", "Event", id);
+        AuditLogger.crud(user.getUserName(), user.getId(), "DELETE", "Event", id);
 
         Event existing = eventOrm.getEventById(id);
         if (existing == null) {
@@ -301,7 +296,7 @@ public class EventResource {
         try {
             googleCalendarEventId = eventOrm.deleteEvent(id);
         } catch (Exception e) {
-            log.log(java.util.logging.Level.SEVERE, "EventResource/deleteEvent failed for id " + id, e);
+            Telemetry.error("Deleting event failed", e, "event.id", id);
             return Response.status(500).entity("Fehler beim Löschen des Events").build();
         }
         calendarSync.delete(googleCalendarEventId);
@@ -316,7 +311,7 @@ public class EventResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response setAttendance(@PathParam("id") Long eventId, EventAttendance attendanceInput) {
-        log.info("EventResource/setAttendance: " + eventId);
+        Telemetry.attr("event.id", eventId);
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
@@ -324,7 +319,7 @@ public class EventResource {
         if (attendanceInput == null || attendanceInput.getStatus() == null) {
             return Response.status(400).entity("Ungültiger Status").build();
         }
-        AuditLogger.crud(log, user.getUserName(), user.getId(), "ATTEND", "Event",
+        AuditLogger.crud(user.getUserName(), user.getId(), "ATTEND", "Event",
                 eventId, "status=" + attendanceInput.getStatus());
 
         Event event = eventOrm.getEventById(eventId);
@@ -355,7 +350,7 @@ public class EventResource {
     @Produces(MediaType.APPLICATION_JSON)
     public Response setAttendanceForUser(@PathParam("id") Long eventId, @PathParam("userId") Long userId,
             EventAttendance attendanceInput) {
-        log.info("EventResource/setAttendanceForUser: event=" + eventId + " user=" + userId);
+        Telemetry.attrs("event.id", eventId, "event.attendance.user.id", userId);
         User actor = userPrincipalResolver.resolveUser();
         if (actor == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
@@ -375,7 +370,7 @@ public class EventResource {
             return Response.status(400).entity("Ungültiger Status").build();
         }
 
-        AuditLogger.crud(log, actor.getUserName(), actor.getId(), "ATTEND", "Event", eventId,
+        AuditLogger.crud(actor.getUserName(), actor.getId(), "ATTEND", "Event", eventId,
                 "status=" + status + " user=" + target.getUserName());
 
         Event updatedEvent = eventOrm.saveAttendance(eventId, userId, status);
@@ -391,7 +386,7 @@ public class EventResource {
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     public Response getEventByPost(@PathParam("postId") Long postId) {
-        log.info("EventResource/getEventByPost: " + postId);
+        Telemetry.attr("forum.post.id", postId);
         Event event = eventOrm.getEventByForumPostId(postId);
         if (event == null) {
             // Most forum posts are not event announcements, so this is optional.
