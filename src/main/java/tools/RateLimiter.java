@@ -24,9 +24,11 @@ public class RateLimiter {
     @Inject
     SecurityIdentity identity;
 
-    // Cache to store the rate-limit buckets with an idle expiration of 10 minutes
+    // Rate-limit buckets expire after 10 idle minutes. The size cap keeps rotating client
+    // addresses (e.g. a large IPv6 range) from growing the cache without bound.
     private final Cache<String, Bucket> buckets = Caffeine.newBuilder()
             .expireAfterAccess(10, TimeUnit.MINUTES)
+            .maximumSize(100_000)
             .build();
 
     /**

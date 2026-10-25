@@ -43,6 +43,10 @@
     </dependency>
      <dependency>
       <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-smallrye-openapi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.quarkus</groupId>
       <artifactId>quarkus-rest-jsonb</artifactId>
     </dependency>
     <dependency>
@@ -102,11 +106,6 @@
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-scheduler</artifactId>
     </dependency>
-   <dependency>
-      <groupId>org.json</groupId>
-      <artifactId>json</artifactId>
-      <version>20210307</version>
-    </dependency>
     <dependency>
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-security-jpa</artifactId>
@@ -128,10 +127,6 @@
     <dependency>
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-jdbc-mariadb</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.quarkiverse.vault</groupId>
-      <artifactId>quarkus-vault</artifactId>
     </dependency>
     <!-- Offline IP-to-country lookups (MaxMind GeoLite2), replaces calls to ip-api.com -->
     <dependency>

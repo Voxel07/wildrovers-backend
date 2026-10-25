@@ -122,7 +122,7 @@ public class GalleryResource {
         try {
             Gallery created = galleryOrm.addGallery(gallery, user.getId());
             notificationService.record("GALLERY", "CREATED", created.getId(), created.getTitle(),
-                    frontendUrl + "/galery", null, false, user.getId());
+                    frontendUrl + "/galerie", null, false, user.getId());
             return Response.status(201).entity(created).build();
         } catch (Exception e) {
             return Response.status(500).entity("Fehler beim Speichern der Galerie").build();
@@ -167,7 +167,7 @@ public class GalleryResource {
         try {
             Gallery updated = galleryOrm.updateGallery(existing);
             notificationService.record("GALLERY", "UPDATED", updated.getId(), updated.getTitle(),
-                    frontendUrl + "/galery", null, false, user.getId());
+                    frontendUrl + "/galerie", null, false, user.getId());
             return Response.ok(updated).build();
         } catch (Exception e) {
             return Response.status(500).entity("Fehler beim Aktualisieren der Galerie").build();
@@ -201,7 +201,7 @@ public class GalleryResource {
         try {
             galleryOrm.deleteGallery(id);
             notificationService.record("GALLERY", "DELETED", id, existing.getTitle(),
-                    frontendUrl + "/galery", null, false, user.getId());
+                    frontendUrl + "/galerie", null, false, user.getId());
             return Response.ok().entity("Galerie gelöscht").build();
         } catch (Exception e) {
             return Response.status(500).entity("Fehler beim Löschen der Galerie").build();

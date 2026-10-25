@@ -2,7 +2,10 @@ package tools;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.json.JSONObject;
+import jakarta.json.Json;
+import jakarta.json.JsonObject;
+import jakarta.json.JsonObjectBuilder;
+import jakarta.json.JsonReader;
 import io.smallrye.jwt.build.Jwt;
 
 import java.net.URI;
@@ -45,7 +48,7 @@ public class GoogleCalendarService {
     private String cachedToken = null;
     private Instant cachedTokenExpiry = null;
 
-    private JSONObject getCredentials() {
+    private JsonObject getCredentials() {
         String jsonStr = credentialsJson;
         if (jsonStr == null || jsonStr.isBlank()) {
             log.warning("Google Calendar credentials are not configured.");
@@ -68,7 +71,7 @@ public class GoogleCalendarService {
             }
         }
         try {
-            return new JSONObject(jsonStr);
+            return parseJson(jsonStr);
         } catch (Exception e) {
             log.log(Level.WARNING, "Failed to parse Google credentials JSON", e);
             return null;
@@ -80,7 +83,7 @@ public class GoogleCalendarService {
             return cachedToken;
         }
 
-        JSONObject creds = getCredentials();
+        JsonObject creds = getCredentials();
         if (creds == null) {
             log.warning("Google Calendar credentials are not configured.");
             return null;
@@ -126,7 +129,7 @@ public class GoogleCalendarService {
                 return null;
             }
 
-            JSONObject respJson = new JSONObject(response.body());
+            JsonObject respJson = parseJson(response.body());
             cachedToken = respJson.getString("access_token");
             int expiresIn = respJson.getInt("expires_in");
             cachedTokenExpiry = Instant.now().plusSeconds(expiresIn - 60); // buffer of 1 min
@@ -153,26 +156,31 @@ public class GoogleCalendarService {
         }
 
         try {
-            JSONObject start = new JSONObject()
-                    .put("dateTime", formatIso(event.getEventDate()))
-                    .put("timeZone", timeZone.getId());
+            JsonObject start = Json.createObjectBuilder()
+                    .add("dateTime", formatIso(event.getEventDate()))
+                    .add("timeZone", timeZone.getId())
+                    .build();
 
             LocalDateTime endDateTime = event.getEventEndDate() != null ? event.getEventEndDate() : event.getEventDate().plusHours(2);
-            JSONObject end = new JSONObject()
-                    .put("dateTime", formatIso(endDateTime))
-                    .put("timeZone", timeZone.getId());
+            JsonObject end = Json.createObjectBuilder()
+                    .add("dateTime", formatIso(endDateTime))
+                    .add("timeZone", timeZone.getId())
+                    .build();
 
             String desc = event.getDescription() != null ? event.getDescription() : "";
             if (event.getForumPostUrl() != null && !event.getForumPostUrl().isBlank()) {
                 desc += "\n\nDiskussion im Forum: " + event.getForumPostUrl();
             }
 
-            JSONObject bodyJson = new JSONObject()
-                    .put("summary", event.getTitle())
-                    .put("description", desc)
-                    .put("location", event.getLocation())
-                    .put("start", start)
-                    .put("end", end);
+            JsonObjectBuilder body = Json.createObjectBuilder()
+                    .add("summary", event.getTitle())
+                    .add("description", desc)
+                    .add("start", start)
+                    .add("end", end);
+            if (event.getLocation() != null) {
+                body.add("location", event.getLocation());
+            }
+            JsonObject bodyJson = body.build();
 
             HttpRequest request;
             String eventId = event.getGoogleCalendarEventId();
@@ -197,7 +205,7 @@ public class GoogleCalendarService {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() == 200 || response.statusCode() == 201) {
-                JSONObject resp = new JSONObject(response.body());
+                JsonObject resp = parseJson(response.body());
                 return resp.getString("id");
             } else {
                 log.severe("Google Calendar API request failed. Status: " + response.statusCode() + ", Body: "
@@ -242,5 +250,11 @@ public class GoogleCalendarService {
 
     private String formatIso(LocalDateTime dateTime) {
         return dateTime.atZone(timeZone).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+    }
+
+    private static JsonObject parseJson(String body) {
+        try (JsonReader reader = Json.createReader(new java.io.StringReader(body))) {
+            return reader.readObject();
+        }
     }
 }
