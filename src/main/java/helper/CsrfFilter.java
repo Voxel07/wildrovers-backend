@@ -34,8 +34,10 @@ public class CsrfFilter implements ContainerRequestFilter {
     private static final Set<String> SAFE_METHODS = Set.of("GET", "HEAD", "OPTIONS");
     public static final String HEADER = "X-Requested-With";
 
+    // REST providers can be created during native-image static initialization.
+    // Resolve origins when handling requests so deployment config is used.
     @ConfigProperty(name = "quarkus.http.cors.origins")
-    List<String> allowedOrigins;
+    jakarta.inject.Provider<List<String>> allowedOrigins;
 
     @Override
     public void filter(ContainerRequestContext request) {
@@ -62,7 +64,7 @@ public class CsrfFilter implements ContainerRequestFilter {
     }
 
     private boolean isAllowed(String origin) {
-        for (String allowed : allowedOrigins) {
+        for (String allowed : allowedOrigins.get()) {
             if (allowed.trim().equalsIgnoreCase(origin)) return true;
         }
         return false;
