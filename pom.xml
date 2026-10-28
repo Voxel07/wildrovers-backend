@@ -231,6 +231,8 @@
       <properties>
     <quarkus.native.enabled>true</quarkus.native.enabled>
     <quarkus.package.jar.enabled>false</quarkus.package.jar.enabled>
+    <!-- Used with -Dquarkus.native.container-build=true; matches the UBI 9 runtime in Dockerfile.native. -->
+    <quarkus.native.builder-image>quay.io/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-25</quarkus.native.builder-image>
       </properties>
     </profile>
   </profiles>

@@ -53,36 +53,40 @@ You can then execute your native executable with: `./target/getting-started-1.0.
 
 If you want to learn more about building native executables, please consult https://quarkus.io/guides/maven-tooling.html.
 
-## Building a native Docker image
+## Building the Docker image
 
-From the backend root, build the executable and runtime image in one command:
+The backend ships only as a native executable. From the backend root, build the
+executable and package it, which is what the release CI does:
 
 ```shell
-docker build -f src/main/docker/Dockerfile.native-multistage -t wildrovers-backend:native .
+./mvnw package -Pnative -DskipTests -Dquarkus.native.container-build=true
+docker build -f src/main/docker/Dockerfile.native -t wildrovers-backend .
 ```
 
-Only Docker is required locally. The build stage uses Mandrel with JDK 25 and
-the Maven wrapper; the final UBI 9 image runs the native executable as user 185,
-matching the JVM image's upload-volume ownership. It includes the AWT/ImageIO
-libraries needed for image uploads. Supply the same runtime environment and
-mounts as `docker-compose.yml`, including `/work/uploads`, `/work/logs` and keys.
-The Dockerfile has its own source allowlist in
-`src/main/docker/Dockerfile.native-multistage.dockerignore`; local credentials
-are excluded from the build context. Tests are skipped, matching the release CI.
+Only Docker and a JDK 25 for Maven are required locally. The container build
+uses the UBI 9 Mandrel builder configured in the `native` profile, so the
+executable links against the same glibc as the UBI 9 runtime image. That image
+runs the executable as user 185 and includes the AWT/ImageIO libraries generated
+next to it in `target/`, which image uploads need. Supply the same runtime
+environment and mounts as `docker-compose.yml`, including `/work/uploads`,
+`/work/logs` and keys.
 
-Native compilation needs several GB of memory. The native-image heap defaults
-to 6 GB and can be changed with `--build-arg NATIVE_IMAGE_XMX=4g`.
+Native compilation needs several GB of memory; set the native-image heap with
+`-Dquarkus.native.native-image-xmx=6g` if the default is too small.
 
-The GitHub Actions workflow `.github/workflows/build-native.yml` publishes both
-Linux AMD64 variants when a tag points to a commit on `master`:
+To build without a local JDK, `src/main/docker/Dockerfile.native-multistage`
+compiles and packages in one Docker build, using its own source allowlist in
+`Dockerfile.native-multistage.dockerignore` so local credentials stay out of the
+build context:
 
-| Image | Release tag | Rolling tag |
-| --- | --- | --- |
-| JVM | `ghcr.io/voxel07/wildrovers-backend:<tag>` | `ghcr.io/voxel07/wildrovers-backend:latest` |
-| Native | `ghcr.io/voxel07/wildrovers-backend:<tag>-native` | `ghcr.io/voxel07/wildrovers-backend:native` |
+```shell
+docker build -f src/main/docker/Dockerfile.native-multistage -t wildrovers-backend .
+```
 
-To deploy the native variant, use the `native` tag or a pinned `<tag>-native`
-tag for the backend service's `image` in your Compose configuration.
+The GitHub Actions workflow `.github/workflows/build-native.yml` builds the
+native executable and publishes the Linux AMD64 image when a tag points to a
+commit on `master`, as `ghcr.io/voxel07/wildrovers-backend:<tag>` and
+`ghcr.io/voxel07/wildrovers-backend:latest`.
 
 # About this Project
 This is the backend for the www.wild-rovers.de homepage. It provides bunch of Rest endpoinst witch are secured by a role based system.

@@ -1,4 +1,4 @@
-name: Build JVM and Native Images and Publish to GHCR
+name: Build Native Image and Publish to GHCR
 
 on:
   push:
@@ -7,21 +7,9 @@ on:
 
 jobs:
   build-and-push:
-    name: Build ${{ matrix.variant }} Docker Image
+    name: Build Native Executable & Docker Container
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - variant: jvm
-            dockerfile: src/main/docker/Dockerfile.jvm
-            tag_suffix: ''
-            latest_tag: latest
-          - variant: native
-            dockerfile: src/main/docker/Dockerfile.native-multistage
-            tag_suffix: '-native'
-            latest_tag: native
     permissions:
       contents: read
       packages: write
@@ -62,7 +50,7 @@ jobs:
           echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
       - name: Set up Java JDK
-        if: steps.check-branch.outputs.on_master == 'true' && matrix.variant == 'jvm'
+        if: steps.check-branch.outputs.on_master == 'true'
         uses: actions/setup-java@v5
         with:
           java-version: '25'
@@ -70,13 +58,18 @@ jobs:
           cache: 'maven'
 
       - name: Make Maven Wrapper Executable
-        if: steps.check-branch.outputs.on_master == 'true' && matrix.variant == 'jvm'
+        if: steps.check-branch.outputs.on_master == 'true'
         run: chmod +x mvnw
 
-      - name: Build JVM Application with Maven
-        if: steps.check-branch.outputs.on_master == 'true' && matrix.variant == 'jvm'
+      # Compiles inside the UBI 9 Mandrel builder (pom native profile) so the
+      # executable matches the runtime image's glibc instead of the runner's.
+      - name: Build Native Executable with Maven
+        if: steps.check-branch.outputs.on_master == 'true'
         run: |
-          ./mvnw package -DskipTests
+          ./mvnw -B -ntp package -DskipTests -Pnative \
+            -Dquarkus.native.container-build=true \
+            -Dquarkus.native.march=compatibility \
+            -Dquarkus.native.native-image-xmx=6g
 
       - name: Log in to GHCR
         if: steps.check-branch.outputs.on_master == 'true'
@@ -95,13 +88,13 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
+          file: src/main/docker/Dockerfile.native
           platforms: linux/amd64
           push: true
           tags: |
-            ghcr.io/${{ steps.repo_details.outputs.owner }}/${{ steps.repo_details.outputs.repo }}:${{ steps.get_tag.outputs.tag }}${{ matrix.tag_suffix }}
-            ghcr.io/${{ steps.repo_details.outputs.owner }}/${{ steps.repo_details.outputs.repo }}:${{ matrix.latest_tag }}
-          cache-from: type=gha,scope=backend-${{ matrix.variant }}
-          cache-to: type=gha,mode=max,scope=backend-${{ matrix.variant }}
+            ghcr.io/${{ steps.repo_details.outputs.owner }}/${{ steps.repo_details.outputs.repo }}:${{ steps.get_tag.outputs.tag }}
+            ghcr.io/${{ steps.repo_details.outputs.owner }}/${{ steps.repo_details.outputs.repo }}:latest
+          cache-from: type=gha,scope=backend-native
+          cache-to: type=gha,mode=max,scope=backend-native
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}

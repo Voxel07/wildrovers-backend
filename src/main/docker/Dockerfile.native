@@ -1,11 +1,21 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10
-WORKDIR /work/
-RUN chown 1001 /work \
-    && chmod "g+rwX" /work \
-    && chown 1001:root /work
-COPY --chown=1001:root target/*-runner /work/application
+# syntax=docker/dockerfile:1
+# Packages a native executable built beforehand from the backend root:
+# ./mvnw package -Pnative -DskipTests -Dquarkus.native.container-build=true
+# docker build -f src/main/docker/Dockerfile.native -t wildrovers-backend:native .
+# The container build compiles in the UBI 9 Mandrel builder, so the executable
+# links against the same glibc as this runtime image.
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7
+
+# Image uploads use AWT/ImageIO, including native shared libraries from the build.
+RUN microdnf install -y freetype fontconfig && microdnf clean all \
+    && mkdir -p /work/uploads /work/logs \
+    && chown -R 185:0 /work && chmod -R g+rwX /work
+WORKDIR /work
+ENV HOME=/work
+
+COPY --chown=185:0 target/*.so /work/
+COPY --chown=185:0 --chmod=0755 target/*-runner /work/application
 
 EXPOSE 8080
-USER 1001
-
+USER 185
 ENTRYPOINT ["./application", "-Dquarkus.http.host=0.0.0.0"]
