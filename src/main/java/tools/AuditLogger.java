@@ -1,6 +1,6 @@
 package tools;
 
-import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.common.AttributesBuilder;
@@ -8,6 +8,7 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
+import io.quarkus.arc.Arc;
 
 /**
  * Audit trail for CRUD operations using OpenTelemetry spans.
@@ -18,8 +19,6 @@ import io.opentelemetry.api.trace.Tracer;
  * {@code audit} event, so requests can be filtered by what they changed.
  */
 public final class AuditLogger {
-
-    private static final Tracer tracer = GlobalOpenTelemetry.getTracer("wildrovers-audit");
 
     private static final AttributeKey<String> ACTION = AttributeKey.stringKey("audit.action");
     private static final AttributeKey<String> ENTITY = AttributeKey.stringKey("audit.entity");
@@ -72,6 +71,9 @@ public final class AuditLogger {
             parent.addEvent("audit", attributes);
         }
 
+        // Resolve the managed SDK only at runtime. A static global tracer would
+        // register a no-op SDK during native-image class initialization.
+        Tracer tracer = Arc.container().instance(OpenTelemetry.class).get().getTracer("wildrovers-audit");
         Span span = tracer.spanBuilder(entity + " " + action)
                 .setSpanKind(SpanKind.INTERNAL)
                 .setAllAttributes(attributes)
