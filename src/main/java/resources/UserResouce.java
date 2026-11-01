@@ -91,6 +91,7 @@ public class UserResouce {
             return Response.ok(user).build();
         }
         user.setEventsAttended(userOrm.getEventsAttendedCount(user.getId()));
+        user.setEventsAttendedByYear(userOrm.getEventsAttendedByYear(user.getId()));
         user.setForumPostCount(userOrm.getForumPostCount(user.getId()));
         user.setForumAnswerCount(userOrm.getForumAnswerCount(user.getId()));
         user.setForumTopicCount(userOrm.getForumTopicCount(user.getId()));

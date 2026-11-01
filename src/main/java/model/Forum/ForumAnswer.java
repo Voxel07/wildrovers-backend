@@ -18,7 +18,10 @@ import jakarta.persistence.ManyToOne;
 import model.User;
 
 @Entity
-@Table(name = "FORUM_ANSWERS")
+// Answers are paged per post in creation order; profile statistics count and date answers per author.
+@Table(name = "FORUM_ANSWERS", indexes = {
+        @jakarta.persistence.Index(name = "IDX_FORUM_ANSWERS_POST_CREATED", columnList = "post_id, creationDate, id"),
+        @jakarta.persistence.Index(name = "IDX_FORUM_ANSWERS_USER_CREATED", columnList = "user_id, creationDate") })
 public class ForumAnswer {
 
     @Id

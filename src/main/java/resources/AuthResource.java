@@ -229,7 +229,10 @@ public class AuthResource {
                 .build();
     }
 
-    /** {@code accessExpiresAt} lets the frontend refresh before the access cookie lapses. */
+    /**
+     * {@code accessExpiresIn} (milliseconds left) lets the frontend refresh before the access
+     * cookie lapses without trusting the browser's clock; {@code accessExpiresAt} is server time.
+     */
     private JsonObject sessionJson(User user, Long accessExpiresAt) {
         JsonObjectBuilder builder = Json.createObjectBuilder()
                 .add("authenticated", true)
@@ -240,6 +243,7 @@ public class AuthResource {
                 .add("oidcLinked", user.isOidcLinked());
         if (accessExpiresAt != null) {
             builder.add("accessExpiresAt", accessExpiresAt);
+            builder.add("accessExpiresIn", Math.max(0L, accessExpiresAt - System.currentTimeMillis()));
         }
         if (user.getPhotoUrl() != null) {
             builder.add("photoUrl", user.getPhotoUrl());

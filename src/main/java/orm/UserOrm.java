@@ -91,6 +91,26 @@ public class UserOrm {
         }
     }
 
+    /**
+     * Events the user said YES to, per calendar year of the event (ascending). Replaces loading
+     * every event with every attendance just to count one user's in the browser.
+     */
+    public java.util.Map<Integer, Long> getEventsAttendedByYear(Long userId) {
+        java.util.Map<Integer, Long> byYear = new java.util.TreeMap<>();
+        try {
+            List<Object[]> rows = em.createQuery(
+                    "SELECT EXTRACT(YEAR FROM e.eventDate), COUNT(ea) FROM EventAttendance ea JOIN ea.event e "
+                            + "WHERE ea.user.id = :userId AND ea.status = 'YES' AND e.eventDate IS NOT NULL "
+                            + "GROUP BY EXTRACT(YEAR FROM e.eventDate)", Object[].class)
+                    .setParameter("userId", userId)
+                    .getResultList();
+            for (Object[] row : rows) byYear.put(((Number) row[0]).intValue(), ((Number) row[1]).longValue());
+        } catch (Exception e) {
+            Telemetry.warn("Failed to load events attended per year", e, "user.id", userId);
+        }
+        return byYear;
+    }
+
     public Long getForumPostCount(Long userId) {
         try {
             return em.createQuery("SELECT COUNT(fp) FROM ForumPost fp WHERE fp.creator.id = :userId", Long.class)

@@ -22,7 +22,11 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 @Entity
 // Only changed columns are written, so edits never overwrite counters updated atomically in SQL.
 @org.hibernate.annotations.DynamicUpdate
-@Table(name = "FORUM_POSTS")
+// Topic pages list posts newest first and the forum overview needs the newest post per topic;
+// profile statistics count and date posts per author.
+@Table(name = "FORUM_POSTS", indexes = {
+        @jakarta.persistence.Index(name = "IDX_FORUM_POSTS_TOPIC_CREATED", columnList = "topic_id, creationDate, id"),
+        @jakarta.persistence.Index(name = "IDX_FORUM_POSTS_USER_CREATED", columnList = "user_id, creationDate") })
 public class ForumPost {
     @Id
     @SequenceGenerator(name = "forumPostSeq", sequenceName = "ZSEQ_fPost_ID", allocationSize = 1, initialValue = 1)

@@ -93,13 +93,17 @@ public class User {
     @Column(name = "regestrationDate")
     private Long regDate;
 
-    @OneToOne(cascade = CascadeType.ALL, mappedBy = "userAddress")
+    // LAZY: an eager inverse one-to-one costs extra SELECTs for every User that is loaded
+    // (forum authors, event attendees, poll voters). Quarkus' bytecode enhancement makes it truly lazy.
+    @OneToOne(cascade = CascadeType.ALL, mappedBy = "userAddress", fetch = FetchType.LAZY)
     private Address address;
 
 
     @JsonIgnore
     @JsonbTransient
-    @OneToOne(cascade = { CascadeType.ALL }, mappedBy = "user")
+    // LAZY: only login, verification and password changes need the secret; loading it eagerly
+    // read every author's password hash on each forum page.
+    @OneToOne(cascade = { CascadeType.ALL }, mappedBy = "user", fetch = FetchType.LAZY)
     private Secret secret;
 
     @Column(name = "photoUrl")
@@ -161,6 +165,10 @@ public class User {
 
     @jakarta.persistence.Transient
     private Long eventsAttended = 0L;
+
+    /** Events attended (YES) per year; only filled for the profile statistics. */
+    @jakarta.persistence.Transient
+    private java.util.Map<Integer, Long> eventsAttendedByYear;
 
     @jakarta.persistence.Transient
     private Long forumPostCount = 0L;
@@ -593,6 +601,14 @@ public class User {
     /** Invalidates every local JWT issued for this account so far. */
     public void revokeTokens() {
         this.tokenVersion = getTokenVersion() + 1;
+    }
+
+    public java.util.Map<Integer, Long> getEventsAttendedByYear() {
+        return eventsAttendedByYear;
+    }
+
+    public void setEventsAttendedByYear(java.util.Map<Integer, Long> eventsAttendedByYear) {
+        this.eventsAttendedByYear = eventsAttendedByYear;
     }
 
     public Long getEventsAttended() {

@@ -99,8 +99,7 @@ public class ForumPostResource {
         model.User user = userPrincipalResolver.resolveUser();
         if (user == null) return Response.status(401).build();
         if (postId == null) return Response.status(400).entity("Es muss ein Post angegeben werden").build();
-        if (forumPostOrm.findPosts(postId, null, null, null, null, Roles.visibleTo(user.getRole()), 0, 1)
-                .items().isEmpty()) {
+        if (!forumPostOrm.isVisible(postId, Roles.visibleTo(user.getRole()))) {
             return Response.status(404).entity("Post nicht gefunden").build();
         }
         try {
