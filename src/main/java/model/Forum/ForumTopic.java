@@ -66,6 +66,7 @@ public class ForumTopic {
     private List<ForumPost> posts = new ArrayList<>();
 
     /** Summary of the newest post, filled for topic lists so the UI needs no extra request per topic. */
+    @io.quarkus.runtime.annotations.RegisterForReflection
     public record LatestPost(Long id, String title, String creator, Long creationDate) { }
 
     @jakarta.persistence.Transient

@@ -131,7 +131,10 @@ public class NotificationPreferenceResource {
 
     public static class PreferenceRequest { public Map<String, ChannelRequest> resources = new LinkedHashMap<>(); public String webhookUrl; }
     public static class ChannelRequest { public boolean email; public boolean webhook; }
+    @io.quarkus.runtime.annotations.RegisterForReflection
     public static class PreferenceResponse { public Map<String, ChannelResponse> resources = new LinkedHashMap<>(); public WebhookResponse webhook = new WebhookResponse(); public String webhookSecret; }
+    @io.quarkus.runtime.annotations.RegisterForReflection
     public static class ChannelResponse { public boolean email; public boolean webhook; }
+    @io.quarkus.runtime.annotations.RegisterForReflection
     public static class WebhookResponse { public boolean configured; public boolean enabled; public String urlMasked; public Long verifiedAt; public Long lastSuccessAt; public String lastError; public int failureCount; }
 }

@@ -18,8 +18,32 @@ import io.opentelemetry.instrumentation.annotations.WithSpan;
 @ApplicationScoped
 public class ForumPollOrm {
 
+    /** Upper limit for options per poll; the date generator can otherwise produce long lists. */
+    public static final int MAX_OPTIONS = 60;
+
     @Inject
     EntityManager em;
+
+    /**
+     * Checks the option list of a create or update request.
+     *
+     * @return an error message for the client, or null if the options are valid
+     */
+    static String validateOptions(List<PollOptions> options) {
+        if (options == null) return null;
+        if (options.size() > MAX_OPTIONS) {
+            return "Eine Umfrage darf höchstens " + MAX_OPTIONS + " Optionen haben.";
+        }
+        for (PollOptions option : options) {
+            if (option.getOptionEndDate() != null && option.getOptionDate() == null) {
+                return "Eine Option mit Enddatum braucht ein Startdatum.";
+            }
+            if (option.getOptionEndDate() != null && option.getOptionEndDate().isBefore(option.getOptionDate())) {
+                return "Das Enddatum einer Option darf nicht vor dem Startdatum liegen.";
+            }
+        }
+        return null;
+    }
 
     @Transactional
     @CacheInvalidateAll.List({
@@ -49,10 +73,17 @@ public class ForumPollOrm {
             return Response.status(Response.Status.FORBIDDEN).entity("Nicht berechtigt").build();
         }
 
+        String optionError = validateOptions(poll.getOptions());
+        if (optionError != null) {
+            return Response.status(Response.Status.BAD_REQUEST).entity(optionError).build();
+        }
+
         poll.setPost(post);
         for (PollOptions option : poll.getOptions()) {
             option.setPoll(poll);
             option.setVotes(0L);
+            // Links to events are only set when an event is created from the option.
+            option.setEventId(null);
         }
 
         em.persist(poll);
@@ -136,8 +167,10 @@ public class ForumPollOrm {
         }
 
         em.flush();
-        // Return fresh poll details with updated vote counts
+        // Return fresh poll details with updated vote counts. The options are serialised after the
+        // transaction, so they must be loaded here (LazyInitializationException otherwise).
         Polls updatedPoll = em.find(Polls.class, pollId);
+        org.hibernate.Hibernate.initialize(updatedPoll.getOptions());
         return Response.ok(updatedPoll).build();
     }
 
@@ -248,6 +281,12 @@ public class ForumPollOrm {
             return Response.status(Response.Status.FORBIDDEN).entity("Nicht berechtigt").build();
         }
 
+        // Validate before changing anything: returning an error does not roll back earlier changes.
+        String optionError = validateOptions(updatedPoll.getOptions());
+        if (optionError != null) {
+            return Response.status(Response.Status.BAD_REQUEST).entity(optionError).build();
+        }
+
         // Update poll fields
         if (updatedPoll.getQuestion() != null && !updatedPoll.getQuestion().isBlank()) {
             poll.setQuestion(updatedPoll.getQuestion());
@@ -260,10 +299,12 @@ public class ForumPollOrm {
         if (updatedPoll.getOptions() != null) {
             for (PollOptions incoming : updatedPoll.getOptions()) {
                 if (incoming.getId() != null) {
-                    // Existing option — update text, preserve votes
+                    // Existing option — update text and dates, preserve votes and the event link
                     PollOptions existing = em.find(PollOptions.class, incoming.getId());
                     if (existing != null && existing.getPoll().getId().equals(pollId)) {
                         existing.setOptionText(incoming.getOptionText());
+                        existing.setOptionDate(incoming.getOptionDate());
+                        existing.setOptionEndDate(incoming.getOptionEndDate());
                         em.merge(existing);
                         keptOptionIds.add(incoming.getId());
                     }
@@ -271,6 +312,7 @@ public class ForumPollOrm {
                     // New option
                     incoming.setPoll(poll);
                     incoming.setVotes(0L);
+                    incoming.setEventId(null);
                     em.persist(incoming);
                 }
             }

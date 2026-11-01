@@ -219,6 +219,26 @@ public class ForumPostResource {
         }
     }
 
+    /** The current user's vote on a post ({@code myVote}: "LIKE", "DISLIKE" or null). */
+    @GET
+    @Path("/myVote")
+    @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getMyVote(@QueryParam("post") Long postId) {
+        Long userId = userPrincipalResolver.resolveUserId();
+        if (userId == null) {
+            return Response.status(401).entity("Nicht angemeldet").build();
+        }
+        if (postId == null) {
+            return Response.status(400).entity("post parameter required").build();
+        }
+        String myVote = forumPostOrm.getMyVote(postId, userId);
+        jakarta.json.JsonObjectBuilder result = jakarta.json.Json.createObjectBuilder();
+        if (myVote != null) result.add("myVote", myVote);
+        else result.addNull("myVote");
+        return Response.ok(result.build()).build();
+    }
+
     @POST
     @Path("/vote")
     @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })

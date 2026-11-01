@@ -117,18 +117,21 @@ public class EventResource {
     /**
      * Not transactional on purpose: the event and its forum post are written in one database
      * transaction, the Google Calendar call happens after the commit (see EventCalendarSync).
+     *
+     * @param pollOptionId optional poll option the event is created from; it is linked to the
+     *                     event (creator of the poll's post or moderators only, once per option)
      */
     @POST
     @RolesAllowed({ "Frischling", "Mitglied", "Vorstand", "Admin" })
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response addEvent(@Valid Event input) {
+    public Response addEvent(@Valid Event input, @QueryParam("pollOption") Long pollOptionId) {
         User user = userPrincipalResolver.resolveUser();
         if (user == null) {
             return Response.status(401).entity("Nicht eingeloggt").build();
         }
         AuditLogger.crud(user.getUserName(), user.getId(), "CREATE", "Event",
-                input.getTitle());
+                input.getTitle(), pollOptionId != null ? "pollOption=" + pollOptionId : null);
 
         // Only user-editable fields; ids, links and sync state are never taken from the client.
         Event event = new Event();
@@ -143,7 +146,9 @@ public class EventResource {
 
         Event created;
         try {
-            created = eventOrm.addEvent(event, user.getId(), post, eventTopicId, frontendUrl);
+            created = eventOrm.addEvent(event, user.getId(), post, eventTopicId, frontendUrl, pollOptionId);
+        } catch (EventOrm.PollOptionLinkException e) {
+            return Response.status(e.status).entity(e.getMessage()).build();
         } catch (EventOrm.ForumPostFailedException e) {
             Telemetry.warn("Event not created", e, "event.title", event.getTitle(), "forum.topic.id", eventTopicId, "http.response.status_code", e.status);
             boolean topicMissing = e.status == 404;

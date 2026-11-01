@@ -104,11 +104,19 @@ class ForumResourceTest {
     }
     @Test @TestSecurity(user="forumOther",roles={"Mitglied"})
     void secondIdenticalVoteRemovesIt() {
+        given().queryParam("post",410).get("/forum/post/myVote").then().statusCode(200).body("myVote", nullValue());
         given().contentType(ContentType.JSON).queryParam("post",410).queryParam("type","like").post("/forum/post/vote").then().statusCode(200)
-                .body("likes", is(1));
-        given().contentType(ContentType.JSON).queryParam("post",410).queryParam("type","like").post("/forum/post/vote").then().statusCode(200)
-                .body("likes", is(0));
+                .body("likes", is(1)).body("myVote", is("LIKE"));
+        given().queryParam("post",410).get("/forum/post/myVote").then().statusCode(200).body("myVote", is("LIKE"));
+        // The other type switches the vote.
+        given().contentType(ContentType.JSON).queryParam("post",410).queryParam("type","dislike").post("/forum/post/vote").then().statusCode(200)
+                .body("likes", is(0)).body("dislikes", is(1)).body("myVote", is("DISLIKE"));
+        // The same type again removes it.
+        given().contentType(ContentType.JSON).queryParam("post",410).queryParam("type","dislike").post("/forum/post/vote").then().statusCode(200)
+                .body("likes", is(0)).body("dislikes", is(0)).body("myVote", nullValue());
+        given().queryParam("post",410).get("/forum/post/myVote").then().statusCode(200).body("myVote", nullValue());
     }
+    @Test void myVoteUnauth() { given().queryParam("post",410).get("/forum/post/myVote").then().statusCode(401); }
 
     // ── Moderation (section 1) ──
     @Test @TestSecurity(user="forumMod",roles={"Vorstand"})

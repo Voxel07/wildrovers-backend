@@ -43,6 +43,16 @@ public class EventOrm {
         }
     }
 
+    /** Thrown inside a transaction to roll back an event that cannot be linked to its poll option. */
+    public static class PollOptionLinkException extends RuntimeException {
+        public final int status;
+
+        public PollOptionLinkException(int status, String message) {
+            super(message);
+            this.status = status;
+        }
+    }
+
     /**
      * Single-event reads (detail, update, delete, attendance): loads creator, attendances and
      * their users in the same query (no select per event). Lists use {@link #loadEventList}.
@@ -172,7 +182,9 @@ public class EventOrm {
 
     /**
      * Creates the discussion post and the event in one transaction: if the post cannot be
-     * written (missing topic, no permission, duplicate title) nothing is saved.
+     * written (missing topic, no permission, duplicate title) nothing is saved. With a poll
+     * option id the option is linked to the new event in the same transaction; only the creator
+     * of the poll's post or a moderator may do this, and each option can become one event only.
      */
     @Transactional
     @CacheInvalidateAll.List({
@@ -184,13 +196,16 @@ public class EventOrm {
         @CacheInvalidateAll(cacheName = "events-by-post-id")
     })
     @WithSpan
-    public Event addEvent(Event event, Long userId, ForumPost post, Long topicId, String frontendUrl) {
-        Telemetry.attrs("user.id", userId, "forum.topic.id", topicId);
+    public Event addEvent(Event event, Long userId, ForumPost post, Long topicId, String frontendUrl,
+                          Long pollOptionId) {
+        Telemetry.attrs("user.id", userId, "forum.topic.id", topicId, "poll.option.id", pollOptionId);
         User user = em.find(User.class, userId);
         if (user == null) {
             Telemetry.warn("User not found", "user.id", userId);
             throw new IllegalArgumentException("Benutzer nicht gefunden.");
         }
+        // Checked first so that a rejected link creates no forum post.
+        model.Forum.Polls.PollOptions pollOption = pollOptionId != null ? lockLinkableOption(pollOptionId, user) : null;
         Response postResponse = forumPostOrm.addPost(post, topicId, userId);
         if (postResponse.getStatus() != 201 || !(postResponse.getEntity() instanceof Long postId)) {
             throw new ForumPostFailedException(postResponse.getStatus(),
@@ -201,7 +216,41 @@ public class EventOrm {
         event.setCreator(user);
         event.setCalendarSyncRequested(System.currentTimeMillis());
         em.persist(event);
+        if (pollOption != null) {
+            pollOption.setEventId(event.getId());
+        }
         return event;
+    }
+
+    /**
+     * Loads and row-locks a poll option that the user may turn into an event. The lock makes a
+     * second, parallel request wait and then see the link of the first one.
+     */
+    private model.Forum.Polls.PollOptions lockLinkableOption(Long pollOptionId, User user) {
+        model.Forum.Polls.PollOptions option = em.find(model.Forum.Polls.PollOptions.class, pollOptionId,
+                jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+        ForumPost pollPost = option != null && option.getPoll() != null ? option.getPoll().getPost() : null;
+        if (pollPost == null) {
+            throw new PollOptionLinkException(404, "Umfrage-Option nicht gefunden");
+        }
+        String visibility = pollPost.getTopic() != null && pollPost.getTopic().getCategory() != null
+                ? pollPost.getTopic().getCategory().getVisibility() : null;
+        if (visibility == null || visibility.isBlank()) {
+            visibility = model.Users.Roles.VSISITOR;
+        }
+        if (!model.Users.Roles.hasRequiredRole(user.getRole(), visibility)) {
+            // Hidden posts look missing, as on all other forum reads.
+            throw new PollOptionLinkException(404, "Umfrage-Option nicht gefunden");
+        }
+        boolean isPostCreator = pollPost.getCreatorObj() != null && pollPost.getCreatorObj().getId().equals(user.getId());
+        if (!isPostCreator && !model.Users.Roles.isModerator(user.getRole())) {
+            throw new PollOptionLinkException(403,
+                    "Nur der Ersteller der Umfrage oder ein Moderator darf daraus ein Event erstellen.");
+        }
+        if (option.getEventId() != null) {
+            throw new PollOptionLinkException(409, "Aus dieser Option wurde bereits ein Event erstellt.");
+        }
+        return option;
     }
 
     /**
@@ -256,6 +305,9 @@ public class EventOrm {
         if (event == null) return null;
         String googleCalendarEventId = event.getGoogleCalendarEventId();
         Long postId = event.getForumPostId();
+        // The poll option may become an event again.
+        em.createQuery("UPDATE PollOptions o SET o.eventId = NULL WHERE o.eventId = :id")
+                .setParameter("id", eventId).executeUpdate();
         em.remove(event);
         em.flush();
         if (postId != null) {

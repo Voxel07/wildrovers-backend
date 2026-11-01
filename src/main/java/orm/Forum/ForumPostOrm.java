@@ -539,7 +539,9 @@ public class ForumPostOrm {
     }
 
     /**
-     * Increment like or dislike counter for a post with single-vote enforcement.
+     * Likes or dislikes a post; one vote per user. Voting the same type again removes the vote,
+     * the other type switches it. The response has the new counters and the user's vote after
+     * the change ({@code myVote}: "LIKE", "DISLIKE" or null).
      */
     @Transactional
     @WithSpan
@@ -573,6 +575,7 @@ public class ForumPostOrm {
         query.setParameter("postId", postId);
 
         List<model.Forum.ForumPostVote> votes = query.getResultList();
+        String myVote = targetType;
         if (votes.isEmpty()) {
             model.Forum.ForumPostVote newVote = new model.Forum.ForumPostVote();
             newVote.setUser(user);
@@ -589,6 +592,7 @@ public class ForumPostOrm {
             model.Forum.ForumPostVote existingVote = votes.get(0);
             if (existingVote.getVoteType().equals(targetType)) {
                 em.remove(existingVote);
+                myVote = null;
                 if ("LIKE".equals(targetType)) {
                     post.setLikes(Math.max(0, post.getLikes() - 1));
                 } else {
@@ -615,11 +619,26 @@ public class ForumPostOrm {
             return Response.status(500).entity("Fehler beim Speichern der Stimme").build();
         }
 
-        jakarta.json.JsonObject result = jakarta.json.Json.createObjectBuilder()
+        jakarta.json.JsonObjectBuilder result = jakarta.json.Json.createObjectBuilder()
                 .add("likes", post.getLikes())
-                .add("dislikes", post.getDislikes())
-                .build();
-        return Response.ok(result).build();
+                .add("dislikes", post.getDislikes());
+        if (myVote != null) result.add("myVote", myVote);
+        else result.addNull("myVote");
+        return Response.ok(result.build()).build();
+    }
+
+    /** The user's vote on a post: "LIKE", "DISLIKE" or null. */
+    @WithSpan
+    public String getMyVote(Long postId, Long userId) {
+        Telemetry.attrs("forum.post.id", postId, "user.id", userId);
+        List<String> types = em.createQuery(
+                        "SELECT v.voteType FROM ForumPostVote v WHERE v.user.id = :userId AND v.post.id = :postId",
+                        String.class)
+                .setParameter("userId", userId)
+                .setParameter("postId", postId)
+                .setMaxResults(1)
+                .getResultList();
+        return types.isEmpty() ? null : types.get(0);
     }
 
     /**

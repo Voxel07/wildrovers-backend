@@ -16,9 +16,12 @@ import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.FetchType;
 import jakarta.json.bind.annotation.JsonbTransient;
 import jakarta.persistence.Transient;
+import java.time.LocalDate;
 
 @Entity
-@Table(name = "FORUM_POLL_OPTIONS")
+@Table(name = "FORUM_POLL_OPTIONS", indexes = {
+        // Deleting an event clears the link of its poll option.
+        @jakarta.persistence.Index(name = "IDX_FORUM_POLL_OPTIONS_EVENT", columnList = "event_id") })
 public class PollOptions {
     @Id
     @SequenceGenerator(name = "forumPollOptSeq", sequenceName = "ZSEQ_fPollOpt_ID", allocationSize = 1, initialValue = 1)
@@ -31,6 +34,21 @@ public class PollOptions {
 
     @Column(name = "votes", columnDefinition = "bigint default '0'")
     private Long votes = 0L;
+
+    /** First day of a date option (null for plain text options). */
+    @Column(name = "option_date")
+    private LocalDate optionDate;
+
+    /** Last day of a multi-day date option (null for single days and text options). */
+    @Column(name = "option_end_date")
+    private LocalDate optionEndDate;
+
+    /**
+     * Event created from this option (no JPA relation, like Event.forumPostId: the event may be
+     * deleted on its own, which clears this id). Never taken from the client.
+     */
+    @Column(name = "event_id")
+    private Long eventId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "poll_id")
@@ -59,6 +77,15 @@ public class PollOptions {
 
     public Long getVotes() { return votes; }
     public void setVotes(Long votes) { this.votes = votes; }
+
+    public LocalDate getOptionDate() { return optionDate; }
+    public void setOptionDate(LocalDate optionDate) { this.optionDate = optionDate; }
+
+    public LocalDate getOptionEndDate() { return optionEndDate; }
+    public void setOptionEndDate(LocalDate optionEndDate) { this.optionEndDate = optionEndDate; }
+
+    public Long getEventId() { return eventId; }
+    public void setEventId(Long eventId) { this.eventId = eventId; }
 
     public Polls getPoll() { return poll; }
     public void setPoll(Polls poll) { this.poll = poll; }

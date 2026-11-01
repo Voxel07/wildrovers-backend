@@ -472,7 +472,12 @@ public class UserResouce {
         return Response.ok(members.stream().map(TeamMember::of).toList()).build();
     }
 
-    /** Explicit public projection: adding a field to User can never leak it here. */
+    /**
+     * Explicit public projection: adding a field to User can never leak it here.
+     * Registered for reflection because it is only reachable through a {@link Response}
+     * entity, which the native-image build cannot see; without it Jackson serializes nothing.
+     */
+    @io.quarkus.runtime.annotations.RegisterForReflection
     public record PublicMember(Long id, String userName, String role, String photoUrl,
             String backgroundUrl, String phrase, String ribbon) {
         static PublicMember of(User u) {
@@ -485,6 +490,7 @@ public class UserResouce {
      * What team members see of each other. Contact details, login metadata
      * (IP, country, times), block and fee status stay with the board.
      */
+    @io.quarkus.runtime.annotations.RegisterForReflection
     public record TeamMember(Long id, String userName, String role, String firstName, String lastName,
             String photoUrl, String backgroundUrl, String phrase, String ribbon, java.time.LocalDate birthday,
             Long regDate, Integer visitedOps) {
