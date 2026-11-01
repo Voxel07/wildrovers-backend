@@ -44,27 +44,86 @@ public class EventOrm {
     }
 
     /**
-     * Loads creator, attendances and their users in the same query (no select per event).
+     * Single-event reads (detail, update, delete, attendance): loads creator, attendances and
+     * their users in the same query (no select per event). Lists use {@link #loadEventList}.
      * No DISTINCT: Hibernate 6+ already returns each event once for a fetch join, while a SQL
      * DISTINCT made the database de-duplicate every wide event x attendance x user row (~6x slower).
      */
     private static final String WITH_ATTENDANCES =
             "SELECT e FROM Event e LEFT JOIN FETCH e.creator LEFT JOIN FETCH e.attendances a LEFT JOIN FETCH a.user";
 
+    /**
+     * Read model for the event lists. Hydrating every attendee as a managed User entity (all
+     * columns, dirty-checking snapshot) took about a third of the server's CPU under load, while
+     * the response only needs id, status and name per attendance. Two narrow queries build
+     * plain, unmanaged Event and EventAttendance objects that serialise exactly like the
+     * entities (including the role-based name masking of EventAttendance). They are response
+     * objects only: never persist or merge them. Single-event reads and all writes keep using
+     * the entities.
+     *
+     * @param condition JPQL condition on {@code e} starting with " WHERE", or ""
+     */
+    private List<Event> loadEventList(String condition, java.util.Map<String, Object> params) {
+        TypedQuery<Object[]> eventQuery = em.createQuery(
+                "SELECT e.id, e.title, e.description, e.eventDate, e.eventEndDate, e.location, "
+                        + "e.googleCalendarEventId, e.forumPostUrl, e.forumPostId, c.id, c.userName "
+                        + "FROM Event e LEFT JOIN e.creator c" + condition + " ORDER BY e.eventDate ASC, e.id ASC",
+                Object[].class);
+        params.forEach(eventQuery::setParameter);
+
+        java.util.Map<Long, Event> byId = new java.util.LinkedHashMap<>();
+        for (Object[] row : eventQuery.getResultList()) {
+            Event event = new Event();
+            event.setId((Long) row[0]);
+            event.setTitle((String) row[1]);
+            event.setDescription((String) row[2]);
+            event.setEventDate((LocalDateTime) row[3]);
+            event.setEventEndDate((LocalDateTime) row[4]);
+            event.setLocation((String) row[5]);
+            event.setGoogleCalendarEventId((String) row[6]);
+            event.setForumPostUrl((String) row[7]);
+            event.setForumPostId((Long) row[8]);
+            event.setCreator(userStub((Long) row[9], (String) row[10]));
+            event.setAttendances(new java.util.ArrayList<>());
+            byId.put(event.getId(), event);
+        }
+        if (byId.isEmpty()) {
+            return new java.util.ArrayList<>();
+        }
+
+        List<Object[]> attendanceRows = em.createQuery(
+                "SELECT a.event.id, a.id, a.status, u.id, u.userName FROM EventAttendance a LEFT JOIN a.user u "
+                        + "WHERE a.event.id IN :ids ORDER BY a.id ASC", Object[].class)
+                .setParameter("ids", byId.keySet())
+                .getResultList();
+        for (Object[] row : attendanceRows) {
+            model.EventAttendance attendance = new model.EventAttendance();
+            attendance.setId((Long) row[1]);
+            attendance.setStatus((String) row[2]);
+            attendance.setUser(userStub((Long) row[3], (String) row[4]));
+            byId.get((Long) row[0]).getAttendances().add(attendance);
+        }
+        return new java.util.ArrayList<>(byId.values());
+    }
+
+    /** Unmanaged User carrying only id and name, for the read model above. */
+    private static User userStub(Long id, String userName) {
+        if (id == null) return null;
+        User user = new User();
+        user.setId(id);
+        user.setUserName(userName);
+        return user;
+    }
+
     public List<Event> getAllEvents() {
         log.info("EventOrm/getAllEvents");
-        TypedQuery<Event> query = em.createQuery(WITH_ATTENDANCES + " ORDER BY e.eventDate ASC", Event.class);
-        return query.getResultList();
+        return loadEventList("", java.util.Map.of());
     }
 
     /** Events starting in [from, to). */
     public List<Event> getEventsBetween(LocalDateTime from, LocalDateTime to) {
         log.info("EventOrm/getEventsBetween " + from + " - " + to);
-        return em.createQuery(WITH_ATTENDANCES
-                        + " WHERE e.eventDate >= :from AND e.eventDate < :to ORDER BY e.eventDate ASC", Event.class)
-                .setParameter("from", from)
-                .setParameter("to", to)
-                .getResultList();
+        return loadEventList(" WHERE e.eventDate >= :from AND e.eventDate < :to", java.util.Map.of("from", from, "to", to));
     }
 
     /** Years that have at least one event, ascending. */
@@ -90,9 +149,7 @@ public class EventOrm {
         if (ids.isEmpty()) {
             return new java.util.ArrayList<>();
         }
-        return em.createQuery(WITH_ATTENDANCES + " WHERE e.id IN :ids ORDER BY e.eventDate ASC", Event.class)
-                .setParameter("ids", ids)
-                .getResultList();
+        return loadEventList(" WHERE e.id IN :ids", java.util.Map.of("ids", ids));
     }
 
     public Event getEventById(Long id) {
