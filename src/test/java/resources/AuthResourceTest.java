@@ -137,6 +137,36 @@ class AuthResourceTest {
         given().header(CSRF, "test").cookie("wr_rt", second).post("/auth/refresh").then().statusCode(401);
     }
 
+    @Test
+    void sessionReportsRemainingAccessLifetimeIndependentOfClientClock() {
+        Response login = login("authMember");
+        long expiresIn = login.jsonPath().getLong("accessExpiresIn");
+        assertTrue(expiresIn > 14 * 60_000L && expiresIn <= 15 * 60_000L, "accessExpiresIn was " + expiresIn);
+
+        given().cookie("wr_at", login.getCookie("wr_at")).get("/auth/session").then()
+                .statusCode(200).body("authenticated", is(true)).body("accessExpiresIn", notNullValue());
+    }
+
+    /**
+     * A stale access cookie fails authentication before the endpoint runs, so /auth/session
+     * answers 401 rather than "anonymous". The refresh cookie still restores the session;
+     * the frontend must try it instead of treating the 401 as a logout.
+     */
+    @Test
+    void expiredAccessCookieIsRejectedButRefreshStillWorks() {
+        String refresh = login("authMember").getCookie("wr_rt");
+        String expired = expiredAccessToken(960L);
+
+        given().cookie("wr_at", expired).get("/auth/session").then().statusCode(401);
+        given().header(CSRF, "test").cookie("wr_at", expired).cookie("wr_rt", refresh).post("/auth/refresh")
+                .then().statusCode(200).body("authenticated", is(true));
+    }
+
+    @Transactional
+    String expiredAccessToken(long userId) {
+        return JWT.generator(em.find(model.User.class, userId), java.time.Duration.ofMinutes(-5));
+    }
+
     @Transactional
     void backdateRotation() {
         em.createQuery("UPDATE AuthSession s SET s.rotatedAt = 0").executeUpdate();
