@@ -13,7 +13,9 @@ import jakarta.json.bind.annotation.JsonbTransient;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
-@Table(name = "EVENT_ATTENDANCES")
+// "Events attended" statistics count YES answers per user.
+@Table(name = "EVENT_ATTENDANCES", indexes = @jakarta.persistence.Index(
+        name = "IDX_EVENT_ATTENDANCES_USER_STATUS", columnList = "user_id, status"))
 public class EventAttendance {
 
     @Id

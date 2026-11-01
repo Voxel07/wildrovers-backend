@@ -43,9 +43,13 @@ public class EventOrm {
         }
     }
 
-    /** Loads creator, attendances and their users in the same query (no select per event). */
+    /**
+     * Loads creator, attendances and their users in the same query (no select per event).
+     * No DISTINCT: Hibernate 6+ already returns each event once for a fetch join, while a SQL
+     * DISTINCT made the database de-duplicate every wide event x attendance x user row (~6x slower).
+     */
     private static final String WITH_ATTENDANCES =
-            "SELECT DISTINCT e FROM Event e LEFT JOIN FETCH e.creator LEFT JOIN FETCH e.attendances a LEFT JOIN FETCH a.user";
+            "SELECT e FROM Event e LEFT JOIN FETCH e.creator LEFT JOIN FETCH e.attendances a LEFT JOIN FETCH a.user";
 
     public List<Event> getAllEvents() {
         log.info("EventOrm/getAllEvents");

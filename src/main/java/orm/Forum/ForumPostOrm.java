@@ -81,7 +81,8 @@ public class ForumPostOrm {
         String order = " ORDER BY fp.creationDate DESC, fp.id DESC";
 
         TypedQuery<ForumPost> query = em.createQuery(
-                "SELECT fp FROM ForumPost fp LEFT JOIN FETCH fp.topic t LEFT JOIN FETCH t.category c" + where + order,
+                "SELECT fp FROM ForumPost fp LEFT JOIN FETCH fp.topic t LEFT JOIN FETCH t.category c LEFT JOIN FETCH fp.creator"
+                        + where + order,
                 ForumPost.class);
         TypedQuery<Long> count = em.createQuery(
                 "SELECT COUNT(fp) FROM ForumPost fp LEFT JOIN fp.topic t LEFT JOIN t.category c" + where, Long.class);
@@ -103,6 +104,17 @@ public class ForumPostOrm {
             }
         }
         return new ForumPage<>(posts, count.getSingleResult());
+    }
+
+    /** Whether the post exists and its category is visible to one of the given roles (one COUNT, no entity load). */
+    public boolean isVisible(Long postId, List<String> visibleRoles) {
+        if (postId == null) return false;
+        TypedQuery<Long> query = em.createQuery(
+                "SELECT COUNT(fp) FROM ForumPost fp LEFT JOIN fp.topic t LEFT JOIN t.category c WHERE fp.id = :id AND "
+                        + ForumPage.visibilityClause("c", visibleRoles), Long.class)
+                .setParameter("id", postId);
+        ForumPage.bindVisibility(query, visibleRoles);
+        return query.getSingleResult() > 0;
     }
 
     public List<ForumPost> getPostsById(Long postId) {
@@ -623,10 +635,11 @@ public class ForumPostOrm {
         );
         query.setParameter("userId", userId);
         query.setParameter("postId", postId);
+        // Most calls are re-reads: an existing marker implies user and post exist (foreign keys).
+        if (query.getSingleResult() > 0) return true;
         User user = em.find(User.class, userId);
         ForumPost post = em.find(ForumPost.class, postId);
         if (user == null || post == null) return false;
-        if (query.getSingleResult() > 0) return true;
 
         ForumPostView view = new ForumPostView();
         view.setUser(user);

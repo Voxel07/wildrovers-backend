@@ -54,7 +54,8 @@ public class ForumAnswerOrm {
         String where = " WHERE " + ForumPage.visibilityClause("c", visibleRoles) + filter;
 
         TypedQuery<ForumAnswer> query = em.createQuery(
-                "SELECT fa" + from + where + " ORDER BY fa.creationDate ASC, fa.id ASC", ForumAnswer.class);
+                "SELECT fa" + from + " LEFT JOIN FETCH fa.creator" + where + " ORDER BY fa.creationDate ASC, fa.id ASC",
+                ForumAnswer.class);
         TypedQuery<Long> count = em.createQuery("SELECT COUNT(fa)" + from + where, Long.class);
         ForumPage.bindVisibility(query, visibleRoles);
         ForumPage.bindVisibility(count, visibleRoles);

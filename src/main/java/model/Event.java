@@ -21,7 +21,10 @@ import java.util.List;
 import java.util.ArrayList;
 
 @Entity
-@Table(name = "EVENT", indexes = @jakarta.persistence.Index(name = "IDX_EVENT_FORUM_POST", columnList = "forum_post_id"))
+@Table(name = "EVENT", indexes = {
+        @jakarta.persistence.Index(name = "IDX_EVENT_FORUM_POST", columnList = "forum_post_id"),
+        // Year, range and upcoming lists filter and sort by date.
+        @jakarta.persistence.Index(name = "IDX_EVENT_DATE", columnList = "event_date") })
 public class Event {
 
     @Id

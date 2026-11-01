@@ -66,7 +66,7 @@ public class ForumTopicOrm {
         String where = " WHERE " + ForumPage.visibilityClause("c", visibleRoles) + filter;
 
         TypedQuery<ForumTopic> query = em.createQuery(
-                "SELECT ft FROM ForumTopic ft LEFT JOIN FETCH ft.category c" + where
+                "SELECT ft FROM ForumTopic ft LEFT JOIN FETCH ft.category c LEFT JOIN FETCH ft.creator" + where
                         + " ORDER BY ft.creationDate ASC, ft.id ASC", ForumTopic.class);
         TypedQuery<Long> count = em.createQuery(
                 "SELECT COUNT(ft) FROM ForumTopic ft LEFT JOIN ft.category c" + where, Long.class);
@@ -133,10 +133,13 @@ public class ForumTopicOrm {
         if (ids.isEmpty()) return;
 
         java.util.Map<Long, ForumTopic.LatestPost> latest = new HashMap<>();
+        // Newest date per topic first (a loose scan of IDX_FORUM_POSTS_TOPIC_CREATED), then only the
+        // matching posts. A correlated MAX per post row re-ran the subquery for every post (~10x slower).
         List<Object[]> rows = em.createQuery(
                 "SELECT p.topic.id, p.id, p.title, c.userName, p.creationDate FROM ForumPost p LEFT JOIN p.creator c "
-                        + "WHERE p.topic.id IN :ids AND p.creationDate = "
-                        + "(SELECT MAX(p2.creationDate) FROM ForumPost p2 WHERE p2.topic.id = p.topic.id) "
+                        + "WHERE (p.topic.id, p.creationDate) IN "
+                        + "(SELECT p2.topic.id, MAX(p2.creationDate) FROM ForumPost p2 WHERE p2.topic.id IN :ids "
+                        + "GROUP BY p2.topic.id) "
                         + "ORDER BY p.id DESC", Object[].class)
                 .setParameter("ids", ids)
                 .getResultList();
