@@ -25,6 +25,7 @@ public class Email {
     @org.eclipse.microprofile.config.inject.ConfigProperty(name = "app.frontend-url", defaultValue = "http://localhost:5173")
     String appFrontendUrl;
 
+    @WithSpan
     public Response sendVerificationMail(String email, String verificationCode) {
         String htmlBody = "<!DOCTYPE html>" +
             "<html>" +
@@ -61,6 +62,7 @@ public class Email {
         return Response.accepted().build();
     }
 
+    @WithSpan
     public Response sendPasswordResetMail(String email, String resetToken) {
         String resetLink = appFrontendUrl + "/password-reset?token=" + resetToken;
 

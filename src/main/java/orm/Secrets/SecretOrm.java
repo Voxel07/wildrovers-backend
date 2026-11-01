@@ -50,6 +50,7 @@ public class SecretOrm {
         return "Secreat erfolgreich erstellt";
     }
 
+    @WithSpan
     public String generateVerificationId()
     {
         int code = 100000 + SECURE_RANDOM.nextInt(900000);
@@ -98,6 +99,7 @@ public class SecretOrm {
 
     /** Stores a new hashed reset token for the account with this e-mail; returns the raw token or null. */
     @jakarta.transaction.Transactional
+    @WithSpan
     public String createResetToken(String email) {
         java.util.List<model.User> users = em.createQuery("SELECT u FROM User u WHERE u.email = :email", model.User.class)
                 .setParameter("email", email)
@@ -113,6 +115,7 @@ public class SecretOrm {
         return token;
     }
 
+    @WithSpan
     public Secret findByResetToken(String token) {
         try {
             return em.createQuery("SELECT s FROM Secret s WHERE s.resetToken = :val", Secret.class)

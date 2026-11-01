@@ -86,7 +86,8 @@ public class RateLimitFilter implements ContainerRequestFilter {
                 if (addr != null) {
                     return addr.hostAddress();
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                tools.Telemetry.warn("Client address unavailable for rate limiting", e);
             }
         }
         return "unknown";

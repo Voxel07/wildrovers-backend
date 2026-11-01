@@ -47,7 +47,6 @@ services:
       MAILER_AUTH_METHODS: "${MAILER_AUTH_METHODS}"
       APP_BASE_URL: "${APP_BASE_URL}"
       APP_FRONTEND_URL: "${APP_FRONTEND_URL}"
-      LOG_FILE_PATH: "/work/logs/trace.log"
       OTEL_DISABLED: "${OTEL_DISABLED:-false}"
       OTEL_LOG_LEVEL: "${OTEL_LOG_LEVEL:-WARN}"
       TRUSTED_PROXIES: "${TRUSTED_PROXIES}"
@@ -83,7 +82,6 @@ services:
       - ./service_account.json:/work/service_account.json:ro
       # Production never generates keys; mount externally managed keys read-only.
       - ${JWT_KEYS_DIR}:/work/keys:ro
-      - backend_logs:/work/logs
     security_opt:
       - no-new-privileges:true
 
@@ -129,7 +127,6 @@ services:
 
 volumes:
   backend_uploads:
-  backend_logs:
   openobserve_data:
 
 networks:

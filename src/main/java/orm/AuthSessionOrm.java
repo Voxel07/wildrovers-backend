@@ -47,6 +47,7 @@ public class AuthSessionOrm {
 
     /** Creates a session and returns the raw refresh token for the cookie. */
     @Transactional
+    @WithSpan
     public String create(Long userId, int tokenVersion, String loginMethod, String idpRefreshToken,
             Long idpAccessExpiresAt, String userAgent) {
         String token = AesGcm.randomToken();
@@ -67,6 +68,7 @@ public class AuthSessionOrm {
 
     /** Validates the presented refresh token and rotates it. */
     @Transactional
+    @WithSpan
     public Refresh rotate(String presentedToken) {
         if (presentedToken == null || presentedToken.isBlank()) {
             return new Refresh(Outcome.INVALID, null, null);
@@ -104,6 +106,7 @@ public class AuthSessionOrm {
     }
 
     @Transactional
+    @WithSpan
     public void revoke(Long sessionId) {
         AuthSession session = sessionId != null ? em.find(AuthSession.class, sessionId) : null;
         if (session != null && session.getRevokedAt() == null) {
@@ -113,6 +116,7 @@ public class AuthSessionOrm {
 
     /** Ends the session behind a refresh cookie, if any (logout). Returns its account id. */
     @Transactional
+    @WithSpan
     public Long revokeByToken(String presentedToken) {
         if (presentedToken == null || presentedToken.isBlank()) return null;
         String hash = SecretOrm.hashResetToken(presentedToken);
@@ -124,6 +128,7 @@ public class AuthSessionOrm {
     }
 
     @Transactional
+    @WithSpan
     public void revokeAllForUser(Long userId) {
         em.createQuery("UPDATE AuthSession s SET s.revokedAt = :now WHERE s.userId = :uid AND s.revokedAt IS NULL")
                 .setParameter("now", Time.currentTimeInMillis())
@@ -133,6 +138,7 @@ public class AuthSessionOrm {
 
     /** Stores the identity provider's rotated refresh token after a successful re-check there. */
     @Transactional
+    @WithSpan
     public void updateIdpTokens(Long sessionId, String idpRefreshToken, long idpAccessExpiresAt) {
         AuthSession session = em.find(AuthSession.class, sessionId);
         if (session != null) {
@@ -141,6 +147,7 @@ public class AuthSessionOrm {
         }
     }
 
+    @WithSpan
     public String decryptIdpRefreshToken(AuthSession session) {
         String value = session.getIdpRefreshTokenEncrypted();
         if (value == null) return null;

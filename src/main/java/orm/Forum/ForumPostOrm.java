@@ -164,7 +164,10 @@ public class ForumPostOrm {
         ForumPost fp = new ForumPost();
         try {
             fp = query.getSingleResult();
+        } catch (jakarta.persistence.NoResultException e) {
+            return fp;
         } catch (Exception e) {
+            Telemetry.warn("Loading latest post failed", e, "forum.topic.id", topicId);
             return fp;
         }
 
@@ -176,6 +179,7 @@ public class ForumPostOrm {
     /** Title and audience of a post, read from the database for notifications. */
     public record NotificationInfo(String title, String requiredRole) { }
 
+    @WithSpan
     public NotificationInfo notificationInfo(Long postId) {
         if (postId == null) return null;
         List<Object[]> rows = em.createQuery(
@@ -371,6 +375,7 @@ public class ForumPostOrm {
      * (event updates) have checked them. Null values leave the field unchanged.
      */
     @Transactional
+    @WithSpan
     public void updateGeneratedPost(Long postId, String title, String content, Long editorId) {
         ForumPost post = em.find(ForumPost.class, postId);
         if (post == null) return;
@@ -388,6 +393,7 @@ public class ForumPostOrm {
      * Clears the persistence context, so callers must not use managed entities afterwards.
      */
     @Transactional
+    @WithSpan
     public void deletePostById(Long postId) {
         ForumPost post = em.find(ForumPost.class, postId);
         if (post != null) {
@@ -652,6 +658,7 @@ public class ForumPostOrm {
         return true;
     }
 
+    @WithSpan
     public java.util.Set<Long> getViewedPostIds(List<Long> postIds, Long userId) {
         if (postIds == null || postIds.isEmpty() || userId == null) {
             return java.util.Collections.emptySet();

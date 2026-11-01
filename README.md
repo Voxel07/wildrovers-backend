@@ -68,8 +68,9 @@ uses the UBI 9 Mandrel builder configured in the `native` profile, so the
 executable links against the same glibc as the UBI 9 runtime image. That image
 runs the executable as user 185 and includes the AWT/ImageIO libraries generated
 next to it in `target/`, which image uploads need. Supply the same runtime
-environment and mounts as `docker-compose.yml`, including `/work/uploads`,
-`/work/logs` and keys.
+environment and mounts as `docker-compose.yml`, including `/work/uploads` and
+keys. Logs are not written to a file: they go to the console and, with OTel enabled,
+to OpenObserve.
 
 Native compilation needs several GB of memory; set the native-image heap with
 `-Dquarkus.native.native-image-xmx=6g` if the default is too small.

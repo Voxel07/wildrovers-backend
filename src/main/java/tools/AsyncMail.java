@@ -21,6 +21,7 @@ public class AsyncMail {
     @Inject
     AsyncMail self;
 
+    @WithSpan
     public void passwordReset(String recipient, String token) {
         Infrastructure.getDefaultWorkerPool().execute(() -> self.sendPasswordReset(recipient, token));
     }

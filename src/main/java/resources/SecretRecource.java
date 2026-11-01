@@ -82,6 +82,7 @@ public class SecretRecource {
                 return "{\"status\":\"Auto-verified " + username + "\"}";
             }
         } catch (Exception e) {
+            Telemetry.error("Auto-verify failed", e);
             return "{\"status\":\"Error: " + e.getMessage() + "\"}";
         }
         return "{\"status\":\"User not found\"}";

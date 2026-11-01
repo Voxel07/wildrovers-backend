@@ -142,6 +142,7 @@ public class ForumPollOrm {
     }
 
     @CacheResult(cacheName = "poll-has-voted")
+    @WithSpan
     public boolean hasVoted(Long pollId, Long userId) {
         Polls poll = em.find(Polls.class, pollId);
         if (poll == null)
@@ -153,6 +154,7 @@ public class ForumPollOrm {
     }
 
     @CacheResult(cacheName = "poll-voted-options")
+    @WithSpan
     public List<Long> getVotedOptionIds(Long pollId, Long userId) {
         return em.createQuery(
             "SELECT o.id FROM PollOptions o JOIN o.votedUsers u WHERE o.poll.id = :pollId AND u.id = :userId",
@@ -168,6 +170,7 @@ public class ForumPollOrm {
      * Returns empty names if the poll is anonymous, and null if the poll does not
      * exist or its category is not visible to the given role (same rule as post reads).
      */
+    @WithSpan
     public jakarta.json.JsonArray getVoterNames(Long pollId, String viewerRole) {
         Polls poll = em.find(Polls.class, pollId);
         if (poll == null || !canView(poll, viewerRole)) {

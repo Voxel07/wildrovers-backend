@@ -165,6 +165,7 @@ public class EventOrm {
 
     /** Loads an event bypassing the caches, in its own short transaction so the data is fresh. */
     @Transactional
+    @WithSpan
     public Event findUncached(Long id) {
         return id == null ? null : em.find(Event.class, id);
     }
@@ -274,6 +275,7 @@ public class EventOrm {
     }
 
     /** Events whose calendar entry has been waiting for a sync since before {@code requestedBefore}. */
+    @WithSpan
     public List<Long> getPendingCalendarSyncIds(long requestedBefore) {
         return em.createQuery("SELECT e.id FROM Event e WHERE e.calendarSyncRequested IS NOT NULL "
                         + "AND e.calendarSyncRequested < :before ORDER BY e.id", Long.class)
@@ -293,6 +295,7 @@ public class EventOrm {
         @CacheInvalidateAll(cacheName = "events-by-id"),
         @CacheInvalidateAll(cacheName = "events-by-post-id")
     })
+    @WithSpan
     public void markCalendarSynced(Long eventId, String googleCalendarEventId, Long syncedRequest) {
         em.createQuery("UPDATE Event e SET e.googleCalendarEventId = :gid, e.calendarSyncRequested = "
                         + "CASE WHEN e.calendarSyncRequested = :requested THEN NULL ELSE e.calendarSyncRequested END "

@@ -98,7 +98,7 @@ public class EventAttendance {
                 }
             }
         } catch (Exception e) {
-            // fallback
+            tools.Telemetry.warn("Viewer role check failed; attendance shown unmasked", e);
         }
         return user.getUserName();
     }
@@ -118,7 +118,7 @@ public class EventAttendance {
                 }
             }
         } catch (Exception e) {
-            // fallback
+            tools.Telemetry.warn("Viewer role check failed; attendance shown unmasked", e);
         }
         return user.getId();
     }

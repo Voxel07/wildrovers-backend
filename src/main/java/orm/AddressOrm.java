@@ -7,6 +7,7 @@ import jakarta.persistence.EntityManager;
 
 import model.Address;
 import model.User;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import tools.Telemetry;
 
 @ApplicationScoped
@@ -16,6 +17,7 @@ public class AddressOrm {
     @Inject
     EntityManager em;
 
+    @WithSpan
     public Address getAddressByUser(Long userId) {
 
         Address a = new Address();
@@ -32,6 +34,7 @@ public class AddressOrm {
         return a;
     }
 
+    @WithSpan
     public String addAddress(Address a, Long userId) {
         try {
             User usr = em.find(User.class, userId);
@@ -39,15 +42,18 @@ public class AddressOrm {
             em.persist(a);
             em.merge(usr);
         } catch (Exception e) {
+            Telemetry.error("Adding address failed", e, "user.id", userId);
             return "Fehler beim Hinzufügen der Addresse";
         }
         return "Addresse erfolgreich hinzugefügt";
     }
 
+    @WithSpan
     public String updateAddress(Address a) {
         try {
             em.merge(a);
         } catch (Exception e) {
+            Telemetry.error("Updating address failed", e, "address.id", a.getId());
             return "Fehler beim Aktualisieren der Adresse";
         }
         return "Adresse erfolgreich aktualiseirt";

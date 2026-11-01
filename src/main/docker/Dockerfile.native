@@ -8,7 +8,7 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7
 
 # Image uploads use AWT/ImageIO, including native shared libraries from the build.
 RUN microdnf install -y freetype fontconfig && microdnf clean all \
-    && mkdir -p /work/uploads /work/logs \
+    && mkdir -p /work/uploads \
     && chown -R 185:0 /work && chmod -R g+rwX /work
 WORKDIR /work
 ENV HOME=/work

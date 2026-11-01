@@ -127,6 +127,7 @@ public class ForumTopicOrm {
      * Fills the newest post and the read state of each topic with two queries for the whole
      * list. Anonymous readers have no read state, so topics with posts count as unread for them.
      */
+    @WithSpan
     public void attachSummaries(List<ForumTopic> topics, Long userId) {
         List<Long> ids = topics.stream().map(ForumTopic::getId).filter(java.util.Objects::nonNull).toList();
         if (ids.isEmpty()) return;

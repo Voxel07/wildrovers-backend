@@ -78,6 +78,7 @@ public class UserOrm {
     @io.quarkus.cache.CacheName("team-members")
     io.quarkus.cache.Cache teamMembersCache;
 
+    @WithSpan
     public Long getEventsAttendedCount(Long userId) {
         try {
             return em
@@ -87,6 +88,7 @@ public class UserOrm {
                     .setParameter("userId", userId)
                     .getSingleResult();
         } catch (Exception e) {
+            Telemetry.warn("Failed to load events attended count", e, "user.id", userId);
             return 0L;
         }
     }
@@ -95,6 +97,7 @@ public class UserOrm {
      * Events the user said YES to, per calendar year of the event (ascending). Replaces loading
      * every event with every attendance just to count one user's in the browser.
      */
+    @WithSpan
     public java.util.Map<Integer, Long> getEventsAttendedByYear(Long userId) {
         java.util.Map<Integer, Long> byYear = new java.util.TreeMap<>();
         try {
@@ -111,32 +114,48 @@ public class UserOrm {
         return byYear;
     }
 
+    @WithSpan
     public Long getForumPostCount(Long userId) {
         try {
             return em.createQuery("SELECT COUNT(fp) FROM ForumPost fp WHERE fp.creator.id = :userId", Long.class)
                     .setParameter("userId", userId).getSingleResult();
-        } catch (Exception e) { return 0L; }
+        } catch (Exception e) {
+            Telemetry.warn("Failed to load forum post count", e, "user.id", userId);
+            return 0L;
+        }
     }
 
+    @WithSpan
     public Long getForumAnswerCount(Long userId) {
         try {
             return em.createQuery("SELECT COUNT(fa) FROM ForumAnswer fa WHERE fa.creator.id = :userId", Long.class)
                     .setParameter("userId", userId).getSingleResult();
-        } catch (Exception e) { return 0L; }
+        } catch (Exception e) {
+            Telemetry.warn("Failed to load forum answer count", e, "user.id", userId);
+            return 0L;
+        }
     }
 
+    @WithSpan
     public Long getForumTopicCount(Long userId) {
         try {
             return em.createQuery("SELECT COUNT(ft) FROM ForumTopic ft WHERE ft.creator.id = :userId", Long.class)
                     .setParameter("userId", userId).getSingleResult();
-        } catch (Exception e) { return 0L; }
+        } catch (Exception e) {
+            Telemetry.warn("Failed to load forum topic count", e, "user.id", userId);
+            return 0L;
+        }
     }
 
+    @WithSpan
     public Long getForumCategoryCount(Long userId) {
         try {
             return em.createQuery("SELECT COUNT(fc) FROM ForumCategory fc WHERE fc.creator.id = :userId", Long.class)
                     .setParameter("userId", userId).getSingleResult();
-        } catch (Exception e) { return 0L; }
+        } catch (Exception e) {
+            Telemetry.warn("Failed to load forum category count", e, "user.id", userId);
+            return 0L;
+        }
     }
 
     private void populateForumActivity(List<User> users) {
@@ -325,20 +344,26 @@ public class UserOrm {
         }
     }
 
+    @WithSpan
     public User findByEmail(String email) {
         try {
             return em.createQuery("SELECT u FROM User u WHERE u.email = :val", User.class)
                     .setParameter("val", email)
                     .getSingleResult();
+        } catch (jakarta.persistence.NoResultException e) {
+            return null;
         } catch (Exception e) {
+            Telemetry.warn("User lookup by email failed", e);
             return null;
         }
     }
 
+    @WithSpan
     public User findById(Long id) {
         return em.find(User.class, id);
     }
 
+    @WithSpan
     public User findByOidcIdentity(String issuer, String subject) {
         List<User> users = em.createQuery(
                 "SELECT u FROM User u WHERE u.oidcIssuer = :issuer AND u.oidcSubject = :subject", User.class)
@@ -681,6 +706,7 @@ public class UserOrm {
 
     /** Stores login time, IP and (when a local GeoIP database is configured) country. */
     @Transactional
+    @WithSpan
     public void recordLogin(User user) {
         User managed = em.contains(user) ? user : em.find(User.class, user.getId());
         if (managed == null) return;
@@ -713,7 +739,10 @@ public class UserOrm {
                     "SELECT u FROM User u WHERE u.userName = :identifier OR u.email = :identifier", User.class)
                     .setParameter("identifier", identifier)
                     .getSingleResult();
+        } catch (jakarta.persistence.NoResultException e) {
+            return invalidCredentialsResponse();
         } catch (Exception e) {
+            Telemetry.warn("Login lookup failed", e);
             return invalidCredentialsResponse();
         }
 
@@ -756,6 +785,7 @@ public class UserOrm {
      * token version, refresh sessions are checked against it.
      */
     @Transactional
+    @WithSpan
     public void revokeAllSessions(Long userId) {
         User user = userId != null ? em.find(User.class, userId) : null;
         if (user != null) {
@@ -869,6 +899,7 @@ public class UserOrm {
         @CacheInvalidateAll(cacheName = "galleries"),
         @CacheInvalidateAll(cacheName = "galleries-by-id")
     })
+    @WithSpan
     public Response deleteUser(Long userId) {
         return deleteUserWithOptions(userId, true, true, false, true, false);
     }
