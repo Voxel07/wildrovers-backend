@@ -47,6 +47,9 @@ src/main/resources/META-INF/resources/key.pem
 src/main/resources/META-INF/resources/certificate.pem
 service_account.json
 *.pem
+# Publicly known fixtures, used only by the test profile.
+!src/test/resources/testPrivateKey.pem
+!src/test/resources/testPublicKey.pem
 
 .env
 
