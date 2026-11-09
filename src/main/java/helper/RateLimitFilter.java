@@ -62,13 +62,18 @@ public class RateLimitFilter implements ContainerRequestFilter {
             path = "/" + path;
         }
 
-        if (!rateLimiter.tryConsume(ip, path, method)) {
-            requestContext.abortWith(
-                Response.status(429)
-                    .entity("{\"status\":\"error\",\"message\":\"Zu viele Anfragen. Bitte warte einen Moment.\"}")
-                    .build()
-            );
+        long retryAfter = rateLimiter.consume(ip, path, method);
+        if (retryAfter > 0) {
+            requestContext.abortWith(tooManyRequests(retryAfter));
         }
+    }
+
+    public static Response tooManyRequests(long retryAfterSeconds) {
+        return Response.status(429)
+                .header("Retry-After", String.valueOf(retryAfterSeconds))
+                .type(jakarta.ws.rs.core.MediaType.APPLICATION_JSON)
+                .entity("{\"status\":\"error\",\"message\":\"Zu viele Anfragen. Bitte warte einen Moment.\"}")
+                .build();
     }
 
     /**

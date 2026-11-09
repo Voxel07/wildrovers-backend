@@ -63,6 +63,12 @@ public class UserResouce {
     @Inject
     tools.HtmlSanitizer htmlSanitizer;
 
+    @Inject
+    tools.AsyncMail asyncMail;
+
+    @Inject
+    tools.ImageDecodeGate imageDecodeGate;
+
     @ConfigProperty(name = "user.photos.upload-dir", defaultValue = "${user.home}/wildrovers-uploads/user-photos")
     String uploadDir;
 
@@ -87,6 +93,7 @@ public class UserResouce {
         if (user == null) {
             return Response.status(401).entity("Benutzer nicht eingeloggt oder unbekannt").build();
         }
+        user.setPendingEmail(userOrm.findPendingEmail(user.getId()));
         if (!stats) {
             return Response.ok(user).build();
         }
@@ -183,7 +190,7 @@ public class UserResouce {
             return Response.ok(result).build();
         } catch (Exception e) {
             Telemetry.error("Deleting posts of user failed", e, "user.id", userId);
-            return Response.status(500).entity("Fehler beim Löschen der Forumsbeiträge: " + e.getMessage()).build();
+            return Response.status(500).entity("Fehler beim Löschen der Forumsbeiträge.").build();
         }
     }
 
@@ -267,12 +274,58 @@ public class UserResouce {
             phrase = htmlSanitizer.sanitizeTitle(profileData.getPhrase());
         }
         try {
-            userOrm.updateUserProfile(user.getId(), phrase, profileData.getBirthday(), profileData.getFirstName(),
-                    profileData.getLastName(), profileData.getEmail(), profileData.getUserName());
-            return Response.ok(userOrm.getUserById(user.getId()).get(0)).build();
+            UserOrm.ProfileUpdate update = userOrm.updateUserProfile(user.getId(), phrase, profileData.getBirthday(),
+                    profileData.getFirstName(), profileData.getLastName(), profileData.getEmail(), profileData.getUserName());
+            if (update.pendingEmail() != null) {
+                // The new address is stored only after the code sent there is confirmed.
+                asyncMail.emailChange(update.pendingEmail(), update.code());
+            }
+            User updated = userOrm.getUserById(user.getId()).get(0);
+            updated.setPendingEmail(userOrm.findPendingEmail(user.getId()));
+            return Response.ok(updated).build();
         } catch (IllegalArgumentException e) {
             return Response.status(400).entity(e.getMessage()).build();
         }
+    }
+
+    public static class EmailConfirmation {
+        public String code;
+    }
+
+    /** Confirms a pending e-mail change with the code sent to the new address. */
+    @POST
+    @Path("/me/email/confirm")
+    @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response confirmEmailChange(EmailConfirmation confirmation) {
+        User user = userPrincipalResolver.resolveUser();
+        if (user == null) {
+            return Response.status(401).entity("Benutzer nicht eingeloggt").build();
+        }
+        String problem = userOrm.confirmEmailChange(user.getId(), confirmation != null ? confirmation.code : null);
+        if (problem != null) {
+            return Response.status(400).entity(problem).build();
+        }
+        AuditLogger.crud(user.getUserName(), user.getId(), "UPDATE", "ProfileEmail", user.getId());
+        // Built from the committed row: the request already holds the account as it was before.
+        String email = userOrm.findEmail(user.getId());
+        return Response.ok(jakarta.json.Json.createObjectBuilder()
+                .add("email", email != null ? email : "")
+                .add("message", "Neue E-Mail-Adresse bestätigt.")
+                .build()).build();
+    }
+
+    @DELETE
+    @Path("/me/email/pending")
+    @RolesAllowed({ "Besucher", "Frischling", "Mitglied", "Vorstand", "Admin" })
+    public Response cancelEmailChange() {
+        User user = userPrincipalResolver.resolveUser();
+        if (user == null) {
+            return Response.status(401).entity("Benutzer nicht eingeloggt").build();
+        }
+        userOrm.cancelEmailChange(user.getId());
+        return Response.noContent().build();
     }
 
     @POST
@@ -293,6 +346,15 @@ public class UserResouce {
         }
 
         try {
+            return imageDecodeGate.run(() -> storePhoto(user, form));
+        } catch (Exception e) {
+            Telemetry.error("Failed to upload photo", e);
+            return Response.status(500).entity("Fehler beim Verarbeiten des Fotos").build();
+        }
+    }
+
+    private Response storePhoto(User user, PhotoUploadForm form) throws Exception {
+        {
             File uploadedFile = form.file.uploadedFile().toFile();
             BufferedImage original = tools.SafeImageReader.readOriented(uploadedFile, 25_000_000L);
             if (original == null) {
@@ -316,9 +378,6 @@ public class UserResouce {
                     .add("photoUrl", photoUrl)
                     .build();
             return Response.ok(result).build();
-        } catch (Exception e) {
-            Telemetry.error("Failed to upload photo", e);
-            return Response.status(500).entity("Fehler beim Verarbeiten des Fotos").build();
         }
     }
 
@@ -340,6 +399,15 @@ public class UserResouce {
         }
 
         try {
+            return imageDecodeGate.run(() -> storeBackground(user, form));
+        } catch (Exception e) {
+            Telemetry.error("Failed to upload background", e);
+            return Response.status(500).entity("Fehler beim Verarbeiten des Hintergrundbildes").build();
+        }
+    }
+
+    private Response storeBackground(User user, PhotoUploadForm form) throws Exception {
+        {
             File uploadedFile = form.file.uploadedFile().toFile();
             BufferedImage original = tools.SafeImageReader.readOriented(uploadedFile, 25_000_000L);
             if (original == null) {
@@ -363,9 +431,6 @@ public class UserResouce {
                     .add("backgroundUrl", backgroundUrl)
                     .build();
             return Response.ok(result).build();
-        } catch (Exception e) {
-            Telemetry.error("Failed to upload background", e);
-            return Response.status(500).entity("Fehler beim Verarbeiten des Hintergrundbildes").build();
         }
     }
 
@@ -431,6 +496,9 @@ public class UserResouce {
     @Produces("image/jpeg")
     public Response getPhoto(@PathParam("userId") Long userId) {
         Telemetry.attr("user.id", userId);
+        if (!userOrm.isListed(userId)) {
+            return Response.status(404).entity("Photo nicht gefunden").build();
+        }
         String base = uploadDir.replace("${user.home}", System.getProperty("user.home"));
         File file = Paths.get(base, userId + ".jpg").toFile();
         if (!file.exists() || !file.isFile()) {
@@ -447,6 +515,9 @@ public class UserResouce {
     @Produces("image/jpeg")
     public Response getBackground(@PathParam("userId") Long userId) {
         Telemetry.attr("user.id", userId);
+        if (!userOrm.isListed(userId)) {
+            return Response.status(404).entity("Hintergrund nicht gefunden").build();
+        }
         String base = backgroundUploadDir.replace("${user.home}", System.getProperty("user.home"));
         File file = Paths.get(base, userId + "_background.jpg").toFile();
         if (!file.exists() || !file.isFile()) {

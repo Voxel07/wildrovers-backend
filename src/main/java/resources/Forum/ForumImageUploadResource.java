@@ -41,6 +41,9 @@ public class ForumImageUploadResource {
     @Inject
     helper.UserPrincipalResolver userPrincipalResolver;
 
+    @Inject
+    tools.ImageDecodeGate decodeGate;
+
     @POST
     @Path("/upload")
     @RolesAllowed({ Roles.VSISITOR, Roles.FRESHMAN, Roles.MEMBER, Roles.ALDERMEN, Roles.ADMIN })
@@ -71,14 +74,19 @@ public class ForumImageUploadResource {
             // Re-encode to a format ImageIO can always write; never trust the client's extension.
             String format = SafeImageReader.outputFormat(requestedExt);
 
+            String filename = java.util.UUID.randomUUID() + "." + format;
             // Upright (EXIF orientation) and at most FULL_MAX_EDGE px, so phone photos are not stored at 40 MP.
-            BufferedImage original = SafeImageReader.readOriented(uploaded, 40_000_000L, ForumImageStore.FULL_MAX_EDGE, format);
+            // Decoding and saving hold one of the few decode slots (see ImageDecodeGate).
+            BufferedImage original = decodeGate.call(() -> {
+                BufferedImage decoded = SafeImageReader.readOriented(uploaded, 40_000_000L, ForumImageStore.FULL_MAX_EDGE, format);
+                if (decoded != null) {
+                    imageStore.saveImage(decoded, format, tempId, filename, userId);
+                }
+                return decoded;
+            });
             if (original == null) {
                 return Response.status(400).entity("Ungültiges Bildformat").build();
             }
-
-            String filename = java.util.UUID.randomUUID() + "." + format;
-            imageStore.saveImage(original, format, tempId, filename, userId);
 
             jakarta.json.JsonObject result = jakarta.json.Json.createObjectBuilder()
                 .add("url", imageStore.signedUrl(tempId, "thumb", filename))

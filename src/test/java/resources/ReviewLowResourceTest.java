@@ -97,8 +97,11 @@ class ReviewLowResourceTest {
     }
 
     @Test void pollsLoadOnlyForPostDetails() {
+        // Lists carry neither polls nor the post body (A-P1); the title is still there.
         given().queryParam("topic", 9100).get("/forum/post").then().statusCode(200)
-                .body("[0].polls.size()", is(0));
+                .body("[0].polls", org.hamcrest.Matchers.nullValue())
+                .body("[0].content", org.hamcrest.Matchers.nullValue())
+                .body("[0].title", org.hamcrest.Matchers.notNullValue());
         given().queryParam("post", 9100).get("/forum/post").then().statusCode(200)
                 .body("[0].polls[0].question", is("Test poll"))
                 .body("[0].polls[0].options.size()", is(1));

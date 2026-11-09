@@ -61,31 +61,32 @@ public class SecretRecource {
         }
 
         String result = secretOrm.verifyUser(request.email, request.code);
-        if ("Erfolgreich validiert".equals(result)) {
-            return json(Response.Status.OK, "success", "Erfolgreich validiert");
+        if (SecretOrm.VERIFIED.equals(result)) {
+            return json(Response.Status.OK, "success", SecretOrm.VERIFIED);
         }
         return json(Response.Status.BAD_REQUEST, "error", result);
     }
 
-    @GET
+    /** Admin tool: marks an account as verified. A POST, because it changes state (CSRF-checked). */
+    @POST
     @Path("/auto-verify")
     @RolesAllowed("Admin")
     @Produces(MediaType.APPLICATION_JSON)
     @jakarta.transaction.Transactional
-    public String autoVerify(@QueryParam("username") String username) {
+    public Response autoVerify(@QueryParam("username") String username) {
         Telemetry.attr("user.name", username);
         try {
-            model.User user = userOrm.findByUsername(username);
+            model.User user = username != null ? userOrm.findByUsername(username) : null;
             if (user != null && user.getSecret() != null) {
                 user.getSecret().setIsVerifyed(true);
                 em.merge(user.getSecret());
-                return "{\"status\":\"Auto-verified " + username + "\"}";
+                return json(Response.Status.OK, "success", "Konto " + username + " verifiziert");
             }
         } catch (Exception e) {
             Telemetry.error("Auto-verify failed", e);
-            return "{\"status\":\"Error: " + e.getMessage() + "\"}";
+            return json(Response.Status.INTERNAL_SERVER_ERROR, "error", "Verifizierung fehlgeschlagen");
         }
-        return "{\"status\":\"User not found\"}";
+        return json(Response.Status.NOT_FOUND, "error", "Benutzer nicht gefunden");
     }
 
     public static class ResetRequest {

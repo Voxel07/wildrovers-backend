@@ -40,6 +40,9 @@ public class ImageExtractor {
     @Inject
     ForumImageStore imageStore;
 
+    @Inject
+    ImageDecodeGate decodeGate;
+
     /**
      * Scans HTML for base64 images, saves them to disk, and returns the content with
      * data: URIs replaced by canonical /forum/img/... URLs. Images that exceed the
@@ -54,6 +57,7 @@ public class ImageExtractor {
         Matcher matcher = BASE64_IMG_PATTERN.matcher(html);
         StringBuilder sb = new StringBuilder();
         int imgIndex = 0;
+        java.util.Map<Integer, String> savedNames = new java.util.HashMap<>();
 
         while (matcher.find()) {
             String b64data = matcher.group(3);
@@ -66,13 +70,21 @@ public class ImageExtractor {
             } else {
                 try {
                     byte[] imageBytes = Base64.getMimeDecoder().decode(b64data);
-                    BufferedImage original = imageBytes.length <= MAX_IMAGE_BYTES
-                            ? SafeImageReader.readOriented(imageBytes, MAX_PIXELS, ForumImageStore.FULL_MAX_EDGE, format) : null;
+                    final int index = imgIndex;
+                    BufferedImage original = imageBytes.length > MAX_IMAGE_BYTES ? null : decodeGate.call(() -> {
+                        BufferedImage decoded = SafeImageReader.readOriented(imageBytes, MAX_PIXELS, ForumImageStore.FULL_MAX_EDGE, format);
+                        if (decoded != null) {
+                            // Saved while the slot is held: encoding the scaled copies needs memory too.
+                            String name = "b64-" + UUID.randomUUID() + "." + format;
+                            imageStore.saveImage(decoded, format, String.valueOf(postId), name, authorId);
+                            savedNames.put(index, name);
+                        }
+                        return decoded;
+                    });
                     if (original == null) {
                         Telemetry.warn("Could not decode embedded image", "forum.post.id", postId, "image.index", imgIndex, "image.format", format);
                     } else {
-                        String filename = "b64-" + UUID.randomUUID() + "." + format;
-                        imageStore.saveImage(original, format, String.valueOf(postId), filename, authorId);
+                        String filename = savedNames.get(imgIndex);
 
                         String fullUrl = ForumImageStore.canonicalPath(String.valueOf(postId), "full", filename);
                         String thumbUrl = ForumImageStore.canonicalPath(String.valueOf(postId), "thumb", filename);

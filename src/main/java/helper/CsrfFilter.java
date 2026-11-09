@@ -24,8 +24,8 @@ import tools.Telemetry;
  *   origins pass;</li>
  *   <li>an {@code Origin} header, when sent, must be one of those origins.</li>
  * </ul>
- * Requests with an {@code Authorization} header carry no ambient credentials
- * and are not checked.
+ * Requests with an {@code Authorization: Bearer} header carry no ambient
+ * credentials and are not checked.
  */
 @Provider
 @PreMatching
@@ -42,7 +42,10 @@ public class CsrfFilter implements ContainerRequestFilter {
     @Override
     public void filter(ContainerRequestContext request) {
         if (SAFE_METHODS.contains(request.getMethod())) return;
-        if (request.getHeaderString("Authorization") != null) return;
+        // Only a bearer token replaces the cookie; LocalJwtAuthMechanism falls back to the
+        // session cookie for any other Authorization header, so those requests stay checked.
+        String authorization = request.getHeaderString("Authorization");
+        if (authorization != null && authorization.startsWith("Bearer ")) return;
 
         Map<String, Cookie> cookies = request.getCookies();
         String path = request.getUriInfo().getPath();

@@ -63,11 +63,27 @@ public class ForumPostResource {
     {
         model.User user = userPrincipalResolver.resolveUser();
         String userRole = user != null ? user.getRole() : Roles.VSISITOR;
+        Long loggedInUserId = user != null ? user.getId() : null;
+        if (postId == null) {
+            // Lists only show titles and counters: skip the post bodies.
+            ForumPage<orm.Forum.PostSummary> summaries = forumPostOrm.findPostSummaries(topicId, userId, editorId, title,
+                    Roles.visibleTo(userRole), page, size);
+            List<orm.Forum.PostSummary> rows = summaries.items();
+            if (loggedInUserId != null && !rows.isEmpty()) {
+                try {
+                    java.util.Set<Long> viewedIds = forumPostOrm.getViewedPostIds(
+                            rows.stream().map(orm.Forum.PostSummary::id).toList(), loggedInUserId);
+                    rows = rows.stream().map(r -> r.withViewed(viewedIds.contains(r.id()))).toList();
+                } catch (Exception e) {
+                    Telemetry.warn("Failed to set viewed state on posts", e);
+                }
+            }
+            return Response.ok(rows).header(ForumPage.TOTAL_HEADER, summaries.total()).build();
+        }
         ForumPage<ForumPost> result = forumPostOrm.findPosts(postId, topicId, userId, editorId, title,
                 Roles.visibleTo(userRole), page, size);
         List<ForumPost> mutablePosts = new java.util.ArrayList<>(result.items());
 
-        Long loggedInUserId = user != null ? user.getId() : null;
         if (loggedInUserId != null && !mutablePosts.isEmpty()) {
             try {
                 java.util.List<Long> postIds = new java.util.ArrayList<>();

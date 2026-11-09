@@ -1,0 +1,24 @@
+# Weekly update pull requests for Maven libraries, the Docker base image and the CI actions.
+# Security alerts for known CVEs additionally need "Dependabot alerts" enabled in the
+# repository settings (Settings > Code security).
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      quarkus:
+        patterns:
+          - "io.quarkus*"
+
+  - package-ecosystem: docker
+    directory: /src/main/docker
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

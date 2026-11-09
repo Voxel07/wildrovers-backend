@@ -1,8 +1,13 @@
 services:
   backend:
-    image: ghcr.io/voxel07/wildrovers-backend:latest
+    # Deploy a release tag, not :latest, so every deployment can be rolled back to a known version.
+    image: ghcr.io/voxel07/wildrovers-backend:${BACKEND_VERSION:?Set BACKEND_VERSION to a release tag in .env}
     container_name: wildrovers-backend
     restart: unless-stopped
+    # Upper bound for the whole process. The native heap (-Xmx) stays below it so a burst of
+    # image uploads fails inside the app (503) instead of the kernel killing the container.
+    mem_limit: "${BACKEND_MEM_LIMIT:-1g}"
+    command: ["-Xmx${BACKEND_MAX_HEAP:-768m}"]
     # Ports can be omitted if you only expose them via the Nginx proxy network,
     # but kept here if you need direct access for testing.
     expose:
@@ -86,11 +91,13 @@ services:
       - no-new-privileges:true
 
   frontend:
-    image: ghcr.io/voxel07/wildrovers-frontend:latest
+    image: ghcr.io/voxel07/wildrovers-frontend:${FRONTEND_VERSION:?Set FRONTEND_VERSION to a release tag in .env}
     container_name: wildrovers-frontend
     restart: unless-stopped
+    # The frontend image runs nginx unprivileged on 8080; point the reverse proxy there.
     expose:
-      - "80"
+      - "8080"
+    mem_limit: "${FRONTEND_MEM_LIMIT:-128m}"
     networks:
       - proxy_network
     environment:

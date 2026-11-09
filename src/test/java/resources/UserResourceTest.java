@@ -140,6 +140,10 @@ class UserResourceTest {
                 .post("/user/resend-verification")
                 .then().statusCode(200)
                 .body("message", equalTo("Ein neuer Verifizierungscode wurde gesendet."));
+        // Sent after commit on a worker thread.
+        for (int i = 0; i < 50 && mailbox.getMailsSentTo("unverified@test.local").isEmpty(); i++) {
+            try { Thread.sleep(100); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }
         assertEquals(1, mailbox.getMailsSentTo("unverified@test.local").size());
     }
 

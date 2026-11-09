@@ -16,7 +16,11 @@ class SecretResourceTest {
         given().contentType(ContentType.JSON).body("{\"email\":\"x@x.com\",\"code\":\"bad\"}").post("/secrets/verify").then().statusCode(400);
     }
     @Test void autoVerifyRequiresAdmin() {
-        given().queryParam("username","nonexistent").get("/secrets/auto-verify").then().statusCode(401);
+        given().queryParam("username","nonexistent").header("X-Requested-With", "test")
+                .post("/secrets/auto-verify").then().statusCode(401);
+    }
+    @Test void autoVerifyIsNotAGet() {
+        given().queryParam("username","nonexistent").get("/secrets/auto-verify").then().statusCode(405);
     }
     @Test void resetMissing() {
         given().contentType(ContentType.JSON).body("{}").post("/secrets/reset-request").then().statusCode(400);

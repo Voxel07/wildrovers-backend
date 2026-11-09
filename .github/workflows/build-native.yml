@@ -6,8 +6,13 @@ on:
       - '*'
 
 jobs:
+  # A release image is only built from a commit whose tests pass.
+  test:
+    uses: ./.github/workflows/test.yml
+
   build-and-push:
     name: Build Native Executable & Docker Container
+    needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:

@@ -9,9 +9,7 @@ import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -156,11 +154,24 @@ public class WebhookSender {
             out.write(request.getBytes(StandardCharsets.US_ASCII));
             out.write(payload);
             out.flush();
-            BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(socket.getInputStream(), StandardCharsets.ISO_8859_1));
-            String statusLine = reader.readLine();
-            return parseStatus(statusLine);
+            return parseStatus(readStatusLine(socket.getInputStream()));
         }
+    }
+
+    /** Longest status line read from a webhook receiver; the rest of the response is never read. */
+    static final int MAX_STATUS_LINE_BYTES = 256;
+
+    /** Reads at most {@link #MAX_STATUS_LINE_BYTES} up to the first line break. */
+    static String readStatusLine(java.io.InputStream in) throws IOException {
+        byte[] buffer = new byte[MAX_STATUS_LINE_BYTES];
+        int length = 0;
+        while (length < buffer.length) {
+            int b = in.read();
+            if (b < 0 || b == 10) break; // LF
+            buffer[length++] = (byte) b;
+        }
+        if (length > 0 && buffer[length - 1] == 13) length--; // CR
+        return length == 0 ? null : new String(buffer, 0, length, StandardCharsets.ISO_8859_1);
     }
 
     private Socket open(Target target, int timeoutMillis) throws IOException {

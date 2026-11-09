@@ -54,8 +54,11 @@ public class ForumImageStore {
     /** Any mention of a forum image path, used to decide which files are still in use. */
     private static final Pattern IMAGE_REFERENCE = Pattern.compile(
             "/forum/img/(" + ID_PATTERN + ")/(?:full|thumb)/(" + FILE_PATTERN + ")", Pattern.CASE_INSENSITIVE);
-    /** Signed URLs stay valid for 6–12 hours and are stable within a 6 hour window (cacheable). */
-    private static final long SIGNATURE_WINDOW_SECONDS = 6L * 60L * 60L;
+    /**
+     * Signed URLs stay valid for 24–48 hours and are stable within a 24 hour window, so browsers
+     * keep post images cached for a day instead of refetching them every few hours.
+     */
+    static final long SIGNATURE_WINDOW_SECONDS = 24L * 60L * 60L;
     /** Longest side of stored full-size images; larger uploads are scaled down. */
     public static final int FULL_MAX_EDGE = 2560;
 

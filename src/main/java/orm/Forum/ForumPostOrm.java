@@ -105,6 +105,42 @@ public class ForumPostOrm {
         return new ForumPage<>(posts, count.getSingleResult());
     }
 
+    /**
+     * Same filters, visibility and order as {@link #findPosts} for list views, but without the
+     * post body: only the columns a post list shows are selected.
+     */
+    @WithSpan
+    public ForumPage<PostSummary> findPostSummaries(Long topicId, Long userId, Long editorId, String title,
+            List<String> visibleRoles, Integer page, Integer size) {
+        String filter = "";
+        Object value = null;
+        if (topicId != null) { filter = " AND t.id = :val"; value = topicId; }
+        else if (userId != null) { filter = " AND fp.creator.id = :val"; value = userId; }
+        else if (editorId != null) { filter = " AND fp.editor.id = :val"; value = editorId; }
+        else if (title != null) { filter = " AND fp.title = :val"; value = title; }
+        String where = " WHERE " + ForumPage.visibilityClause("c", visibleRoles) + filter;
+        String order = " ORDER BY fp.creationDate DESC, fp.id DESC";
+
+        TypedQuery<Object[]> query = em.createQuery(
+                "SELECT fp.id, fp.title, cr.userName, cr.photoUrl, fp.creationDate, fp.editDate, fp.likes, fp.dislikes, "
+                        + "fp.views, fp.answerCount, t.id, t.topic, c.id, c.category "
+                        + "FROM ForumPost fp LEFT JOIN fp.topic t LEFT JOIN t.category c LEFT JOIN fp.creator cr"
+                        + where + order,
+                Object[].class);
+        TypedQuery<Long> count = em.createQuery(
+                "SELECT COUNT(fp) FROM ForumPost fp LEFT JOIN fp.topic t LEFT JOIN t.category c" + where, Long.class);
+        ForumPage.bindVisibility(query, visibleRoles);
+        ForumPage.bindVisibility(count, visibleRoles);
+        if (value != null) {
+            query.setParameter("val", value);
+            count.setParameter("val", value);
+        }
+        query.setFirstResult(ForumPage.firstResult(page, size));
+        query.setMaxResults(ForumPage.pageSize(size));
+        List<PostSummary> rows = query.getResultList().stream().map(PostSummary::of).toList();
+        return new ForumPage<>(rows, count.getSingleResult());
+    }
+
     /** Whether the post exists and its category is visible to one of the given roles (one COUNT, no entity load). */
     @WithSpan
     public boolean isVisible(Long postId, List<String> visibleRoles) {

@@ -68,6 +68,27 @@ public class UserOrm {
     @Inject
     AccountSnapshotCache accountSnapshots;
 
+    @Inject
+    tools.AsyncMail asyncMail;
+
+    @Inject
+    AuthSessionOrm authSessions;
+
+    @ConfigProperty(name = "user.photos.upload-dir", defaultValue = "${user.home}/wildrovers-uploads/user-photos")
+    String photoUploadDir;
+
+    @ConfigProperty(name = "user.backgrounds.upload-dir", defaultValue = "${user.home}/wildrovers-uploads/profile-backgrounds")
+    String backgroundUploadDir;
+
+    /** A confirmation code for a new e-mail address is valid this long. */
+    static final long EMAIL_CHANGE_TTL_MS = 30 * 60 * 1000L;
+
+    private static final java.util.regex.Pattern EMAIL_PATTERN =
+            java.util.regex.Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+
+    /** Same answer for a new sign-up and for an address that already has an account. */
+    static final String SIGNUP_ACCEPTED = "Nutzer erfolgreich erstellt";
+
     /** Verified when the account does not exist, so a miss costs as much time as a wrong password. */
     private static final String DUMMY_PASSWORD_HASH = BcryptUtil.bcryptHash(java.util.UUID.randomUUID().toString());
 
@@ -363,6 +384,23 @@ public class UserOrm {
         return em.find(User.class, id);
     }
 
+    /** Stored e-mail address, read from the database (not from an entity this request already holds). */
+    @WithSpan
+    public String findEmail(Long userId) {
+        List<String> emails = em.createQuery("SELECT u.email FROM User u WHERE u.id = :id", String.class)
+                .setParameter("id", userId).getResultList();
+        return emails.isEmpty() ? null : emails.get(0);
+    }
+
+    /** True for an existing account that is neither blocked nor deactivated (its profile images may be shown). */
+    @WithSpan
+    public boolean isListed(Long id) {
+        if (id == null) return false;
+        return em.createQuery("SELECT COUNT(u) FROM User u WHERE u.id = :id AND u.isActive = true "
+                + "AND (u.isBlocked IS NULL OR u.isBlocked = false)", Long.class)
+                .setParameter("id", id).getSingleResult() > 0;
+    }
+
     @WithSpan
     public User findByOidcIdentity(String issuer, String subject) {
         List<User> users = em.createQuery(
@@ -414,7 +452,19 @@ public class UserOrm {
                 }
                 existing.setOidcIssuer(profile.issuer());
                 existing.setOidcSubject(profile.subject());
+                // Whoever registered the local account (or last changed its address) knows its password.
+                // From now on Authentik vouches for this account, so that password and every session
+                // opened with it must stop working.
+                if (existing.getSecret() != null) {
+                    existing.getSecret().setPassword(BcryptUtil.bcryptHash(java.util.UUID.randomUUID().toString()));
+                    existing.getSecret().clearPendingEmail();
+                    existing.getSecret().setResetToken(null);
+                    existing.getSecret().setResetTokenTimestamp(null);
+                }
+                existing.revokeTokens();
+                authSessions.revokeAllForUser(existing.getId());
                 user = existing;
+                changed = true;
                 Telemetry.event("oidc.account_linked", "user.id", existing.getId(), "oidc.issuer", profile.issuer());
             } else {
                 user = createOidcUser(profile, email, role);
@@ -486,18 +536,24 @@ public class UserOrm {
         String userName = signup.userName.trim();
         String mail = signup.email.trim();
 
-        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.userName =: val1 OR u.email =: val2",
-                User.class);
-        query.setParameter("val1", userName);
-        query.setParameter("val2", mail);
+        // Hash first so every branch below costs about the same time.
+        String passwordHash = BcryptUtil.bcryptHash(signup.password);
 
-        if (!query.getResultList().isEmpty()) {
-            return Response.status(406).entity("Nutzer bereits bekannt").build();
+        // User names are public (forum, team page), so a taken one may be reported. It is checked
+        // before the e-mail so the answer never depends on whether the address is registered.
+        if (findByUsername(userName) != null) {
+            return Response.status(Response.Status.CONFLICT)
+                    .entity("Dieser Benutzername ist bereits vergeben.").build();
+        }
+        if (findByEmail(mail) != null) {
+            // Same answer as a real sign-up; the owner of the address gets a notice instead of a code.
+            Telemetry.event("signup.existing_email");
+            asyncMail.accountExists(mail);
+            return Response.status(201).entity(SIGNUP_ACCEPTED).build();
         }
 
         // Build the entity from the allowlisted signup fields only. Role,
         // permissions and status are never taken from the request.
-        String passwordHash = BcryptUtil.bcryptHash(signup.password);
         User usr = new User();
         usr.setUserName(userName);
         usr.setEmail(mail);
@@ -517,36 +573,15 @@ public class UserOrm {
             return Response.status(500).entity("Fehler beim Nutzer einfügen").build();
         }
 
-        // NOTE:
-        /**
-         * Needs to be after the User has been persisted to the Database so we can get
-         * the ID;
-         */
-        /*
-         * Generate secrets
-         */
-        Long userId = usr.getId();
+        // The secret needs the generated user id, so it is created after the user is persisted.
         String verificationId = secretOrm.generateVerificationId();
-        secretOrm.addSecret(userId, false, verificationId, passwordHash);
+        secretOrm.addSecret(usr.getId(), false, verificationId, passwordHash);
         recordSignupNotification(usr);
-        // Id zurückgeben
 
-        /**
-         * Send Email so that the user can verify his acc
-         */
-        try {
-            email.sendVerificationMail(usr.getEmail(), verificationId);
-        } catch (Exception e) {
-            Telemetry.error("Sending verification e-mail failed", e);
-            throw new jakarta.ws.rs.WebApplicationException(
-                Response.status(500)
-                    .entity("Fehler beim Senden der Verifizierungs-E-Mail: " + e.getMessage())
-                    .build()
-            );
-        }
-
-        return Response.status(201).entity("Nutzer erfolgreich erstellt").build();
-
+        // Sent after commit on a worker thread: a slow mail server no longer holds the
+        // transaction and its connection. A lost mail can be re-requested via resend-verification.
+        asyncMail.verification(usr.getEmail(), verificationId);
+        return Response.status(201).entity(SIGNUP_ACCEPTED).build();
     }
 
     private void recordSignupNotification(User user) {
@@ -686,6 +721,15 @@ public class UserOrm {
             return new LoginResult(null, invalidCredentialsResponse());
         }
 
+        // Authentik owns linked accounts: a local password would bypass a block or group change there.
+        if (user.isOidcLinked()) {
+            JsonObject response = jakarta.json.Json.createObjectBuilder()
+                    .add("code", "OIDC_ACCOUNT")
+                    .add("message", "Dieses Konto wird über Authentik verwaltet. Bitte melde dich über Authentik an.")
+                    .build();
+            return new LoginResult(null, Response.status(401).entity(response).build());
+        }
+
         if (!Boolean.TRUE.equals(user.getSecret().getIsVerifyed())) {
             JsonObject response = jakarta.json.Json.createObjectBuilder()
                     .add("code", "ACCOUNT_NOT_VERIFIED")
@@ -733,27 +777,30 @@ public class UserOrm {
             return invalidCredentialsResponse();
         }
 
-        User user;
+        User user = null;
         try {
-            user = em.createQuery(
+            List<User> found = em.createQuery(
                     "SELECT u FROM User u WHERE u.userName = :identifier OR u.email = :identifier", User.class)
                     .setParameter("identifier", identifier)
-                    .getSingleResult();
-        } catch (jakarta.persistence.NoResultException e) {
-            return invalidCredentialsResponse();
+                    .setMaxResults(1)
+                    .getResultList();
+            user = found.isEmpty() ? null : found.get(0);
         } catch (Exception e) {
             Telemetry.warn("Login lookup failed", e);
-            return invalidCredentialsResponse();
         }
 
+        // Unknown accounts are checked against a dummy hash, so the response time does not reveal them.
+        String storedPasswordHash = user != null && user.getSecret() != null ? user.getSecret().getPassword() : null;
+        boolean passwordMatches;
         try {
-            String storedPasswordHash = user.getSecret() != null ? user.getSecret().getPassword() : null;
-            if (storedPasswordHash == null
-                    || !verifyBCryptPassword(storedPasswordHash, credentials.getPassword())) {
-                return invalidCredentialsResponse();
-            }
+            passwordMatches = verifyBCryptPassword(
+                    storedPasswordHash != null ? storedPasswordHash : DUMMY_PASSWORD_HASH, credentials.getPassword())
+                    && storedPasswordHash != null;
         } catch (Exception e) {
             Telemetry.event("verification.resend_rejected");
+            passwordMatches = false;
+        }
+        if (!passwordMatches) {
             return invalidCredentialsResponse();
         }
 
@@ -765,11 +812,12 @@ public class UserOrm {
         String verificationId = secretOrm.generateVerificationId();
         user.getSecret().setVerificationId(verificationId);
         user.getSecret().setVerificationTimestamp(Time.currentTimeInMillis());
+        user.getSecret().setVerificationAttempts(0);
         em.merge(user.getSecret());
 
         // The recipient always comes from the authenticated account record, never
-        // from a caller-controlled email address.
-        email.sendVerificationMail(user.getEmail(), verificationId);
+        // from a caller-controlled email address. Sent after commit, off the request thread.
+        asyncMail.verification(user.getEmail(), verificationId);
         return Response.ok(jakarta.json.Json.createObjectBuilder()
                 .add("message", "Ein neuer Verifizierungscode wurde gesendet.")
                 .build()).build();
@@ -824,47 +872,142 @@ public class UserOrm {
         return users;
     }
 
+    /**
+     * Result of a profile update. When the e-mail address was changed, {@code pendingEmail} and
+     * {@code code} are set: the address is stored only after that code, sent to the new address,
+     * has been confirmed.
+     */
+    public record ProfileUpdate(User user, String pendingEmail, String code) { }
+
+    public static boolean isValidEmail(String email) {
+        return email != null && email.length() <= 254 && EMAIL_PATTERN.matcher(email).matches();
+    }
+
     @Transactional
     @CacheInvalidateAll(cacheName = "team-members")
     @WithSpan
-    public User updateUserProfile(Long userId, String phrase, java.time.LocalDate birthday, String firstName,
+    public ProfileUpdate updateUserProfile(Long userId, String phrase, java.time.LocalDate birthday, String firstName,
             String lastName, String email, String userName) {
         User user = em.find(User.class, userId);
-        if (user != null) {
-            if (userName != null && !userName.isBlank()) {
-                User existing = findByUsername(userName);
-                if (existing != null && !existing.getId().equals(userId)) {
-                    throw new IllegalArgumentException(
-                            "Dieser Benutzername wird bereits verwendet.");
-                }
-                if (!userName.equals(user.getUserName())) {
-                    try {
-                        forumCategoryOrm.invalidateCategoryCaches();
-                    } catch (Exception e) {
-                        throw new IllegalArgumentException("Fehler beim Invalidate der Kategorien-Caches.");
-                    }
-                }
-                user.setUserName(userName);
-            }
-            if (firstName != null && !firstName.isBlank()) {
-                user.setFirstName(firstName);
-            }
-            if (lastName != null && !lastName.isBlank()) {
-                user.setLastName(lastName);
-            }
-            if (email != null && !email.isBlank()) {
-                User existing = findByEmail(email);
-                if (existing != null && !existing.getId().equals(userId)) {
-                    throw new IllegalArgumentException(
-                            "Diese E-Mail-Adresse wird bereits von einem anderen Benutzer verwendet.");
-                }
-                user.setEmail(email);
-            }
-            user.setPhrase(phrase);
-            user.setBirthday(birthday);
-            em.merge(user);
+        if (user == null) {
+            return new ProfileUpdate(null, null, null);
         }
-        return user;
+        String pendingEmail = null;
+        String code = null;
+        if (email != null && !email.isBlank() && !email.trim().equalsIgnoreCase(user.getEmail())) {
+            String newEmail = email.trim();
+            if (!isValidEmail(newEmail)) {
+                throw new IllegalArgumentException("Bitte gib eine gültige E-Mail-Adresse ein.");
+            }
+            User existing = findByEmail(newEmail);
+            if (existing != null && !existing.getId().equals(userId)) {
+                throw new IllegalArgumentException(
+                        "Diese E-Mail-Adresse wird bereits von einem anderen Benutzer verwendet.");
+            }
+            model.Users.Secret secret = user.getSecret();
+            if (secret == null) {
+                throw new IllegalArgumentException("Die E-Mail-Adresse dieses Kontos kann nicht geändert werden.");
+            }
+            code = secretOrm.generateVerificationId();
+            secret.setPendingEmail(newEmail);
+            secret.setPendingEmailCode(SecretOrm.hashResetToken(code));
+            secret.setPendingEmailTimestamp(Time.currentTimeInMillis());
+            secret.setPendingEmailAttempts(0);
+            pendingEmail = newEmail;
+            Telemetry.event("profile.email_change_requested", "user.id", userId);
+        }
+        if (userName != null && !userName.isBlank()) {
+            User existing = findByUsername(userName);
+            if (existing != null && !existing.getId().equals(userId)) {
+                throw new IllegalArgumentException(
+                        "Dieser Benutzername wird bereits verwendet.");
+            }
+            if (!userName.equals(user.getUserName())) {
+                try {
+                    forumCategoryOrm.invalidateCategoryCaches();
+                } catch (Exception e) {
+                    throw new IllegalArgumentException("Fehler beim Invalidate der Kategorien-Caches.");
+                }
+            }
+            user.setUserName(userName);
+        }
+        if (firstName != null && !firstName.isBlank()) {
+            user.setFirstName(firstName);
+        }
+        if (lastName != null && !lastName.isBlank()) {
+            user.setLastName(lastName);
+        }
+        user.setPhrase(phrase);
+        user.setBirthday(birthday);
+        em.merge(user);
+        return new ProfileUpdate(user, pendingEmail, code);
+    }
+
+    /** Address awaiting confirmation for this account, or null. */
+    @WithSpan
+    public String findPendingEmail(Long userId) {
+        List<String> pending = em.createQuery(
+                "SELECT s.pendingEmail FROM Secret s WHERE s.user.id = :uid AND s.pendingEmail IS NOT NULL", String.class)
+                .setParameter("uid", userId)
+                .setMaxResults(1)
+                .getResultList();
+        return pending.isEmpty() ? null : pending.get(0);
+    }
+
+    /**
+     * Stores the pending e-mail address once the code sent there is confirmed.
+     *
+     * @return null on success, otherwise the message for the user
+     */
+    @Transactional
+    @CacheInvalidateAll(cacheName = "team-members")
+    @WithSpan
+    public String confirmEmailChange(Long userId, String code) {
+        User user = em.find(User.class, userId);
+        model.Users.Secret secret = user != null ? user.getSecret() : null;
+        if (secret == null || secret.getPendingEmail() == null || secret.getPendingEmailCode() == null) {
+            return "Es gibt keine offene Änderung der E-Mail-Adresse.";
+        }
+        Long requestedAt = secret.getPendingEmailTimestamp();
+        if (requestedAt == null || Time.currentTimeInMillis() - requestedAt > EMAIL_CHANGE_TTL_MS
+                || secret.getPendingEmailAttempts() >= model.Users.Secret.MAX_CODE_ATTEMPTS) {
+            secret.clearPendingEmail();
+            return "Der Code ist abgelaufen. Bitte ändere die E-Mail-Adresse erneut.";
+        }
+        boolean matches = code != null && java.security.MessageDigest.isEqual(
+                SecretOrm.hashResetToken(code.trim()).getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                secret.getPendingEmailCode().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        if (!matches) {
+            int attempts = secret.getPendingEmailAttempts() + 1;
+            secret.setPendingEmailAttempts(attempts);
+            if (attempts >= model.Users.Secret.MAX_CODE_ATTEMPTS) {
+                secret.clearPendingEmail();
+                Telemetry.warn("E-mail change code entered wrongly too often", "user.id", userId,
+                        "security.event", "email_change_code_exhausted");
+                return "Der Code wurde zu oft falsch eingegeben. Bitte ändere die E-Mail-Adresse erneut.";
+            }
+            return "Der Code ist ungültig.";
+        }
+        String newEmail = secret.getPendingEmail();
+        User existing = findByEmail(newEmail);
+        if (existing != null && !existing.getId().equals(userId)) {
+            secret.clearPendingEmail();
+            return "Diese E-Mail-Adresse wird bereits von einem anderen Benutzer verwendet.";
+        }
+        user.setEmail(newEmail);
+        secret.clearPendingEmail();
+        accountSnapshots.invalidate(userId);
+        Telemetry.event("profile.email_changed", "user.id", userId);
+        return null;
+    }
+
+    @Transactional
+    @WithSpan
+    public void cancelEmailChange(Long userId) {
+        User user = em.find(User.class, userId);
+        if (user != null && user.getSecret() != null) {
+            user.getSecret().clearPendingEmail();
+        }
     }
 
     @Transactional
@@ -1063,8 +1206,15 @@ public class UserOrm {
                 em.createQuery("UPDATE User u SET u.mentor = null WHERE u.mentor.id = :uid")
                         .setParameter("uid", userId).executeUpdate();
 
-                // Delete Secret
+                // Delete Secret and every browser session
                 em.createQuery("DELETE FROM Secret s WHERE s.user.id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
+                em.createQuery("DELETE FROM AuthSession s WHERE s.userId = :uid")
+                        .setParameter("uid", userId).executeUpdate();
+                // Contact data
+                em.createQuery("DELETE FROM Phone p WHERE p.user.id = :uid")
+                        .setParameter("uid", userId).executeUpdate();
+                em.createQuery("DELETE FROM Address a WHERE a.userAddress.id = :uid")
                         .setParameter("uid", userId).executeUpdate();
 
                 // Decrement votes in PollOptions
@@ -1109,9 +1259,9 @@ public class UserOrm {
                 em.flush();
                 em.clear();
 
-                // Block the user instead of deleting to prevent OIDC JIT re-provisioning.
-                // Keep email + userName so the OIDC lookup finds this record and
-                // the isBlocked check in UserPrincipalResolver returns 403.
+                // Soft delete blocks the record instead of removing it so OIDC JIT provisioning
+                // cannot recreate it: the OIDC lookup goes by issuer + subject, which stay, and the
+                // isBlocked check in UserPrincipalResolver returns 403. Personal data is removed.
                 user = em.find(User.class, userId);
                 if (user != null) {
                     if (hardDelete) {
@@ -1121,12 +1271,21 @@ public class UserOrm {
                         user.setIsBlocked(true);
                         user.setFirstName("Gelöscht");
                         user.setLastName("Gelöscht");
+                        user.setUserName("geloescht-" + userId);
+                        // Unique and required: a placeholder on a reserved domain that never receives mail.
+                        user.setEmail("geloescht-" + userId + "@deleted.invalid");
                         user.setPhrase(null);
                         user.setPhotoUrl(null);
                         user.setBackgroundUrl(null);
+                        user.setBirthday(null);
+                        user.setLastLoginIp(null);
+                        user.setLastLoginCountry(null);
+                        user.setRibbon(null);
+                        user.revokeTokens();
                         em.merge(user);
                     }
                 }
+                deleteProfileImages(userId);
             } else {
                 em.merge(user);
             }
@@ -1134,7 +1293,23 @@ public class UserOrm {
             return Response.ok("Benutzer erfolgreich gelöscht").build();
         } catch (Exception e) {
             Telemetry.error("Deleting user failed", e, "user.id", userId);
-            return Response.status(500).entity("Fehler beim Löschen des Benutzers: " + e.getMessage()).build();
+            return Response.status(500).entity("Fehler beim Löschen des Benutzers.").build();
+        }
+    }
+
+    /** Removes the profile photo and background; {@code /user/photo/{id}} would serve them to anyone. */
+    private void deleteProfileImages(Long userId) {
+        String home = System.getProperty("user.home");
+        java.nio.file.Path[] files = {
+                java.nio.file.Paths.get(photoUploadDir.replace("${user.home}", home), userId + ".jpg"),
+                java.nio.file.Paths.get(backgroundUploadDir.replace("${user.home}", home), userId + "_background.jpg")
+        };
+        for (java.nio.file.Path file : files) {
+            try {
+                java.nio.file.Files.deleteIfExists(file);
+            } catch (Exception e) {
+                Telemetry.warn("Could not delete profile image of deleted user", e, "user.id", userId);
+            }
         }
     }
 

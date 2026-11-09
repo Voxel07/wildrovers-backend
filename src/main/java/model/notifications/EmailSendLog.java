@@ -8,7 +8,10 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "EMAIL_SEND_LOG")
+@Table(name = "EMAIL_SEND_LOG", indexes = {
+        @jakarta.persistence.Index(name = "IDX_EMAIL_SEND_LOG_CREATED", columnList = "created_at"),
+        @jakarta.persistence.Index(name = "IDX_EMAIL_SEND_LOG_RECIPIENT_CREATED", columnList = "recipient, created_at")
+})
 public class EmailSendLog {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -48,6 +48,7 @@ public class AuthResource {
     @Inject OidcRoleMapper roleMapper;
     @Inject UserPrincipalResolver userPrincipalResolver;
     @Inject SecurityIdentity identity;
+    @Inject tools.RateLimiter rateLimiter;
 
     public static class OidcCallback {
         public String code;
@@ -60,6 +61,13 @@ public class AuthResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response login(User credentials, @HeaderParam("User-Agent") String userAgent) {
+        if (credentials != null) {
+            long retryAfter = rateLimiter.consumeLoginAttempt(
+                    credentials.getUserName() != null ? credentials.getUserName() : credentials.getEmail());
+            if (retryAfter > 0) {
+                return helper.RateLimitFilter.tooManyRequests(retryAfter);
+            }
+        }
         UserOrm.LoginResult result = userOrm.authenticateLocal(credentials);
         if (result.error() != null) {
             return result.error();
@@ -133,6 +141,12 @@ public class AuthResource {
 
         User user = userOrm.findById(session.getUserId());
         if (user == null || user.getTokenVersion() != session.getTokenVersion()) {
+            sessions.revoke(session.getId());
+            return sessionEnded();
+        }
+        // Password sessions of accounts now managed by Authentik would never be re-checked there.
+        if (AuthSession.METHOD_LOCAL.equals(session.getLoginMethod()) && user.isOidcLinked()) {
+            Telemetry.event("auth.local_session_of_oidc_account_ended", "user.id", user.getId());
             sessions.revoke(session.getId());
             return sessionEnded();
         }

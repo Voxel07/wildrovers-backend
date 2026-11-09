@@ -136,6 +136,10 @@ public class User {
     @jakarta.persistence.Transient
     private List<Integer> paidYears = new ArrayList<>();
 
+    /** New address awaiting confirmation; only filled for the account owner's own profile. */
+    @jakarta.persistence.Transient
+    private String pendingEmail;
+
     @Column(name = "canCreateCategory", columnDefinition = "boolean default false")
     private Boolean canCreateCategory = false;
 
@@ -596,6 +600,14 @@ public class User {
     /** True when the account is bound to an Authentik identity; Authentik then owns its role. */
     public boolean isOidcLinked() {
         return oidcSubject != null;
+    }
+
+    public String getPendingEmail() {
+        return pendingEmail;
+    }
+
+    public void setPendingEmail(String pendingEmail) {
+        this.pendingEmail = pendingEmail;
     }
 
     /** Invalidates every local JWT issued for this account so far. */

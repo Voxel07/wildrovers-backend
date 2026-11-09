@@ -69,6 +69,11 @@ public class ForumImageResource {
                 return Response.status(404).entity("Bild nicht gefunden").build();
             }
             cacheControl = "private, max-age=300";
+        } else if (signed) {
+            // A valid signature was issued together with content the reader was allowed to see,
+            // so neither the category nor the reader has to be looked up again.
+            long secondsLeft = Math.max(0L, exp - System.currentTimeMillis() / 1000L);
+            cacheControl = "private, max-age=" + Math.min(86_400L, secondsLeft);
         } else {
             List<String> visibility = em.createQuery(
                     "SELECT c.visibility FROM ForumPost p JOIN p.topic t JOIN t.category c WHERE p.id = :id",
@@ -84,12 +89,10 @@ public class ForumImageResource {
             if (Roles.VSISITOR.equals(required)) {
                 cacheControl = "public, max-age=86400";
             } else {
-                if (!signed) {
-                    User user = currentUser();
-                    if (user == null || !Roles.hasRequiredRole(user.getRole(), required)) {
-                        Telemetry.event("forum.image.access_denied", "forum.post.id", postId, "user.id", user != null ? user.getId() : null);
-                        return Response.status(404).entity("Bild nicht gefunden").build();
-                    }
+                User user = currentUser();
+                if (user == null || !Roles.hasRequiredRole(user.getRole(), required)) {
+                    Telemetry.event("forum.image.access_denied", "forum.post.id", postId, "user.id", user != null ? user.getId() : null);
+                    return Response.status(404).entity("Bild nicht gefunden").build();
                 }
                 cacheControl = "private, max-age=3600";
             }

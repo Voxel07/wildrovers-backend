@@ -43,6 +43,26 @@ public class Secret {
     @Column(name = "resetTokenTimestamp")
     private Long resetTokenTimestamp;
 
+    /** Wrong codes entered for the current verification code; the code is void after {@link #MAX_CODE_ATTEMPTS}. */
+    @Column(name = "verificationAttempts", nullable = false, columnDefinition = "integer default 0")
+    private Integer verificationAttempts = 0;
+
+    /** Address the user asked to switch to; stored as e-mail only once the code sent there is confirmed. */
+    @Column(name = "pendingEmail", length = 320)
+    private String pendingEmail;
+
+    /** SHA-256 of the confirmation code sent to {@link #pendingEmail}. */
+    @Column(name = "pendingEmailCode", length = 64)
+    private String pendingEmailCode;
+
+    @Column(name = "pendingEmailTimestamp")
+    private Long pendingEmailTimestamp;
+
+    @Column(name = "pendingEmailAttempts", nullable = false, columnDefinition = "integer default 0")
+    private Integer pendingEmailAttempts = 0;
+
+    public static final int MAX_CODE_ATTEMPTS = 5;
+
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "user_id", referencedColumnName = "id")
     private User user;
@@ -124,5 +144,63 @@ public class Secret {
 
     public void setResetTokenTimestamp(Long resetTokenTimestamp) {
         this.resetTokenTimestamp = resetTokenTimestamp;
+    }
+
+    @JsonIgnore
+    @JsonbTransient
+    public int getVerificationAttempts() {
+        return verificationAttempts != null ? verificationAttempts : 0;
+    }
+
+    public void setVerificationAttempts(Integer verificationAttempts) {
+        this.verificationAttempts = verificationAttempts;
+    }
+
+    @JsonIgnore
+    @JsonbTransient
+    public String getPendingEmail() {
+        return pendingEmail;
+    }
+
+    public void setPendingEmail(String pendingEmail) {
+        this.pendingEmail = pendingEmail;
+    }
+
+    @JsonIgnore
+    @JsonbTransient
+    public String getPendingEmailCode() {
+        return pendingEmailCode;
+    }
+
+    public void setPendingEmailCode(String pendingEmailCode) {
+        this.pendingEmailCode = pendingEmailCode;
+    }
+
+    @JsonIgnore
+    @JsonbTransient
+    public Long getPendingEmailTimestamp() {
+        return pendingEmailTimestamp;
+    }
+
+    public void setPendingEmailTimestamp(Long pendingEmailTimestamp) {
+        this.pendingEmailTimestamp = pendingEmailTimestamp;
+    }
+
+    @JsonIgnore
+    @JsonbTransient
+    public int getPendingEmailAttempts() {
+        return pendingEmailAttempts != null ? pendingEmailAttempts : 0;
+    }
+
+    public void setPendingEmailAttempts(Integer pendingEmailAttempts) {
+        this.pendingEmailAttempts = pendingEmailAttempts;
+    }
+
+    /** Drops a pending e-mail change. */
+    public void clearPendingEmail() {
+        this.pendingEmail = null;
+        this.pendingEmailCode = null;
+        this.pendingEmailTimestamp = null;
+        this.pendingEmailAttempts = 0;
     }
 }

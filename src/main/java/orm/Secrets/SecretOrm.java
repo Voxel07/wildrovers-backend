@@ -57,44 +57,53 @@ public class SecretOrm {
         return String.valueOf(code);
     }
 
+    public static final String VERIFIED = "Erfolgreich validiert";
+    /** One answer for every failure, so the endpoint does not reveal which addresses are registered. */
+    public static final String VERIFICATION_FAILED =
+            "Der Code ist ungültig oder abgelaufen. Fordere bei Bedarf einen neuen Code an.";
+    private static final long VERIFICATION_TTL_MS = 5 * 60 * 1000L;
+
     @Transactional
     @WithSpan
     public String verifyUser(String email, String verificationId)
     {
+        User user = email != null ? userOrm.findByEmail(email.trim()) : null;
+        Secret secret = user != null ? user.getSecret() : null;
+        if (secret == null || secret.getVerificationId() == null) {
+            Telemetry.event("verification.rejected", "verification.reason", "no_code");
+            return VERIFICATION_FAILED;
+        }
+        boolean matches = verificationId != null && MessageDigest.isEqual(
+                secret.getVerificationId().getBytes(StandardCharsets.UTF_8),
+                verificationId.trim().getBytes(StandardCharsets.UTF_8));
 
-        User user = userOrm.findByEmail(email);
-        if (user == null) {
-            Telemetry.event("verification.user_not_found");
-            return "Der User wurde nicht gefunden";
+        // A repeated submit of the right code after success is not an error.
+        if (Boolean.TRUE.equals(secret.getIsVerifyed())) {
+            return matches ? VERIFIED : VERIFICATION_FAILED;
         }
-        if (user.getSecret() == null) {
-            return "Keine Verifizierungsdaten vorhanden";
+
+        Long timestamp = secret.getVerificationTimestamp();
+        boolean expired = timestamp != null && tools.Time.currentTimeInMillis() - timestamp > VERIFICATION_TTL_MS;
+        if (expired || secret.getVerificationAttempts() >= Secret.MAX_CODE_ATTEMPTS) {
+            Telemetry.event("verification.rejected", "verification.reason", expired ? "expired" : "attempts_exhausted");
+            return VERIFICATION_FAILED;
         }
-        if (Boolean.TRUE.equals(user.getSecret().getIsVerifyed())) {
-            return "User ist bereits verifiziert";
-        }
-        
-        Long timestamp = user.getSecret().getVerificationTimestamp();
-        if (timestamp != null) {
-            long elapsed = tools.Time.currentTimeInMillis() - timestamp;
-            if (elapsed > 5 * 60 * 1000) {
-                return "Der Code ist abgelaufen";
+
+        if (!matches) {
+            int attempts = secret.getVerificationAttempts() + 1;
+            secret.setVerificationAttempts(attempts);
+            if (attempts >= Secret.MAX_CODE_ATTEMPTS) {
+                // Five wrong guesses void the code; a new one has to be requested.
+                secret.setVerificationId(null);
+                Telemetry.warn("Verification code entered wrongly too often", "user.id", user.getId(),
+                        "security.event", "verification_code_exhausted");
             }
+            return VERIFICATION_FAILED;
         }
 
-        if (user.getSecret().getVerificationId() == null || !user.getSecret().getVerificationId().equals(verificationId)) {
-            return "ID stimmt nicht";
-        }
-        
-        user.getSecret().setIsVerifyed(true);
-
-        try {
-            em.merge(user);
-        } catch (Exception e) {
-            Telemetry.error("Account verification failed", e);
-            return "Fehler beim update";
-        }
-        return "Erfolgreich validiert";
+        secret.setIsVerifyed(true);
+        secret.setVerificationAttempts(0);
+        return VERIFIED;
     }
 
     /** Stores a new hashed reset token for the account with this e-mail; returns the raw token or null. */
@@ -106,6 +115,11 @@ public class SecretOrm {
                 .setMaxResults(1)
                 .getResultList();
         if (users.isEmpty() || users.get(0).getSecret() == null) {
+            return null;
+        }
+        // Authentik owns linked accounts; a local password would outlive a block or group change there.
+        if (users.get(0).isOidcLinked()) {
+            Telemetry.event("password_reset.oidc_account_skipped", "user.id", users.get(0).getId());
             return null;
         }
         String token = java.util.UUID.randomUUID().toString();
