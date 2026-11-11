@@ -24,7 +24,7 @@ RUN ./mvnw -B -ntp package -Pnative -DskipTests \
     -Dquarkus.native.native-image-xmx=${NATIVE_IMAGE_XMX}
 
 # Keep the runtime on the same UBI major version as the native builder.
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.8
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.9
 
 # Image uploads use AWT/ImageIO, including native shared libraries from the build.
 RUN microdnf install -y freetype fontconfig && microdnf clean all \
