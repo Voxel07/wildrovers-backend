@@ -36,6 +36,15 @@ public class NotificationItem {
     /** Minimum application role allowed to learn about this item (e.g. forum category visibility). */
     @Column(name = "required_role", length = 20)
     private String requiredRole;
+    /** Account that caused the item; it never receives its own notification. */
+    @Column(name = "actor_user_id")
+    private Long actorUserId;
+    /**
+     * When the e-mail recipients are determined (the next morning run). E-mail receipts are only
+     * created then, from the preferences, roles and event state at that moment. NULL once done.
+     */
+    @Column(name = "email_fanout_at")
+    private Long emailFanoutAt;
 
     public Long getId() { return id; }
     public String getResourceType() { return resourceType; }
@@ -58,4 +67,8 @@ public class NotificationItem {
     public void setRequiresResponse(boolean requiresResponse) { this.requiresResponse = requiresResponse; }
     public String getRequiredRole() { return requiredRole == null || requiredRole.isBlank() ? model.Users.Roles.VSISITOR : requiredRole; }
     public void setRequiredRole(String requiredRole) { this.requiredRole = requiredRole; }
+    public Long getActorUserId() { return actorUserId; }
+    public void setActorUserId(Long actorUserId) { this.actorUserId = actorUserId; }
+    public Long getEmailFanoutAt() { return emailFanoutAt; }
+    public void setEmailFanoutAt(Long emailFanoutAt) { this.emailFanoutAt = emailFanoutAt; }
 }

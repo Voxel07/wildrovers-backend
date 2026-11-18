@@ -94,6 +94,8 @@ public class UserResouce {
             return Response.status(401).entity("Benutzer nicht eingeloggt oder unbekannt").build();
         }
         user.setPendingEmail(userOrm.findPendingEmail(user.getId()));
+        // The account comes from findById, which does not compute the yearly-fee fields.
+        userOrm.populateYearlyFees(user);
         if (!stats) {
             return Response.ok(user).build();
         }

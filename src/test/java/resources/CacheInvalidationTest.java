@@ -44,6 +44,14 @@ public class CacheInvalidationTest {
     @Inject
     TestDbHelper dbHelper;
 
+    @org.junit.jupiter.api.AfterEach
+    @Transactional
+    void cleanup() {
+        // Leave no rows that reference the test users; later test classes delete all users.
+        em.createNativeQuery("DELETE FROM \"EVENT\"").executeUpdate();
+        em.createNativeQuery("DELETE FROM \"GALLERY\"").executeUpdate();
+    }
+
     @BeforeEach
     @Transactional
     void setup() {

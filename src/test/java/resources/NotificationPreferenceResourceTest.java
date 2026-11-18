@@ -42,6 +42,15 @@ class NotificationPreferenceResourceTest {
         }
     }
 
+    @org.junit.jupiter.api.AfterEach
+    @Transactional
+    void cleanup() {
+        em.createQuery("DELETE FROM NotificationReceipt").executeUpdate();
+        em.createQuery("DELETE FROM NotificationItem").executeUpdate();
+        em.createQuery("DELETE FROM NotificationPreference p WHERE p.user.id IN (950, 951, 952, 953)").executeUpdate();
+        em.createQuery("DELETE FROM UserWebhook w WHERE w.user.id IN (950, 951, 952, 953)").executeUpdate();
+    }
+
     @Test
     void anonymousCannotReadPreferences() {
         given().get("/user/me/notifications").then().statusCode(401);
@@ -150,12 +159,43 @@ class NotificationPreferenceResourceTest {
         notificationService.recordSignup(em.find(model.User.class, 953L), "https://wildrovers.example");
         em.flush();
 
-        List<Long> recipientIds = em.createQuery(
-                "SELECT r.user.id FROM NotificationReceipt r WHERE r.item.resourceType = 'SIGNUP' ORDER BY r.user.id",
-                Long.class).getResultList();
-        assertEquals(List.of(951L, 952L), recipientIds);
+        // Webhook receipts exist at once; e-mail recipients are only chosen at the morning run.
+        assertEquals(List.of(952L), signupRecipients());
         assertEquals(1, notificationService.dueDigestBatches("WEBHOOK").size());
         assertEquals(0, notificationService.dueDigestBatches("EMAIL").size());
+
+        makeMorningRunDue();
+        assertEquals(1, notificationService.prepareDueEmails());
+        em.flush();
+        assertEquals(List.of(951L, 952L), signupRecipients());
+        assertEquals(1, notificationService.dueDigestBatches("EMAIL").size());
+    }
+
+    @Test
+    @Transactional
+    void subscriberWhoLostTheRoleBeforeTheMorningRunGetsNoMail() {
+        persistPreference(951L, "SIGNUP", true, false);
+        notificationService.recordSignup(em.find(model.User.class, 953L), "https://wildrovers.example");
+        em.createQuery("UPDATE User u SET u.role = 'Mitglied' WHERE u.id = 951").executeUpdate();
+        try {
+            makeMorningRunDue();
+            assertEquals(0, notificationService.prepareDueEmails());
+            assertEquals(List.of(), signupRecipients());
+        } finally {
+            em.createQuery("UPDATE User u SET u.role = 'Admin' WHERE u.id = 951").executeUpdate();
+        }
+    }
+
+    private List<Long> signupRecipients() {
+        return em.createQuery(
+                "SELECT r.user.id FROM NotificationReceipt r WHERE r.item.resourceType = 'SIGNUP' ORDER BY r.user.id",
+                Long.class).getResultList();
+    }
+
+    private void makeMorningRunDue() {
+        em.createQuery("UPDATE NotificationItem i SET i.emailFanoutAt = :due WHERE i.emailFanoutAt IS NOT NULL")
+                .setParameter("due", System.currentTimeMillis() - 1).executeUpdate();
+        em.clear();
     }
 
     @Test

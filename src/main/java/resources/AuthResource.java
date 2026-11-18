@@ -204,15 +204,34 @@ public class AuthResource {
         if (expiresAt != null && expiresAt > System.currentTimeMillis()) return true;
         String idpRefreshToken = sessions.decryptIdpRefreshToken(session);
         if (idpRefreshToken == null) return true;
+        io.quarkus.logging.Log.infof(
+                "Re-checking Authentik account mapping for userId=%s session=%s: identity-provider access token %s",
+                session.getUserId(), session.getId(),
+                expiresAt == null ? "has no known expiry" : "expired at " + java.time.Instant.ofEpochMilli(expiresAt));
         try {
             OidcClient.Tokens tokens = oidcClient.refresh(idpRefreshToken);
             sessions.updateIdpTokens(session.getId(), tokens.refreshToken(), tokens.accessExpiresAt());
             UserOrm.OidcResolution resolution = userOrm.resolveOidcUser(profile(tokens), roleMapper.mapToRole(tokens.groups()));
-            return resolution.user() != null && resolution.user().getId().equals(session.getUserId());
+            if (resolution.user() == null) {
+                io.quarkus.logging.Log.warnf("Authentik re-check ended session %s of userId=%s: %s",
+                        session.getId(), session.getUserId(), resolution.problem());
+                return false;
+            }
+            if (!resolution.user().getId().equals(session.getUserId())) {
+                io.quarkus.logging.Log.warnf(
+                        "Authentik re-check ended session %s: identity now maps to userId=%s instead of userId=%s",
+                        session.getId(), resolution.user().getId(), session.getUserId());
+                return false;
+            }
+            return true;
         } catch (OidcClient.GrantRejectedException e) {
+            io.quarkus.logging.Log.infof("Authentik re-check ended session %s of userId=%s: refresh token rejected (%s)",
+                    session.getId(), session.getUserId(), e.getMessage());
             Telemetry.event("oidc.session_ended_by_idp", "auth.session.id", session.getId(), "user.id", session.getUserId(), "reason", e.getMessage());
             return false;
         } catch (Exception e) {
+            io.quarkus.logging.Log.warnf("Authentik re-check for session %s skipped, identity provider unreachable: %s",
+                    session.getId(), e.toString());
             Telemetry.warn("Identity provider unreachable while refreshing session", e, "auth.session.id", session.getId());
             return true;
         }

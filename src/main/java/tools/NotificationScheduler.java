@@ -26,6 +26,13 @@ public class NotificationScheduler {
 
     @Scheduled(every = "${notification.mail.delivery-interval:15s}", concurrentExecution = SKIP)
     void deliverEmails() {
+        try {
+            // Recipients and content are decided now, right before sending, not when the item was recorded.
+            notifications.prepareDueEmails();
+        } catch (Exception e) {
+            Telemetry.warn("Preparing due notification e-mails failed", e);
+            io.quarkus.logging.Log.warn("Preparing due notification e-mails failed", e);
+        }
         java.util.List<NotificationService.DeliveryBatch> emailEvents = notifications.dueEventBatches("EMAIL");
         if (!emailEvents.isEmpty()) {
             deliver(emailEvents.subList(0, 1), "EMAIL", "Wild Rovers - Event-Benachrichtigung", "event.notification");

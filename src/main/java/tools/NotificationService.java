@@ -41,8 +41,11 @@ public class NotificationService {
     }
 
     /**
-     * Records an item and fans it out to subscribers. Only active, unblocked accounts whose
-     * role satisfies {@code requiredRole} receive a receipt; delivery re-checks this.
+     * Records an item. Webhook subscribers get their receipt now (webhooks are immediate).
+     * E-mail recipients are not chosen here: {@link #prepareDueEmails()} picks them at the next
+     * morning run from the preferences, roles and event state at that moment.
+     * Only active, unblocked accounts whose role satisfies {@code requiredRole} receive a receipt;
+     * delivery re-checks this.
      */
     @Transactional
     public void record(String resourceType, String action, Long entityId, String title, String targetUrl,
@@ -67,28 +70,126 @@ public class NotificationService {
         item.setEventStartAt(eventStartAt);
         item.setRequiresResponse(requiresResponse);
         item.setRequiredRole(audience);
+        item.setActorUserId(actorUserId);
+        item.setEmailFanoutAt(nextDigestAt(now));
         em.persist(item);
 
-        List<NotificationPreference> subscribers = em.createQuery(
-                "SELECT p FROM NotificationPreference p JOIN FETCH p.user u "
-                        + "WHERE p.resourceType = :type AND (p.emailEnabled = true OR p.webhookEnabled = true) "
-                        + "AND u.role IN :roles AND u.isActive = true AND (u.isBlocked IS NULL OR u.isBlocked = false)",
-                NotificationPreference.class)
-                .setParameter("type", resourceType)
-                .setParameter("roles", rolesAtLeast(audience))
-                .getResultList();
-        for (NotificationPreference preference : subscribers) {
+        for (NotificationPreference preference : subscribers(resourceType, audience, "p.webhookEnabled = true")) {
             if (actorUserId != null && actorUserId.equals(preference.getUser().getId()))
                 continue;
             NotificationReceipt receipt = new NotificationReceipt();
             receipt.setUser(preference.getUser());
             receipt.setItem(item);
-            receipt.setEmailRequested(preference.isEmailEnabled());
-            receipt.setWebhookRequested(preference.isWebhookEnabled());
-            receipt.setEmailNextAttemptAt("EVENT".equals(resourceType) ? now : nextDigestAt(now));
+            receipt.setEmailRequested(false);
+            receipt.setWebhookRequested(true);
             receipt.setWebhookNextAttemptAt(now);
             em.persist(receipt);
         }
+    }
+
+    /**
+     * Decides, right before sending, who gets an e-mail for each item whose morning run is due:
+     * current preferences, roles and account status, and for events the current event state.
+     * Items that became pointless (event deleted, superseded by a newer change) are dropped.
+     *
+     * @return number of e-mail receipts that became due
+     */
+    @Transactional
+    public int prepareDueEmails() {
+        long now = System.currentTimeMillis();
+        List<NotificationItem> items = em.createQuery(
+                "SELECT i FROM NotificationItem i WHERE i.emailFanoutAt IS NOT NULL AND i.emailFanoutAt <= :now "
+                        + "ORDER BY i.occurredAt, i.id",
+                NotificationItem.class).setParameter("now", now).getResultList();
+        int prepared = 0;
+        for (NotificationItem item : items) {
+            item.setEmailFanoutAt(null);
+            String skipReason = obsoleteReason(item, items);
+            if (skipReason != null) {
+                io.quarkus.logging.Log.infof("E-mail for notification item %s (%s %s %s) skipped: %s",
+                        item.getId(), item.getResourceType(), item.getActionType(), item.getEntityId(), skipReason);
+                Telemetry.event("notification.email_skipped", "notification.item.id", item.getId(), "reason", skipReason);
+                continue;
+            }
+            if ("EVENT".equals(item.getResourceType()) && !"DELETED".equals(item.getActionType())) {
+                Event event = em.find(Event.class, item.getEntityId());
+                if (event.getTitle() != null && !event.getTitle().isBlank()) {
+                    item.setTitle(event.getTitle());
+                }
+            }
+            int recipients = 0;
+            for (NotificationPreference preference : subscribers(item.getResourceType(), item.getRequiredRole(),
+                    "p.emailEnabled = true")) {
+                Long userId = preference.getUser().getId();
+                if (userId.equals(item.getActorUserId()))
+                    continue;
+                if ("EVENT".equals(item.getResourceType()) && item.isRequiresResponse() && hasResponded(userId, item.getEntityId()))
+                    continue;
+                List<NotificationReceipt> existing = em.createQuery(
+                        "SELECT r FROM NotificationReceipt r WHERE r.user.id = :userId AND r.item.id = :itemId",
+                        NotificationReceipt.class)
+                        .setParameter("userId", userId).setParameter("itemId", item.getId()).getResultList();
+                NotificationReceipt receipt;
+                if (existing.isEmpty()) {
+                    receipt = new NotificationReceipt();
+                    receipt.setUser(preference.getUser());
+                    receipt.setItem(item);
+                    receipt.setWebhookRequested(false);
+                    em.persist(receipt);
+                } else {
+                    receipt = existing.get(0);
+                    if (receipt.getAcknowledgedAt() != null)
+                        continue;
+                }
+                receipt.setEmailRequested(true);
+                receipt.setEmailNextAttemptAt(now);
+                recipients++;
+            }
+            prepared += recipients;
+            io.quarkus.logging.Log.infof("E-mail for notification item %s (%s %s %s) prepared for %d recipient(s)",
+                    item.getId(), item.getResourceType(), item.getActionType(), item.getEntityId(), recipients);
+        }
+        return prepared;
+    }
+
+    /** Why an item due for e-mail should not be sent any more, or null if it should. */
+    private String obsoleteReason(NotificationItem item, List<NotificationItem> due) {
+        if (!"EVENT".equals(item.getResourceType()))
+            return null;
+        String action = item.getActionType();
+        Long entityId = item.getEntityId();
+        if (!"DELETED".equals(action) && em.find(Event.class, entityId) == null)
+            return "event was deleted in the meantime";
+        for (NotificationItem other : due) {
+            if (other == item || !"EVENT".equals(other.getResourceType()) || !entityId.equals(other.getEntityId()))
+                continue;
+            if ("UPDATED".equals(action) && "CREATED".equals(other.getActionType()))
+                return "event is announced as new in the same run";
+            if ("UPDATED".equals(action) && "UPDATED".equals(other.getActionType())
+                    && (other.getOccurredAt() > item.getOccurredAt()
+                            || (other.getOccurredAt() == item.getOccurredAt() && other.getId() > item.getId())))
+                return "superseded by a newer change in the same run";
+            if ("DELETED".equals(action) && "CREATED".equals(other.getActionType()))
+                return "event was created and deleted before anyone was told";
+        }
+        return null;
+    }
+
+    private boolean hasResponded(Long userId, Long eventId) {
+        return em.createQuery(
+                "SELECT COUNT(a) FROM EventAttendance a WHERE a.event.id = :eventId AND a.user.id = :userId", Long.class)
+                .setParameter("eventId", eventId).setParameter("userId", userId).getSingleResult() > 0;
+    }
+
+    private List<NotificationPreference> subscribers(String resourceType, String audience, String channelCondition) {
+        return em.createQuery(
+                "SELECT p FROM NotificationPreference p JOIN FETCH p.user u "
+                        + "WHERE p.resourceType = :type AND " + channelCondition + " "
+                        + "AND u.role IN :roles AND u.isActive = true AND (u.isBlocked IS NULL OR u.isBlocked = false)",
+                NotificationPreference.class)
+                .setParameter("type", resourceType)
+                .setParameter("roles", rolesAtLeast(audience))
+                .getResultList();
     }
 
     @Transactional

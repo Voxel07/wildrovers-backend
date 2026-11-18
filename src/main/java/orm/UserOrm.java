@@ -289,6 +289,12 @@ public class UserOrm {
         }
     }
 
+    /** Fills hasPaidCurrentYear and paidYears for an account loaded without them (e.g. via findById). */
+    @WithSpan
+    public void populateYearlyFees(User user) {
+        if (user != null) populateYearlyFees(List.of(user));
+    }
+
     /**
      * Populates transient fields hasPaidCurrentYear and paidYears on each user.
      */
@@ -445,8 +451,14 @@ public class UserOrm {
             User existing = findByEmail(email);
             if (existing != null) {
                 if (existing.getOidcSubject() != null || !profile.emailVerified()) {
-                    Telemetry.warn("OIDC identity cannot be linked to account (already bound or e-mail not verified)",
-                            "user.id", existing.getId(), "oidc.issuer", profile.issuer(), "oidc.email_verified", profile.emailVerified());
+                    String reason = existing.getOidcSubject() != null
+                            ? "account with this e-mail is already bound to another identity-provider subject"
+                            : "identity provider did not assert email_verified=true";
+                    Telemetry.warn("OIDC identity cannot be linked to account",
+                            "user.id", existing.getId(), "oidc.issuer", profile.issuer(), "oidc.email_verified", profile.emailVerified(),
+                            "oidc.account_already_bound", existing.getOidcSubject() != null, "reason", reason);
+                    io.quarkus.logging.Log.warnf("OIDC link refused for userId=%s (issuer=%s): %s",
+                            existing.getId(), profile.issuer(), reason);
                     return new OidcResolution(null,
                             "Dieses Anmeldekonto kann keinem Benutzer zugeordnet werden. Bitte wende dich an den Vorstand.");
                 }
