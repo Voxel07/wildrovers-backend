@@ -128,6 +128,49 @@ class PollDateEventTest {
                 .body("[0].polls.find { it.id == " + pollId + " }.options.find { it.optionText == 'Freitext' }.optionDate", nullValue());
     }
 
+    /** The update response must list the options as saved, not the ones loaded before the update. */
+    @Test @TestSecurity(user = "pollOwner", roles = {"Mitglied"})
+    void updateReturnsAddedAndDropsRemovedOptions() {
+        List<Long> optionIds = createWeekendPoll();
+        Long pollId = pollIdOf(optionIds.get(0));
+        Long kept = optionIds.get(0);
+        Long removed = optionIds.get(1);
+        given().queryParam("poll", pollId).queryParam("option", kept)
+                .post("/forum/poll/vote").then().statusCode(200);
+        setEventId(kept, 4242L);
+
+        String update = "{\"question\":\"Welches Wochenende?\",\"options\":["
+                + "{\"id\":" + kept + ",\"optionText\":\"Wochenende 0\",\"optionDate\":\"2031-11-08\",\"optionEndDate\":\"2031-11-09\"},"
+                + "{\"id\":null,\"optionText\":\"Neu\",\"optionDate\":\"2031-11-29\"}]}";
+        var response = given().contentType(ContentType.JSON).queryParam("poll", pollId).body(update)
+                .post("/forum/poll/update").then().statusCode(200)
+                .body("id", is(pollId.intValue()))
+                .body("question", is("Welches Wochenende?"))
+                .body("options.size()", is(2))
+                .body("options.find { it.id == " + removed + " }", nullValue())
+                .body("options.find { it.id == " + kept + " }.votes", is(1))
+                .body("options.find { it.id == " + kept + " }.eventId", is(4242))
+                .body("options.find { it.id == " + kept + " }.optionEndDate", is("2031-11-09"))
+                .body("options.find { it.optionText == 'Neu' }.votes", is(0))
+                .body("options.find { it.optionText == 'Neu' }.optionDate", is("2031-11-29"))
+                .body("options.find { it.optionText == 'Neu' }.eventId", nullValue())
+                .extract();
+        Number added = response.path("options.find { it.optionText == 'Neu' }.id");
+        assertNotNull(added);
+        assertEquals(List.of(kept, added.longValue()), storedOptionIds(pollId));
+    }
+
+    @Transactional
+    void setEventId(Long optionId, Long eventId) {
+        em.find(PollOptions.class, optionId).setEventId(eventId);
+    }
+
+    @Transactional
+    List<Long> storedOptionIds(Long pollId) {
+        return em.createQuery("SELECT o.id FROM PollOptions o WHERE o.poll.id = :pollId ORDER BY o.id", Long.class)
+                .setParameter("pollId", pollId).getResultList();
+    }
+
     @Test @TestSecurity(user = "pollOther", roles = {"Mitglied"})
     void voteReturnsPollWithOptions() {
         List<Long> optionIds = createWeekendPoll();

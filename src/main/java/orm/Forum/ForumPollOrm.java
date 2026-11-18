@@ -296,6 +296,9 @@ public class ForumPollOrm {
 
         // Collect IDs of options that should remain
         java.util.Set<Long> keptOptionIds = new java.util.HashSet<>();
+        // New options join poll.getOptions() only after the removal loop below: they get their id on
+        // persist, which is not in keptOptionIds.
+        List<PollOptions> newOptions = new java.util.ArrayList<>();
         if (updatedPoll.getOptions() != null) {
             for (PollOptions incoming : updatedPoll.getOptions()) {
                 if (incoming.getId() != null) {
@@ -314,24 +317,28 @@ public class ForumPollOrm {
                     incoming.setVotes(0L);
                     incoming.setEventId(null);
                     em.persist(incoming);
+                    newOptions.add(incoming);
                 }
             }
         }
 
-        // Delete options that were removed from the update payload
-        for (PollOptions existing : poll.getOptions()) {
+        // Delete options that were removed from the update payload. They also leave poll.getOptions(),
+        // which is the list the response is built from (em.find would return this same instance).
+        java.util.Iterator<PollOptions> optionIterator = poll.getOptions().iterator();
+        while (optionIterator.hasNext()) {
+            PollOptions existing = optionIterator.next();
             if (!keptOptionIds.contains(existing.getId())) {
                 // Delete votes for this option first
                 em.createNativeQuery("DELETE FROM FORUM_POLL_OPTION_VOTES WHERE option_id = :optId")
                     .setParameter("optId", existing.getId()).executeUpdate();
+                optionIterator.remove();
                 em.remove(existing);
             }
         }
+        poll.getOptions().addAll(newOptions);
 
         em.flush();
-        // Return fresh poll data
-        Polls refreshed = em.find(Polls.class, pollId);
-        return Response.ok(refreshed).build();
+        return Response.ok(poll).build();
     }
 
     @Transactional
