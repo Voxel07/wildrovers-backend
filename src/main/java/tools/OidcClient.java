@@ -134,9 +134,19 @@ public class OidcClient {
         }
         long expiresIn = response.containsKey("expires_in") ? response.getJsonNumber("expires_in").longValue() : 300L;
         String refreshToken = response.getString("refresh_token", previousRefreshToken);
+        // Both tokens are signed by the same issuer and validated above; either may carry the claim.
+        boolean emailVerified = isTrue(claim(primary, "email_verified")) || (access != null && isTrue(claim(access, "email_verified")));
+        if (!emailVerified) {
+            Object raw = claim(primary, "email_verified");
+            io.quarkus.logging.Log.warnf(
+                    "OIDC tokens without email_verified=true: checked=%s value=%s (type %s) accessToken=%s; claims in checked token: %s",
+                    idToken != null ? "id_token" : "access_token", raw, raw == null ? "missing" : raw.getClass().getName(),
+                    access == null ? "not a JWT or not sent" : "email_verified=" + claim(access, "email_verified"),
+                    new java.util.TreeSet<>(primary.getClaimNames()));
+        }
         return new Tokens(primary.getIssuer(), primary.getSubject(),
                 string(primary, "preferred_username"), string(primary, "email"),
-                Boolean.parseBoolean(String.valueOf(claim(primary, "email_verified"))),
+                emailVerified,
                 string(primary, "given_name"), string(primary, "family_name"),
                 groups, refreshToken, System.currentTimeMillis() + expiresIn * 1000L);
     }
@@ -163,6 +173,14 @@ public class OidcClient {
 
     private static Object claim(JsonWebToken jwt, String name) {
         return jwt.getClaim(name);
+    }
+
+    /** A boolean claim may arrive as Boolean, as JSON true or as the string "true". */
+    private static boolean isTrue(Object value) {
+        if (value instanceof Boolean b) return b;
+        if (value == JsonValue.TRUE) return true;
+        if (value instanceof JsonString s) return Boolean.parseBoolean(s.getString().trim());
+        return value != null && Boolean.parseBoolean(String.valueOf(value).trim());
     }
 
     private static String string(JsonWebToken jwt, String name) {
